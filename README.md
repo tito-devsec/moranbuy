@@ -4,7 +4,7 @@ MoranBuy is an AI-powered reverse marketplace. Customers describe the product th
 budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
 matches to the customer, prioritizing budget fit and total cost before location convenience.
 
-> Build status: Phase 6 of 15 done. The reverse-marketplace engine, budget-first ranking, Muse Spark
+> Build status: Phase 9 of 15 done. The reverse-marketplace engine, budget-first ranking, Muse Spark
 > client, customer web chat and the signed WhatsApp intake from Moran AI are implemented and tested.
 > Merchant platform, campaign engine, follow-up engine, consent management and the admin app are
 > being built phase by phase. `HACKATHON_CHANGES.md` says exactly what works today.
@@ -137,7 +137,8 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 
 ## Known limitations (today)
 
-- Campaigns, outreach, follow-up, consent and the admin app are not built yet.
+- The admin app, Moran-side drop-ins and Hermes research skill are not built yet (Phase 10).
+- The WhatsApp provider rate for campaign pricing must be configured by an administrator; until then campaigns cannot be paid.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - Muse Spark is in US public preview; access needs a Meta Model API key.
 - Live campaign and follow-up sending stays in dry-run until every gate is verified in production.

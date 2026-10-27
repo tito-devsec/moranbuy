@@ -193,9 +193,78 @@
         </div>
       </div>
 
-      <div x-show="tab === 'Campaigns'" class="bg-white rounded-xl border p-5 text-sm">
-        <h3 class="font-semibold mb-2">Campaigns, new-product outreach and follow-up</h3>
-        <p>These services are built in the next phase. When active, they appear here. A paid service shows as <em>active · paid</em> under Services once payment is verified.</p>
+      <div x-show="tab === 'Campaigns'" class="space-y-4">
+        <div class="bg-white rounded-xl border p-5 text-sm">
+          <h3 class="font-semibold mb-1">Sender</h3>
+          <p x-text="senderInfo?.eligible ? 'Campaigns send from your own connected WhatsApp number through Moran AI.' : (senderInfo?.message || '')"></p>
+          <p class="text-xs text-gray-500 mt-1">Every campaign passes these gates before anything is queued: active service, verified payment, eligible sender, approved template, approved draft, consented recipients, rate limit, configured pricing. Then you confirm.</p>
+        </div>
+        <div class="bg-white rounded-xl border p-5">
+          <div class="flex justify-between items-center mb-2"><h3 class="font-semibold">Templates</h3><button class="px-3 py-1.5 rounded-lg border text-sm" @click="newTemplate()">New template</button></div>
+          <ul class="text-sm divide-y">
+            <template x-for="t in templates" :key="t.id"><li class="py-2 flex justify-between items-center"><span><span x-text="t.name"></span> <span class="text-xs text-gray-500" x-text="`${t.language} · ${t.headerFormat}`"></span></span><span class="flex items-center gap-2"><span class="font-mono text-xs" x-text="t.status"></span><button class="underline" x-show="['draft','rejected','unavailable'].includes(t.status)" @click="submitTemplate(t)">Submit</button><button class="underline" x-show="t.status === 'pending'" @click="refreshTemplate(t)">Refresh</button></span></li></template>
+          </ul>
+          <p class="text-xs text-gray-500 mt-2">Approval comes only from Meta through Moran AI; MoranBuy never marks a template approved itself.</p>
+        </div>
+        <div class="bg-white rounded-xl border p-5">
+          <div class="flex justify-between items-center mb-2"><h3 class="font-semibold">New-product outreach offers</h3></div>
+          <ul class="text-sm divide-y">
+            <template x-for="o in offers" :key="o.id"><li class="py-2 flex justify-between items-center"><span><span x-text="o.listingName"></span> <span class="text-xs text-gray-500" x-text="MoranBuy.money(o.listingPrice, o.listingCurrency)"></span></span><span class="flex items-center gap-2"><span class="font-mono text-xs" x-text="o.status"></span><template x-if="o.status === 'offered'"><span><button class="underline mr-2" @click="answerOffer(o, true)">Yes, draft a promotion</button><button class="underline" @click="answerOffer(o, false)">No</button></span></template></span></li></template>
+          </ul>
+          <p class="text-xs text-gray-500 mt-2" x-show="!offers.length">When you publish a product, MoranBuy asks here before drafting any promotion. Nothing is sent by publishing.</p>
+        </div>
+        <div class="bg-white rounded-xl border p-5">
+          <div class="flex justify-between items-center mb-2"><h3 class="font-semibold">Campaigns</h3><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm" @click="newCampaign()">New campaign</button></div>
+          <ul class="text-sm divide-y">
+            <template x-for="c in campaigns" :key="c.id">
+              <li class="py-3">
+                <div class="flex justify-between"><span class="font-medium" x-text="c.name"></span><span class="font-mono text-xs" x-text="c.status + (c.dryRun ? ' · dry run' : '')"></span></div>
+                <div class="text-xs text-gray-500" x-text="`${c.kind} · queued ${c.counts.queued}, sent ${c.counts.sent}, failed ${c.counts.failed}, skipped ${c.counts.skipped}`"></div>
+                <p class="mt-1 whitespace-pre-wrap" x-text="c.draftBody || '(no message yet)'"></p>
+                <div class="text-xs mt-1" x-show="c.pricing && c.pricing.recipients !== undefined" x-text="`Recipients ${c.pricing.recipients} · provider ${c.pricing.providerTotal === null ? 'rate not configured' : MoranBuy.money(c.pricing.providerTotal)} · MoranBuy fee ${MoranBuy.money(c.pricing.serviceFee)} · tax ${MoranBuy.money(c.pricing.taxes)} · estimated total ${c.pricing.estimatedTotal === null ? 'unknown' : MoranBuy.money(c.pricing.estimatedTotal)}`"></div>
+                <div class="flex gap-2 flex-wrap mt-2">
+                  <button class="underline" x-show="['draft','approved','priced','awaiting_payment'].includes(c.status)" @click="act(c, 'draft', {})">Draft with Muse</button>
+                  <button class="underline" x-show="['draft','approved','priced','awaiting_payment'].includes(c.status)" @click="revise(c)">Revise</button>
+                  <button class="underline" x-show="['draft','approved','priced','awaiting_payment'].includes(c.status)" @click="editBody(c)">Edit text</button>
+                  <button class="underline" x-show="c.status === 'draft' && c.draftBody" @click="act(c, 'approve')">Approve draft</button>
+                  <button class="underline" x-show="['approved','priced'].includes(c.status)" @click="act(c, 'price')">Audience and cost</button>
+                  <button class="underline" x-show="c.status === 'priced'" @click="pay(c)">Pay</button>
+                  <button class="underline" x-show="['awaiting_payment','paid','ready'].includes(c.status)" @click="act(c, 'readiness')">Check gates</button>
+                  <button class="underline font-semibold" x-show="c.status === 'ready'" @click="confirmSend(c)">Confirm and send</button>
+                  <button class="underline" x-show="c.status === 'dispatching'" @click="act(c, 'pause')">Pause</button>
+                  <button class="underline" x-show="c.status === 'paused'" @click="act(c, 'resume')">Resume</button>
+                </div>
+                <pre class="text-xs bg-gray-50 rounded p-2 mt-2 overflow-x-auto" x-show="c.gateResults && Object.keys(c.gateResults).length" x-text="JSON.stringify(c.gateResults, null, 1)"></pre>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </div>
+
+      <div x-show="tab === 'Follow-up'" class="space-y-4">
+        <div class="bg-white rounded-xl border p-5 text-sm">
+          <h3 class="font-semibold mb-2">Paid follow-up service</h3>
+          <p x-text="followup.question"></p>
+          <div class="mt-3 flex gap-2" x-show="!followup.decision"><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white" @click="answerFollowup(true)">Yes, I want it</button><button class="px-3 py-1.5 rounded-lg border" @click="answerFollowup(false)">No, thank you</button></div>
+          <p class="mt-2" x-show="followup.decision === 'declined'">You declined. Nothing was activated or charged. You can accept later from this page.</p>
+          <p class="mt-2" x-show="followup.decision === 'accepted'">Accepted. Complete registration, policy and payment through the link below; the service runs only after payment is verified.</p>
+          <p class="mt-1 break-all" x-show="followup.registrationUrl"><a class="underline" :href="followup.registrationUrl" x-text="followup.registrationUrl"></a></p>
+          <div class="mt-3 flex gap-2" x-show="followup.decision === 'declined'"><button class="px-3 py-1.5 rounded-lg border" @click="answerFollowup(true)">Accept now</button></div>
+        </div>
+        <div class="bg-white rounded-xl border p-5 text-sm" x-show="followup.active">
+          <h3 class="font-semibold mb-2">Settings</h3>
+          <div class="flex gap-3 flex-wrap items-center">
+            <label>Attempts after <input class="border rounded p-1 w-40" x-model="followup.settings.scheduleText"> hours</label>
+            <label>Max attempts <input class="border rounded p-1 w-16" type="number" min="1" max="5" x-model.number="followup.settings.maxAttempts"></label>
+            <label><input type="checkbox" x-model="followup.settings.paused"> Paused</label>
+            <button class="px-3 py-1.5 rounded-lg border" @click="saveFollowupSettings()">Save</button>
+          </div>
+          <h3 class="font-semibold mt-4 mb-2">Leads</h3>
+          <table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Customer</th><th class="p-2">Product</th><th class="p-2">Said</th><th class="p-2">Basis</th><th class="p-2">State</th><th class="p-2">Attempts</th><th class="p-2">Next</th><th class="p-2"></th></tr></thead>
+            <tbody><template x-for="l in followup.leads" :key="l.id"><tr class="border-t"><td class="p-2" x-text="l.phone"></td><td class="p-2" x-text="l.listing_name || '-'"></td><td class="p-2" x-text="l.stated_intention || '-'"></td><td class="p-2" x-text="l.consent_basis"></td><td class="p-2" x-text="l.state + (l.stop_reason ? ` (${l.stop_reason})` : '')"></td><td class="p-2" x-text="`${l.attempts}/${l.max_attempts}`"></td><td class="p-2" x-text="l.next_action_at || '-'"></td><td class="p-2"><button class="underline" x-show="['scheduled','contacted'].includes(l.state)" @click="stopLead(l)">Stop</button></td></tr></template></tbody></table>
+          <button class="mt-2 underline" @click="summarizeLeads()">Summarise with Muse</button>
+          <p class="mt-1" x-text="followup.summary"></p>
+        </div>
       </div>
     </section>
   </main>
@@ -204,7 +273,8 @@
     // The page state and actions; every call goes through MoranBuy.api, and every error is shown as the server said it.
     function businessApp() {
       return {
-        me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns'], error: '', notice: '',
+        me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns', 'Follow-up'],
+        templates: [], offers: [], campaigns: [], senderInfo: null, followup: { question: '', decision: null, registrationUrl: null, active: false, settings: { scheduleText: '24, 72', maxAttempts: 2, paused: false }, leads: [], summary: '' }, error: '', notice: '',
         listings: [], locations: [], orders: [], editing: null, editingLoc: null,
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
         async init() { if (MoranBuy.session.loggedIn()) await this.loadMe(); },
@@ -215,6 +285,8 @@
           if (this.tab === 'Products') this.listings = (await MoranBuy.api('/api/merchant/listings')).listings;
           if (this.tab === 'Locations') this.locations = (await MoranBuy.api('/api/merchant/locations')).locations;
           if (this.tab === 'Orders') this.orders = (await MoranBuy.api('/api/merchant/orders')).orders;
+          if (this.tab === 'Campaigns') { this.senderInfo = await MoranBuy.api('/api/merchant/campaigns/sender'); this.templates = (await MoranBuy.api('/api/merchant/campaigns/templates')).templates; this.offers = (await MoranBuy.api('/api/merchant/campaigns/outreach/offers')).offers; this.campaigns = (await MoranBuy.api('/api/merchant/campaigns')).campaigns; }
+          if (this.tab === 'Follow-up') await this.loadFollowup();
         },
         login() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/login', { method: 'POST', body: this.forms.login }); MoranBuy.session.save(d); await this.loadMe(); }); },
         register() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/register', { method: 'POST', body: { ...this.forms.register, phone: this.forms.register.phone || undefined } }); MoranBuy.session.save(d); await this.loadMe(); }); },
@@ -251,6 +323,21 @@
           if (d.location && d.location.positionFound === false) this.notice = 'Saved without a map position: the address could not be placed. Add a pin so customers see the distance.';
         }, 'Saved.'); },
         removeLocation(l) { if (!confirm(`Delete ${l.name}?`)) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/locations/${l.id}`, { method: 'DELETE' }); await this.load(); }); },
+        newTemplate() { const name = prompt('Template name (lowercase, digits, underscores):'); if (!name) return; const body = prompt('Message body (include "Jibu STOP kuacha" or "Reply STOP to opt out"):'); if (!body) return; const media = prompt('Image URL for the header (blank for none):') || ''; return this.run(async () => { await MoranBuy.api('/api/merchant/campaigns/templates', { method: 'POST', body: { name, body, headerFormat: media ? 'IMAGE' : 'NONE', headerMediaUrl: media || null } }); await this.load(); }, 'Template saved as draft.'); },
+        submitTemplate(t) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/templates/${t.id}/submit`, { method: 'POST' }); await this.load(); }, 'Submitted through Moran AI for Meta review.'); },
+        refreshTemplate(t) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/templates/${t.id}/refresh`, { method: 'POST' }); await this.load(); }); },
+        answerOffer(o, accept) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/outreach/offers/${o.id}/answer`, { method: 'POST', body: { accept } }); await this.load(); }, accept ? 'Offer accepted: a draft campaign was created. Nothing has been sent.' : 'Offer declined.'); },
+        newCampaign() { const name = prompt('Campaign name:'); if (!name) return; const objective = prompt('What should this campaign achieve?') || null; const listingId = prompt('Product id to feature (optional):') || null; const templateId = prompt('Approved template id (required to send):') || null; return this.run(async () => { await MoranBuy.api('/api/merchant/campaigns', { method: 'POST', body: { name, objective, listingId, templateId } }); await this.load(); }, 'Campaign created as a draft.'); },
+        act(c, action, body) { return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/${action}`, { method: 'POST', body: body || {} }); await this.load(); if (action === 'draft') this.notice = `Draft source: ${d.draftSource}. ${(d.notes || []).join(' ')}`; if (action === 'readiness') this.notice = d.ready ? 'Every gate passed. You can confirm and send.' : 'Some gates failed; see the details under the campaign.'; }); },
+        revise(c) { const revision = prompt('How should the draft change?'); if (!revision) return; return this.act(c, 'draft', { revision }); },
+        editBody(c) { const draftBody = prompt('Message text:', c.draftBody || ''); if (draftBody === null) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/${c.id}`, { method: 'PATCH', body: { draftBody } }); await this.load(); }); },
+        pay(c) { const phone = prompt('Mobile money number to charge:') || undefined; return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/pay`, { method: 'POST', body: { phone } }); await this.load(); this.notice = `Payment ${d.payment.reference} started (${d.payment.provider}): ${MoranBuy.money(d.payment.amount, d.payment.currency)}. The campaign waits until the provider confirms it.`; }); },
+        confirmSend(c) { if (!confirm(`Send "${c.name}" to ${c.pricing.recipients} people now? This cannot be undone.`)) return; return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/confirm`, { method: 'POST', body: { confirm: true } }); await this.load(); this.notice = d.dryRun ? 'Confirmed in dry-run mode: recipients are recorded, nothing leaves the server.' : 'Confirmed. Messages are being sent.'; }); },
+        async loadFollowup() { const o = await MoranBuy.api('/api/merchant/followup/offer'); this.followup.question = o.question; this.followup.decision = o.decision; this.followup.active = (this.me?.entitlements || []).some((e) => e.service === 'paid_followup' && e.status === 'active'); if (this.followup.active) { const s = (await MoranBuy.api('/api/merchant/followup/settings')).settings; this.followup.settings = { scheduleText: s.scheduleHours.join(', '), maxAttempts: s.maxAttempts, paused: s.paused }; this.followup.leads = (await MoranBuy.api('/api/merchant/followup/leads')).leads; } },
+        answerFollowup(accept) { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/followup/offer/answer', { method: 'POST', body: { accept } }); this.followup.decision = d.decision; this.followup.registrationUrl = d.registrationUrl; await this.loadMe(); await this.loadFollowup(); }); },
+        saveFollowupSettings() { return this.run(async () => { const s = this.followup.settings; await MoranBuy.api('/api/merchant/followup/settings', { method: 'PATCH', body: { scheduleHours: s.scheduleText.split(',').map((x) => Number(x.trim())).filter(Boolean), maxAttempts: Number(s.maxAttempts), paused: !!s.paused } }); await this.loadFollowup(); }, 'Saved.'); },
+        stopLead(l) { return this.run(async () => { await MoranBuy.api(`/api/merchant/followup/leads/${l.id}/stop`, { method: 'POST', body: { reason: 'cancelled' } }); await this.loadFollowup(); }); },
+        summarizeLeads() { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/followup/leads/summary', { method: 'POST' }); this.followup.summary = d.summary || `Muse is ${d.museStatus}; no summary.`; }); },
         orderStatus(o, status) { let deliveryFee; if (status === 'accepted' && !o.total_confirmed) { const f = prompt('Delivery fee to confirm for this order (TZS):'); if (f !== null && f !== '') deliveryFee = Number(f); } return this.run(async () => { await MoranBuy.api(`/api/merchant/orders/${o.id}/status`, { method: 'POST', body: { status, ...(deliveryFee !== undefined ? { deliveryFee } : {}) } }); await this.load(); }); },
       };
     }

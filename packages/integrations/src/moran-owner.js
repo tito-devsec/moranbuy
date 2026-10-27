@@ -31,4 +31,9 @@ export class MoranOwnerClient {
   products(token, serviceId) { return this.request('/api/products', { token, serviceId }); }
   updateProduct(token, serviceId, id, patch) { return this.request(`/api/products/${id}`, { method: 'PATCH', token, serviceId, body: patch }); }
   locations(token) { return this.request('/api/business-locations', { token }); }
+  // Template lifecycle in Moran: the draft is saved and submitted there, and the status is whatever Meta told Moran.
+  createTemplate(token, serviceId, draft) { return this.request('/api/whatsapp-templates', { method: 'POST', token, serviceId, body: draft }); }
+  submitTemplate(token, id) { return this.request(`/api/whatsapp-templates/${id}/submit`, { method: 'POST', token }); }
+  getTemplate(token, id) { return this.request(`/api/whatsapp-templates/${id}`, { token }); }
+  syncTemplates(token) { return this.request('/api/whatsapp-templates/sync', { method: 'POST', token }); }
 }

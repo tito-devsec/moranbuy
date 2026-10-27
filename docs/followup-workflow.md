@@ -1,0 +1,42 @@
+# Optional paid follow-up
+
+`packages/followup-engine`, new in this repository.
+
+## Asking first
+
+`GET /api/merchant/followup/offer` returns the question (Swahili or English) and records that it
+was asked. `POST /offer/answer`:
+
+- `{accept: false}` records the decision. Nothing is activated or charged. The worker skips the merchant (`not_accepted`).
+- `{accept: true}` selects the `paid_followup` service (status `pending_payment`), returns a
+  one-time registration link for verification, policy and payment, and still activates nothing.
+  Activation happens after a verified payment or an audited admin action.
+
+A follow-up-only merchant never receives the conversation agent; that is a separate entitlement.
+
+## Leads
+
+`createLead` records only what the service needs: merchant, phone, customer reference, product,
+source (enquiry, order, session, manual), the customer's stated intention, a requested contact
+time, the consent basis, state, next action, attempts, last contact, outcome, stop reason.
+Leads come from confirmed orders (service relationship) or an explicit follow-up consent
+(`followup_offer`). A lead with no basis is stored as `stopped (no_consent)` and never scheduled.
+Tasks are scheduled from the merchant's `scheduleHours` and `maxAttempts`.
+
+## Execution
+
+`processDueFollowups` claims each due task with a conditional update and checks, at that moment:
+merchant active, service accepted, entitlement active and paid, not paused, lead still open,
+attempts under the limit, consent still granted, a connected sender, quiet hours. Anything failing
+is recorded as `skipped` with the reason. A send records the real result; `FOLLOWUP_DRY_RUN=true`
+records without sending.
+
+Stop conditions, enforced by `stopLead` and `stopLeadsForPhone`: opt-out (STOP), a reply from the
+customer, a decline, a completed purchase, cancellation by the merchant, or the maximum attempts.
+Pending tasks are cancelled with the reason.
+
+## Tests
+
+`tests/integration/engagement.test.js`: offer, decline without activation, accept with link,
+entitlement refusal, paused and unpaid skips, idempotent passes, stop on reply, dry run, lead from
+a confirmed order.

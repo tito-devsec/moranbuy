@@ -19,9 +19,9 @@ This file lists what is new in this repository and the evidence for it. It is up
 | Muse Spark integration (Meta Model API, `muse-spark-1.3`) with real telemetry | done (client, extraction, drafting, telemetry); live key still to be supplied by the owner | `packages/muse-intelligence`, `tests/integration/muse-client.test.js`, `docs/muse-integration.md` |
 | Merchant management, Moran product link and import without duplicates, locations, source-of-truth rules | done | `packages/merchant-management`, `packages/product-catalog`, `tests/integration/merchants.test.js`, `docs/merchant-registration.md` |
 | Entitlements enforced server-side and the business app | done (app pages for campaigns, outreach and follow-up arrive with Phase 7 to 8) | `packages/authorization`, `apps/business/`, `tests/integration/merchants.test.js` |
-| New campaign engine and new-product outreach | planned (Phase 7) | |
-| Optional paid follow-up engine | planned (Phase 8) | |
-| Consent management | planned (Phase 9) | |
+| New campaign engine (drafting, review, templates through Moran, pricing, server-verified payment, eight dispatch gates, explicit confirmation, idempotent worker) and new-product outreach offers | done; live sending stays dry-run until the owner configures the provider rate and a payment provider | `packages/campaign-engine`, `packages/campaign-outreach`, `packages/billing`, `tests/integration/engagement.test.js`, `docs/campaign-workflow.md` |
+| Optional paid follow-up engine (ask first, decline activates nothing, leads, schedules, stop rules, idempotent worker) | done | `packages/followup-engine`, `tests/integration/engagement.test.js`, `docs/followup-workflow.md` |
+| Consent management (append-only events, per-merchant purposes, STOP handling, audience exclusion reasons, send-time recheck, erasure) | done | `packages/consent-management`, `docs/privacy-and-consent.md` |
 | MoranBuy Admin with real Muse telemetry | planned (Phase 10) | |
 | Moran-side integration drop-ins and Hermes research skill | planned (Phase 10) | |
 

@@ -6,6 +6,8 @@ import { logger } from '@moranbuy/observability';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { shoppingDeps, upsertCustomer } from '../services/shopping.js';
 import { db } from '../db/connection.js';
+import { detectOptOut, detectOptIn, optOut, optIn } from '@moranbuy/consent-management';
+import { stopLeadsForPhone } from '@moranbuy/followup-engine';
 
 export const internalInboundRouter = express.Router();
 
@@ -27,7 +29,19 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
 
   const customer = await upsertCustomer({ channel: 'whatsapp', channelRef: String(from), name });
   const { engine, moran } = shoppingDeps();
-  const out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location });
+  // A bare STOP to the MoranBuy number ends marketing and follow-up from every merchant; START restores only the MoranBuy relationship.
+  let out;
+  if (detectOptOut(text)) {
+    await optOut(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
+    await stopLeadsForPhone(db, { phone: from, reason: 'opted_out' });
+    out = { replies: [{ text: 'Sawa. Hutapokea tena ujumbe wa matangazo au ufuatiliaji kupitia MoranBuy. / You will no longer receive marketing or follow-up messages through MoranBuy.' }], session: { id: null, state: 'opted_out' } };
+  } else if (detectOptIn(text)) {
+    await optIn(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
+    out = { replies: [{ text: 'Karibu tena. / Welcome back.' }], session: { id: null, state: 'opted_in' } };
+  } else {
+    await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
+    out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location });
+  }
   const sent = [];
   for (const [i, r] of out.replies.entries()) {
     const idempotencyKey = `moranbuy:${messageId}:${i}`;

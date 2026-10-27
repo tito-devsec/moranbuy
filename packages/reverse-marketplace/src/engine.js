@@ -6,6 +6,8 @@ import { fallbackExtract } from './parse.js';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
 import { buildFacts, renderReply } from './present.js';
+import { upsertContact, recordConsent } from '@moranbuy/consent-management';
+import { createLead, followupSettings } from '@moranbuy/followup-engine';
 
 const SESSION_TTL_MS = 6 * 3600000;
 
@@ -125,6 +127,13 @@ export class ShoppingEngine {
       currency: request.currency || 'TZS', fulfilment, customer_location_json: request.location ? JSON.stringify(request.location) : null, status: 'pending_merchant', confirmed_at: new Date(this.now()),
     });
     await this.save(session, { state: 'confirmed' });
+    // The merchant now has a real relationship with this customer: a contact and service consent for the order, and a lead only where follow-up was accepted.
+    if (customer.channel === 'whatsapp') {
+      await upsertContact(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, name: customer.name || null, source: 'order' });
+      await recordConsent(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, purpose: 'service', status: 'granted', source: 'order_confirmation', evidenceRef: ref });
+      const merchant = await this.db('merchants').where({ id: sel.merchantId }).first();
+      if (followupSettings(merchant).decision === 'accepted') await createLead(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, listingId: sel.listingId, source: 'order', statedIntention: 'placed an order', customerRef: customer.id, now: this.now() });
+    }
     const text = lang === 'en'
       ? `Order ${ref} sent to ${sel.merchantName}. Status: waiting for the merchant to accept. I will tell you when it changes.`
       : `Oda ${ref} imetumwa kwa ${sel.merchantName}. Hali: inasubiri muuzaji akubali. Nitakujulisha ikibadilika.`;

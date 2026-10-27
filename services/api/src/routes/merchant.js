@@ -5,6 +5,7 @@ import { requireMerchantAuth, requireEntitlement, listEntitlements, selectServic
 import { publicMerchant, submitVerification, moranAccessTokenFor } from '@moranbuy/merchant-management';
 import { listingInput, listListings, getListing, createListing, updateListing, deleteListing, locationInput, listLocations, createLocation, updateLocation, deleteLocation, syncMoranProducts, syncMoranLocations } from '@moranbuy/product-catalog';
 import { audit } from '@moranbuy/observability';
+import { offerOutreachForListing } from '@moranbuy/campaign-outreach';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validate } from '../middleware/validate.js';
 import { db } from '../db/connection.js';
@@ -47,7 +48,12 @@ merchantRouter.post('/verification', validate({ body: z.object({ registrationNum
 // ---- listings ----
 merchantRouter.get('/listings', asyncHandler(async (req, res) => res.json({ listings: await listListings(db, req.merchant.id, { includeArchived: req.query.includeArchived === 'true' }) })));
 merchantRouter.get('/listings/:id', validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ listing: await getListing(db, req.merchant.id, req.params.id) })));
-merchantRouter.post('/listings', validate({ body: listingInput }), asyncHandler(async (req, res) => res.status(201).json({ listing: await createListing(db, req.merchant.id, req.body, actor(req)) })));
+merchantRouter.post('/listings', validate({ body: listingInput }), asyncHandler(async (req, res) => {
+  const listing = await createListing(db, req.merchant.id, req.body, actor(req));
+  // Publishing a product may produce an outreach offer the merchant must answer; nothing is sent by publishing.
+  const offer = await offerOutreachForListing(db, { merchantId: req.merchant.id, listingId: listing.id, trigger: 'listing_published' });
+  res.status(201).json({ listing, outreachOffer: offer ? { id: offer.id, status: offer.status } : null });
+}));
 merchantRouter.patch('/listings/:id', validate({ params: idParams, body: listingInput.partial() }), asyncHandler(async (req, res) => res.json({ listing: await updateListing(db, req.merchant.id, req.params.id, req.body, actor(req)) })));
 merchantRouter.delete('/listings/:id', validate({ params: idParams }), asyncHandler(async (req, res) => { await deleteListing(db, req.merchant.id, req.params.id, actor(req)); res.json({ ok: true }); }));
 
