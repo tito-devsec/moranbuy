@@ -1,0 +1,64 @@
+# Local and VPS stack for MoranBuy: its own Postgres and Redis, the API, the workers and an optional Hermes research agent.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moranbuy
+      POSTGRES_USER: moranbuy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-moranbuy}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moranbuy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
+      REDIS_URL: redis://redis:6379
+    command: ["sh", "-c", "npm run migrate && node services/api/src/server.js"]
+    ports: ["4000:4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
+      REDIS_URL: redis://redis:6379
+    command: ["node", "services/api/src/workers/main.js"]
+    depends_on:
+      api: { condition: service_started }
+
+  # Hermes Agent with web and browser toolsets for product research; see integrations/hermes/README.md.
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    profiles: ["research"]
+    restart: unless-stopped
+    environment:
+      API_SERVER_KEY: ${HERMES_API_KEY:-}
+      OPENAI_API_KEY: ${HERMES_OPENAI_API_KEY:-}
+    volumes:
+      - ./integrations/hermes/config.yaml:/root/.hermes/config.yaml:ro
+      - ./integrations/hermes/skills:/root/.hermes/skills:ro
+    expose: ["8642"]
+
+volumes:
+  pgdata:
+  redisdata:

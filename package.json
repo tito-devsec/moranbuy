@@ -1,0 +1,45 @@
+{
+  "name": "moranbuy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MoranBuy: an AI-powered reverse marketplace. Customers say what they need and can afford; MoranBuy finds eligible business offers ranked by budget first and location second.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=22.0.0" },
+  "workspaces": ["packages/*", "services/*"],
+  "scripts": {
+    "start": "node services/api/src/server.js",
+    "dev": "node --watch services/api/src/server.js",
+    "worker": "node services/api/src/workers/main.js",
+    "migrate": "knex migrate:latest --knexfile services/api/src/db/knexfile.js",
+    "migrate:rollback": "knex migrate:rollback --knexfile services/api/src/db/knexfile.js",
+    "migrate:make": "knex migrate:make --knexfile services/api/src/db/knexfile.js",
+    "seed": "knex seed:run --knexfile services/api/src/db/knexfile.js",
+    "lint": "node scripts/lint.mjs",
+    "check": "node scripts/check-syntax.mjs",
+    "test": "node --test \"tests/unit/**/*.test.js\"",
+    "test:integration": "node --test \"tests/integration/**/*.test.js\"",
+    "test:security": "node --test \"tests/security/**/*.test.js\"",
+    "test:e2e": "node --test \"tests/end-to-end/**/*.test.js\"",
+    "test:all": "npm run check && npm test && npm run test:integration && npm run test:security && npm run test:e2e",
+    "hooks": "git config core.hooksPath scripts/githooks"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "knex": "^3.3.0",
+    "pg": "^8.22.0",
+    "pino": "^9.14.0",
+    "pino-http": "^10.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.2.2"
+  }
+}

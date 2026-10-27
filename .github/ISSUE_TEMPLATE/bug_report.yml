@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in MoranBuy does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not paste secrets, access tokens, phone numbers or customer records. Redact logs before attaching them. Security problems go through SECURITY.md, not here."
+  - type: input
+    id: version
+    attributes: { label: Version or commit, placeholder: "v0.1.0 or a commit hash" }
+    validations: { required: true }
+  - type: dropdown
+    id: experience
+    attributes:
+      label: Affected experience
+      options: [Customer (WhatsApp or web), Business app, Admin app, API, Workers, Moran integration, Muse Spark, Payments, Other]
+    validations: { required: true }
+  - type: textarea
+    id: environment
+    attributes: { label: Environment, description: "OS, Node version, how it is deployed (local, Docker Compose, VPS), APP_ENV" }
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Steps to reproduce }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behaviour }
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behaviour }
+    validations: { required: true }
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options: [Blocker, High, Medium, Low]
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes: { label: Relevant redacted logs, render: shell }

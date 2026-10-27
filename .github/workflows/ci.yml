@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: moranbuy_test
+          POSTGRES_USER: moranbuy
+          POSTGRES_PASSWORD: moranbuy
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U moranbuy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgres://moranbuy:moranbuy@127.0.0.1:5432/moranbuy_test
+      REDIS_URL: redis://127.0.0.1:6379
+      AUTH_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      MORAN_SHARED_SECRET: ci-only-shared-secret
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run check
+      - run: npm run migrate
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run test:security
+      - run: npm run test:e2e
+      - name: Migrations roll back cleanly
+        run: npm run migrate:rollback -- --all && npm run migrate

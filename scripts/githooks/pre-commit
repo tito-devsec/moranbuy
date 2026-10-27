@@ -1,0 +1,9 @@
+#!/bin/sh
+# Refuses to commit env files and private keys; run `npm run hooks` once to enable.
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env$|(^|/)\.env\.[^/]+$|\.pem$|\.key$' | grep -vE '(^|/)\.env\.example$')
+if [ -n "$blocked" ]; then
+  echo "pre-commit: refusing to commit secret files:" >&2
+  echo "$blocked" | sed 's/^/  /' >&2
+  exit 1
+fi
+exit 0
