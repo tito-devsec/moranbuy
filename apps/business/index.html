@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoranBuy for Business</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="app.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900" x-data="businessApp()" x-init="init()">
+  <header class="bg-teal-700 text-white">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div><div class="font-semibold text-lg">MoranBuy for Business</div><div class="text-xs opacity-90">List once. Customers who can afford your products find you.</div></div>
+      <div x-show="me" class="text-sm flex items-center gap-3"><span x-text="me?.merchant.businessName"></span><button class="underline" @click="logout()">Sign out</button></div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <!-- Sign in, register, or link a Moran AI account -->
+    <section x-show="!me" x-cloak class="grid md:grid-cols-3 gap-6">
+      <form class="bg-white rounded-xl border p-5 space-y-3" @submit.prevent="login()">
+        <h2 class="font-semibold">Sign in</h2>
+        <input class="w-full border rounded-lg p-2" type="email" placeholder="Email" x-model="forms.login.email" required>
+        <input class="w-full border rounded-lg p-2" type="password" placeholder="Password" x-model="forms.login.password" required>
+        <button class="w-full bg-teal-700 text-white rounded-lg p-2">Sign in</button>
+      </form>
+      <form class="bg-white rounded-xl border p-5 space-y-3" @submit.prevent="register()">
+        <h2 class="font-semibold">Register a standalone business</h2>
+        <input class="w-full border rounded-lg p-2" placeholder="Business name" x-model="forms.register.businessName" required>
+        <input class="w-full border rounded-lg p-2" placeholder="Your name" x-model="forms.register.ownerName" required>
+        <input class="w-full border rounded-lg p-2" type="email" placeholder="Email" x-model="forms.register.email" required>
+        <input class="w-full border rounded-lg p-2" type="password" placeholder="Password (8+)" x-model="forms.register.password" required minlength="8">
+        <input class="w-full border rounded-lg p-2" placeholder="WhatsApp number (optional)" x-model="forms.register.phone">
+        <fieldset class="text-sm space-y-1"><legend class="font-medium">Services you may want (paid ones are activated only after payment)</legend>
+          <label class="block"><input type="checkbox" checked disabled> Product listing (free)</label>
+          <label class="block"><input type="checkbox" value="campaign_engine" x-model="forms.register.services"> Campaign engine</label>
+          <label class="block"><input type="checkbox" value="new_product_outreach" x-model="forms.register.services"> New-product outreach</label>
+          <label class="block"><input type="checkbox" value="paid_followup" x-model="forms.register.services"> Paid follow-up</label>
+        </fieldset>
+        <button class="w-full bg-teal-700 text-white rounded-lg p-2">Create account</button>
+      </form>
+      <form class="bg-white rounded-xl border p-5 space-y-3" @submit.prevent="linkMoran()">
+        <h2 class="font-semibold">Already on Moran AI?</h2>
+        <p class="text-sm text-gray-600">Sign in with your Moran AI owner credentials. Your existing products and locations are imported; nothing is re-uploaded.</p>
+        <template x-if="!forms.link.twoFactorToken">
+          <div class="space-y-3">
+            <input class="w-full border rounded-lg p-2" type="email" placeholder="Moran AI email" x-model="forms.link.email" required>
+            <input class="w-full border rounded-lg p-2" type="password" placeholder="Moran AI password" x-model="forms.link.password" required>
+          </div>
+        </template>
+        <template x-if="forms.link.twoFactorToken">
+          <input class="w-full border rounded-lg p-2" placeholder="Six-digit code from your authenticator" x-model="forms.link.twoFactorCode" required>
+        </template>
+        <button class="w-full bg-gray-900 text-white rounded-lg p-2">Link Moran AI account</button>
+      </form>
+      <p class="md:col-span-3 text-red-700 text-sm" x-text="error"></p>
+    </section>
+
+    <!-- Signed in -->
+    <section x-show="me" x-cloak>
+      <nav class="flex gap-2 flex-wrap mb-4">
+        <template x-for="t in tabs" :key="t"><button class="px-3 py-1.5 rounded-lg border text-sm" :class="tab === t ? 'bg-teal-700 text-white border-teal-700' : 'bg-white'" @click="tab = t; load()" x-text="t"></button></template>
+      </nav>
+      <p class="text-red-700 text-sm mb-3" x-text="error"></p>
+      <p class="text-green-700 text-sm mb-3" x-text="notice"></p>
+
+      <div x-show="tab === 'Overview'" class="grid md:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl border p-5">
+          <h3 class="font-semibold mb-2">Business</h3>
+          <dl class="text-sm grid grid-cols-2 gap-y-1">
+            <dt class="text-gray-500">Name</dt><dd x-text="me?.merchant.businessName"></dd>
+            <dt class="text-gray-500">Registration</dt><dd x-text="me?.merchant.registrationType === 'moran' ? 'Registered Moran AI business' : 'Standalone MoranBuy merchant'"></dd>
+            <dt class="text-gray-500">Verification</dt><dd x-text="me?.merchant.verificationStatus"></dd>
+            <dt class="text-gray-500">Moran products synced</dt><dd x-text="me?.merchant.productsSyncedAt || 'never'"></dd>
+          </dl>
+          <div class="mt-3 flex gap-2" x-show="me?.merchant.registrationType === 'moran'">
+            <button class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm" @click="syncMoran()">Sync products and locations from Moran AI</button>
+          </div>
+          <div class="mt-3" x-show="me?.merchant.verificationStatus === 'unverified'">
+            <button class="px-3 py-1.5 rounded-lg border text-sm" @click="submitVerification()">Submit verification details</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border p-5">
+          <h3 class="font-semibold mb-2">Services</h3>
+          <ul class="text-sm space-y-1">
+            <template x-for="e in me?.entitlements || []" :key="e.service">
+              <li class="flex justify-between"><span x-text="MoranBuy.label(e.service)"></span><span class="font-mono" x-text="`${e.status} · ${e.billing_state}`"></span></li>
+            </template>
+          </ul>
+          <p class="text-xs text-gray-500 mt-2">Paid services are activated only after payment is verified. Nothing is switched on automatically.</p>
+          <div class="mt-3 flex gap-2 flex-wrap">
+            <template x-for="s in ['campaign_engine','new_product_outreach','paid_followup']" :key="s">
+              <button class="px-3 py-1.5 rounded-lg border text-sm" x-show="!(me?.entitlements || []).some(e => e.service === s)" @click="selectService(s)" x-text="'Add ' + MoranBuy.label(s)"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="tab === 'Products'">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-semibold">Products</h3><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm" @click="editing = blankListing()">Add product</button></div>
+        <form x-show="editing" x-cloak class="bg-white rounded-xl border p-5 grid md:grid-cols-3 gap-3 mb-4" @submit.prevent="saveListing()">
+          <input class="border rounded-lg p-2" placeholder="Name" x-model="editing.name" required :disabled="editing.source === 'moran'">
+          <input class="border rounded-lg p-2" placeholder="Product type (e.g. sofa)" x-model="editing.productType">
+          <input class="border rounded-lg p-2" placeholder="Category" x-model="editing.category" :disabled="editing.source === 'moran'">
+          <input class="border rounded-lg p-2" type="number" min="0" placeholder="Price (TZS)" x-model.number="editing.price" required :disabled="editing.source === 'moran'">
+          <input class="border rounded-lg p-2" type="number" min="0" placeholder="Stock (blank = unknown)" x-model.number="editing.stock" :disabled="editing.source === 'moran'">
+          <input class="border rounded-lg p-2" placeholder="Image URL" x-model="editing.imageUrl" :disabled="editing.source === 'moran'">
+          <input class="border rounded-lg p-2 md:col-span-2" placeholder='Attributes as key=value, comma separated (seats=3, color=grey)' x-model="editing.attributesText">
+          <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="editing.moranbuyVisible"> Visible on MoranBuy</label>
+          <textarea class="border rounded-lg p-2 md:col-span-3" placeholder="Description" x-model="editing.description" :disabled="editing.source === 'moran'"></textarea>
+          <div class="md:col-span-3 text-xs text-gray-500" x-show="editing.source === 'moran'">Name, price, stock, images and status of this product belong to Moran AI. Change them there (or with the Moran edit below); MoranBuy mirrors them on the next sync.</div>
+          <div class="md:col-span-3 flex gap-2"><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Save</button><button type="button" class="px-3 py-1.5 rounded-lg border text-sm" @click="editing = null">Cancel</button></div>
+        </form>
+        <div class="bg-white rounded-xl border overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 text-left"><tr><th class="p-2">Product</th><th class="p-2">Price</th><th class="p-2">Stock</th><th class="p-2">Status</th><th class="p-2">Source</th><th class="p-2">Visible</th><th class="p-2"></th></tr></thead>
+            <tbody>
+              <template x-for="l in listings" :key="l.id">
+                <tr class="border-t">
+                  <td class="p-2"><div x-text="l.name"></div><div class="text-xs text-gray-500" x-text="l.productType || l.category || ''"></div></td>
+                  <td class="p-2" x-text="MoranBuy.money(l.price, l.currency)"></td>
+                  <td class="p-2" x-text="l.stock === null ? 'unknown' : l.stock"></td>
+                  <td class="p-2" x-text="l.status"></td>
+                  <td class="p-2" x-text="l.source === 'moran' ? 'Moran AI' : 'MoranBuy'"></td>
+                  <td class="p-2" x-text="l.moranbuyVisible ? 'yes' : 'no'"></td>
+                  <td class="p-2 whitespace-nowrap"><button class="underline mr-2" @click="edit(l)">Edit</button><button class="underline mr-2" x-show="l.source === 'moran'" @click="editMoranPrice(l)">Moran price</button><button class="underline text-red-700" x-show="l.source !== 'moran'" @click="removeListing(l)">Delete</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div x-show="tab === 'Locations'">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-semibold">Locations</h3><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm" @click="editingLoc = blankLocation()">Add location</button></div>
+        <form x-show="editingLoc" x-cloak class="bg-white rounded-xl border p-5 grid md:grid-cols-3 gap-3 mb-4" @submit.prevent="saveLocation()">
+          <input class="border rounded-lg p-2" placeholder="Name (e.g. Sinza shop)" x-model="editingLoc.name" required>
+          <input class="border rounded-lg p-2" placeholder="Region" x-model="editingLoc.region">
+          <input class="border rounded-lg p-2" placeholder="District" x-model="editingLoc.district">
+          <input class="border rounded-lg p-2" placeholder="Ward / area" x-model="editingLoc.ward">
+          <input class="border rounded-lg p-2" placeholder="Street" x-model="editingLoc.street">
+          <input class="border rounded-lg p-2" placeholder="Map pin latitude (optional)" x-model.number="editingLoc.latitude">
+          <input class="border rounded-lg p-2" placeholder="Map pin longitude (optional)" x-model.number="editingLoc.longitude">
+          <select class="border rounded-lg p-2" x-model="editingLoc.deliveryChoice"><option value="unknown">Delivery: not stated</option><option value="yes">Delivery available</option><option value="no">No delivery</option></select>
+          <input class="border rounded-lg p-2" type="number" min="0" placeholder="Delivery fee (blank = not stated)" x-model.number="editingLoc.deliveryFee" :disabled="editingLoc.deliveryChoice !== 'yes'">
+          <input class="border rounded-lg p-2" type="number" min="1" placeholder="Delivery radius km" x-model.number="editingLoc.deliveryRadiusKm" :disabled="editingLoc.deliveryChoice !== 'yes'">
+          <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="editingLoc.pickupAvailable"> Customers can pick up here</label>
+          <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="editingLoc.isDefault"> Default location</label>
+          <div class="md:col-span-3 text-xs text-gray-500">Without a pin, the address is looked up on the map. If it cannot be placed, the location is saved without a position and distance is not shown to customers; add a pin to fix that.</div>
+          <div class="md:col-span-3 flex gap-2"><button class="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Save</button><button type="button" class="px-3 py-1.5 rounded-lg border text-sm" @click="editingLoc = null">Cancel</button></div>
+        </form>
+        <div class="bg-white rounded-xl border overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 text-left"><tr><th class="p-2">Name</th><th class="p-2">Address</th><th class="p-2">Position</th><th class="p-2">Delivery</th><th class="p-2">Fee</th><th class="p-2">Default</th><th class="p-2"></th></tr></thead>
+            <tbody>
+              <template x-for="l in locations" :key="l.id">
+                <tr class="border-t">
+                  <td class="p-2" x-text="l.name"></td>
+                  <td class="p-2" x-text="l.formattedAddress || '-'"></td>
+                  <td class="p-2" x-text="l.latitude === null ? 'not placed' : `${l.latitude}, ${l.longitude} (${l.source})`"></td>
+                  <td class="p-2" x-text="l.deliveryAvailable === null ? 'not stated' : l.deliveryAvailable ? `yes, ${l.deliveryRadiusKm || '?'} km` : 'no'"></td>
+                  <td class="p-2" x-text="MoranBuy.money(l.deliveryFee)"></td>
+                  <td class="p-2" x-text="l.isDefault ? 'yes' : ''"></td>
+                  <td class="p-2 whitespace-nowrap"><button class="underline mr-2" x-show="l.origin !== 'moran'" @click="editLoc(l)">Edit</button><button class="underline text-red-700" @click="removeLocation(l)">Delete</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div x-show="tab === 'Orders'">
+        <h3 class="font-semibold mb-3">Orders from MoranBuy customers</h3>
+        <div class="bg-white rounded-xl border overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 text-left"><tr><th class="p-2">Ref</th><th class="p-2">Product</th><th class="p-2">Qty</th><th class="p-2">Known total</th><th class="p-2">Fulfilment</th><th class="p-2">Customer</th><th class="p-2">Status</th><th class="p-2"></th></tr></thead>
+            <tbody>
+              <template x-for="o in orders" :key="o.id">
+                <tr class="border-t">
+                  <td class="p-2 font-mono" x-text="o.order_ref"></td>
+                  <td class="p-2" x-text="o.listing_name || '-'"></td>
+                  <td class="p-2" x-text="o.quantity"></td>
+                  <td class="p-2"><span x-text="MoranBuy.money(o.known_total, o.currency)"></span><span class="text-xs text-gray-500" x-show="!o.total_confirmed"> (delivery not confirmed)</span></td>
+                  <td class="p-2" x-text="o.fulfilment"></td>
+                  <td class="p-2" x-text="o.customer_ref || o.customer_name || 'web customer'"></td>
+                  <td class="p-2" x-text="o.status"></td>
+                  <td class="p-2 whitespace-nowrap" x-show="o.status === 'pending_merchant'"><button class="underline mr-2" @click="orderStatus(o, 'accepted')">Accept</button><button class="underline text-red-700" @click="orderStatus(o, 'rejected')">Reject</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div x-show="tab === 'Campaigns'" class="bg-white rounded-xl border p-5 text-sm">
+        <h3 class="font-semibold mb-2">Campaigns, new-product outreach and follow-up</h3>
+        <p>These services are built in the next phase. When active, they appear here. A paid service shows as <em>active · paid</em> under Services once payment is verified.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // The page state and actions; every call goes through MoranBuy.api, and every error is shown as the server said it.
+    function businessApp() {
+      return {
+        me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns'], error: '', notice: '',
+        listings: [], locations: [], orders: [], editing: null, editingLoc: null,
+        forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
+        async init() { if (MoranBuy.session.loggedIn()) await this.loadMe(); },
+        async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
+        async loadMe() { this.me = await MoranBuy.api('/api/merchants/auth/me'); await this.load(); },
+        async load() {
+          if (!this.me) return;
+          if (this.tab === 'Products') this.listings = (await MoranBuy.api('/api/merchant/listings')).listings;
+          if (this.tab === 'Locations') this.locations = (await MoranBuy.api('/api/merchant/locations')).locations;
+          if (this.tab === 'Orders') this.orders = (await MoranBuy.api('/api/merchant/orders')).orders;
+        },
+        login() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/login', { method: 'POST', body: this.forms.login }); MoranBuy.session.save(d); await this.loadMe(); }); },
+        register() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/register', { method: 'POST', body: { ...this.forms.register, phone: this.forms.register.phone || undefined } }); MoranBuy.session.save(d); await this.loadMe(); }); },
+        linkMoran() { return this.run(async () => {
+          const body = this.forms.link.twoFactorToken ? { twoFactorToken: this.forms.link.twoFactorToken, twoFactorCode: this.forms.link.twoFactorCode } : { email: this.forms.link.email, password: this.forms.link.password };
+          const d = await MoranBuy.api('/api/merchants/auth/link-moran', { method: 'POST', body });
+          if (d.twoFactorRequired) { this.forms.link.twoFactorToken = d.twoFactorToken; this.notice = 'Enter the code from your authenticator app.'; return; }
+          MoranBuy.session.save(d); await this.loadMe();
+        }); },
+        logout() { MoranBuy.api('/api/merchants/auth/logout', { method: 'POST' }).catch(() => {}); MoranBuy.session.clear(); this.me = null; },
+        syncMoran() { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/sync/moran', { method: 'POST' }); await this.loadMe(); this.notice = `Products: ${d.products.created} new, ${d.products.updated} updated, ${d.products.archived} archived. Locations: ${d.locations.imported}.`; }); },
+        selectService(s) { return this.run(async () => { await MoranBuy.api('/api/merchant/services', { method: 'POST', body: { services: [s] } }); await this.loadMe(); }, 'Service selected. It activates after payment is verified.'); },
+        submitVerification() { const n = prompt('Business registration number (or leave blank):') ?? ''; return this.run(async () => { await MoranBuy.api('/api/merchant/verification', { method: 'POST', body: { registrationNumber: n || null } }); await this.loadMe(); }, 'Verification submitted for review.'); },
+        blankListing() { return { name: '', productType: '', category: '', price: null, stock: null, imageUrl: '', attributesText: '', description: '', moranbuyVisible: true }; },
+        edit(l) { this.editing = { ...l, attributesText: Object.entries(l.attributes || {}).map(([k, v]) => `${k}=${v}`).join(', ') }; },
+        saveListing() { return this.run(async () => {
+          const attributes = {}; for (const pair of String(this.editing.attributesText || '').split(',')) { const [k, v] = pair.split('=').map((s) => s && s.trim()); if (k && v !== undefined) attributes[k] = Number.isFinite(Number(v)) ? Number(v) : v; }
+          const base = { productType: this.editing.productType || null, attributes, moranbuyVisible: !!this.editing.moranbuyVisible };
+          const full = { ...base, name: this.editing.name, category: this.editing.category || null, price: Number(this.editing.price), stock: this.editing.stock === '' || this.editing.stock === null ? null : Number(this.editing.stock), imageUrl: this.editing.imageUrl || null, description: this.editing.description || null };
+          if (this.editing.id) await MoranBuy.api(`/api/merchant/listings/${this.editing.id}`, { method: 'PATCH', body: this.editing.source === 'moran' ? base : full });
+          else await MoranBuy.api('/api/merchant/listings', { method: 'POST', body: full });
+          this.editing = null; await this.load();
+        }, 'Saved.'); },
+        editMoranPrice(l) { const p = prompt(`New price in ${l.currency} for ${l.name} (changed in Moran AI):`, l.price); if (p === null) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/listings/${l.id}/moran`, { method: 'PATCH', body: { price: Number(p) } }); await this.load(); }, 'Price changed in Moran AI and mirrored here.'); },
+        removeListing(l) { if (!confirm(`Delete ${l.name}?`)) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/listings/${l.id}`, { method: 'DELETE' }); await this.load(); }); },
+        blankLocation() { return { name: '', region: '', district: '', ward: '', street: '', latitude: null, longitude: null, deliveryChoice: 'unknown', deliveryFee: null, deliveryRadiusKm: null, pickupAvailable: true, isDefault: false }; },
+        editLoc(l) { this.editingLoc = { ...l, deliveryChoice: l.deliveryAvailable === null ? 'unknown' : l.deliveryAvailable ? 'yes' : 'no' }; },
+        saveLocation() { return this.run(async () => {
+          const e = this.editingLoc; const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
+          const body = { name: e.name, region: e.region || null, district: e.district || null, ward: e.ward || null, street: e.street || null, latitude: num(e.latitude), longitude: num(e.longitude), pickupAvailable: !!e.pickupAvailable, isDefault: !!e.isDefault,
+            deliveryAvailable: e.deliveryChoice === 'unknown' ? null : e.deliveryChoice === 'yes', deliveryFee: e.deliveryChoice === 'yes' ? num(e.deliveryFee) : null, deliveryRadiusKm: e.deliveryChoice === 'yes' ? num(e.deliveryRadiusKm) : null };
+          const d = e.id ? await MoranBuy.api(`/api/merchant/locations/${e.id}`, { method: 'PATCH', body }) : await MoranBuy.api('/api/merchant/locations', { method: 'POST', body });
+          this.editingLoc = null; await this.load();
+          if (d.location && d.location.positionFound === false) this.notice = 'Saved without a map position: the address could not be placed. Add a pin so customers see the distance.';
+        }, 'Saved.'); },
+        removeLocation(l) { if (!confirm(`Delete ${l.name}?`)) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/locations/${l.id}`, { method: 'DELETE' }); await this.load(); }); },
+        orderStatus(o, status) { let deliveryFee; if (status === 'accepted' && !o.total_confirmed) { const f = prompt('Delivery fee to confirm for this order (TZS):'); if (f !== null && f !== '') deliveryFee = Number(f); } return this.run(async () => { await MoranBuy.api(`/api/merchant/orders/${o.id}/status`, { method: 'POST', body: { status, ...(deliveryFee !== undefined ? { deliveryFee } : {}) } }); await this.load(); }); },
+      };
+    }
+  </script>
+</body>
+</html>

@@ -4,6 +4,9 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
 ## Unreleased
 
+### 2026-10-28
+- Phase 5 and 6: merchant registration and sign-in, Moran AI account linking with two-factor relay, product and location import keyed by source ids, source-of-truth rules for Moran-owned fields, locations with geocoding or pins, orders and enquiries for merchants, entitlement records enforced in middleware, business app.
+
 ### 2026-10-27
 - Phase 4: reverse-marketplace engine (structured requests, deterministic fallback parser, clarification, discovery, budget-first ranking with evidence, presentation, selection and explicit order confirmation), Muse Spark client with real telemetry, customer web chat, signed inbound channel from Moran, catalogue and shopping migrations.
 - Phase 1: existing-system assessment and implementation plan (`docs/`).
