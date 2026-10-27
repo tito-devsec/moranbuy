@@ -48,6 +48,7 @@ export function parseQuantity(text) {
 // Best-effort product words: the text with budget, place and filler removed, trimmed to a short phrase.
 export function parseProductGuess(text) {
   let t = String(text || '').toLowerCase();
+  t = t.split(/\b(nipo|niko|i am in|i'm in|delivery|nataka delivery|pickup)\b/)[0];
   t = t.replace(/(tsh|tzs|sh)?\s*\d[\d,.]*\s*(m|mil|milioni|million|k|elfu|laki)?/g, ' ');
   t = t.replace(/\b(nina|nataka|ninahitaji|naomba|nipo|niko|delivery|ikiwezekana|i want|i need|budget|please|tafadhali|na|ya|wa|of|for|a|an|the|my|is)\b/g, ' ');
   t = t.replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim();

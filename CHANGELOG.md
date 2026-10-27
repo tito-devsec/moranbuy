@@ -5,6 +5,7 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 ## Unreleased
 
 ### 2026-10-28
+- Phase 10 to 15: admin API and app, Moran-side integration patch and drop-in files, Hermes research agent config, skill and client with unverified web offers, security tests, demo seed, architecture, API, deployment, testing and demo docs.
 - Phase 7 to 9: campaign engine with templates, Muse drafting with grounding check, audience resolution with exclusion reasons, pricing with configured rates, sandbox and Snippe payment providers with server-side settlement, dispatch gates, explicit confirmation, recipient ledger and worker; new-product outreach offers; optional paid follow-up with offer, leads, schedules, stop rules and worker; consent events, STOP handling and contact erasure; business app tabs for campaigns and follow-up.
 - Phase 5 and 6: merchant registration and sign-in, Moran AI account linking with two-factor relay, product and location import keyed by source ids, source-of-truth rules for Moran-owned fields, locations with geocoding or pins, orders and enquiries for merchants, entitlement records enforced in middleware, business app.
 

@@ -1,0 +1,40 @@
+# MoranBuy inside Moran
+
+MoranBuy (github.com/tito-devsec/moranbuy) is a reverse marketplace: a customer says what they
+need and can afford, MoranBuy finds offers from businesses and ranks them budget first, location
+second. Inside Moran it is **one admin-managed business** plus a signed channel.
+
+## What this adds to Moran
+
+| Piece | File |
+|---|---|
+| `tenants.admin_managed`, `tenants.moranbuy_listed`, `services.moranbuy_listed`, one `moranbuy` workspace | `src/db/migrations/20260101000102_moranbuy.js` |
+| Register the MoranBuy business, sign and verify the channel, forward inbound, send from the MoranBuy number or a listed merchant's number, listings of listed businesses, MoranBuy knowledge | `src/services/moranbuy.service.js` |
+| `/internal/moranbuy/*` (signed): `POST send`, `POST send-template`, `GET listings`, `GET knowledge/search` | `src/api/routes/moranbuy-internal.routes.js` |
+| `/api/admin/moranbuy` (`GET`, `POST register`) | `src/api/routes/admin/moranbuy.routes.js` |
+| `/api/moranbuy` (owner): `GET` status, `POST listing` the "List my products on MoranBuy" switch | `src/api/routes/moranbuy-owner.routes.js` |
+| Webhook: a message to the MoranBuy tenant is forwarded instead of answered by an agent | `src/api/routes/whatsapp-webhook.routes.js` |
+| Owner login refused for admin-managed accounts | `src/api/routes/auth.routes.js` |
+| Super Admin: "Register MoranBuy" on Businesses | `admin-frontend/assets/js/pages/businesses.js` |
+| Owner dashboard: MoranBuy entry at the right of the header | `frontend/moran-app.js`, `frontend/config.js` (`MORANBUY_URL`) |
+
+## Environment
+
+```
+MORANBUY_API_URL=https://buy.moranai.co.tz
+MORANBUY_SHARED_SECRET=<long random, the same value in MoranBuy's MORAN_SHARED_SECRET>
+```
+
+## Running it
+
+1. `npm run migrate`.
+2. Super Admin → Businesses → **Register MoranBuy** (contact email; the owner login is refused by design).
+3. Open the business page and connect its WhatsApp number as for any business; write its knowledge on the Knowledge tab.
+4. In `frontend/config.js` set `MORANBUY_URL`; the MoranBuy entry appears in every owner's header.
+5. A business owner switches on **List my products on MoranBuy** (`POST /api/moranbuy/listing`); only then do its products reach MoranBuy.
+
+## What MoranBuy may and may not do here
+
+- Reads: listed businesses' active products with their default location; the MoranBuy tenant's knowledge.
+- Sends: from the MoranBuy number (replies to its own customers) and, for a listed business with a connected number, approved templates and texts to that business's customers. Every send passes `authorizeOutbound`.
+- Never: the n8n key, Moran's database, another business's data, an unapproved template.

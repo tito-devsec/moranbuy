@@ -1,6 +1,7 @@
 import { config } from '@moranbuy/core';
 import { MuseClient } from '@moranbuy/muse-intelligence';
-import { Geocoder, MoranInternalClient } from '@moranbuy/integrations';
+import { Geocoder, MoranInternalClient, createResearcher } from '@moranbuy/integrations';
+import { recordMuseRequest } from '@moranbuy/muse-intelligence';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
 import { db } from '../db/connection.js';
@@ -22,7 +23,8 @@ export function shoppingDeps() {
       geocoder: new Geocoder({ cfg: c }),
       moran: new MoranInternalClient({ cfg: c }),
     };
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db) });
+    shared.researcher = createResearcher(c, { recorder: (r) => recordMuseRequest(db, r) });
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher });
   }
   return shared;
 }

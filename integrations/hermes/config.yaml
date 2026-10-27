@@ -1,0 +1,29 @@
+# MoranBuy's own Hermes Agent (Nous Research) for product research on the public web.
+# Reached only by the MoranBuy API on the internal Docker network; its key is HERMES_API_KEY.
+# Unlike Moran's Hermes (every tool off), this one has exactly the web and browser toolsets and one skill.
+model:
+  provider: custom
+  base_url: https://api.openai.com/v1
+  default: gpt-6-luna
+  api_key: ${OPENAI_API_KEY}
+
+platform_toolsets:
+  api_server: [web, browser, skills]
+
+agent:
+  disabled_toolsets: [terminal, file, code_execution, vision, image_gen, video, video_gen, delegation, cronjob, kanban, memory, session_search, connections, todo, clarify, x_search, tts, stt, homeassistant, computer_use, a2a, spotify, discord, discord_admin, yuanbao, context_engine]
+  api_max_retries: 1
+  run_budget_seconds: 60
+
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+
+curator:
+  enabled: false
+skills:
+  write_approval: true
+  guard_agent_created: true
+
+cron:
+  allow_agent_scheduling: false

@@ -75,6 +75,7 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
     a.trust.score = (a.trust.merchantVerified ? 40 : 0) + (a.trust.priceVerified ? 20 : 0) + (a.trust.stockKnown ? 20 : 0) + (a.trust.stale ? 0 : 20) - (a.trust.suspiciousPrice ? 60 : 0);
     if (a.trust.stale) a.reasons.push('listing_stale');
     if (a.trust.suspiciousPrice) a.reasons.push('price_needs_confirmation');
+    if (a.offer.unverified) a.reasons.push('found_online_unverified');
     if (!a.cost.totalConfirmed) a.reasons.push(`unknown_cost:${a.cost.unknownParts.join(',')}`);
   }
 
@@ -88,7 +89,8 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
   const sortGroup = (group) => {
     const min = group.length ? Math.min(...group.map((a) => a.cost.knownTotal)) : 0;
     return group.sort((x, y) =>
-      (y.trust.suspiciousPrice ? 0 : 1) - (x.trust.suspiciousPrice ? 0 : 1)
+      (y.offer.unverified ? 0 : 1) - (x.offer.unverified ? 0 : 1)
+      || (y.trust.suspiciousPrice ? 0 : 1) - (x.trust.suspiciousPrice ? 0 : 1)
       || y.suitability.bucket - x.suitability.bucket
       || band(x, min) - band(y, min)
       || y.location.score - x.location.score

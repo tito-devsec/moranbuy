@@ -22,7 +22,15 @@ This file lists what is new in this repository and the evidence for it. It is up
 | New campaign engine (drafting, review, templates through Moran, pricing, server-verified payment, eight dispatch gates, explicit confirmation, idempotent worker) and new-product outreach offers | done; live sending stays dry-run until the owner configures the provider rate and a payment provider | `packages/campaign-engine`, `packages/campaign-outreach`, `packages/billing`, `tests/integration/engagement.test.js`, `docs/campaign-workflow.md` |
 | Optional paid follow-up engine (ask first, decline activates nothing, leads, schedules, stop rules, idempotent worker) | done | `packages/followup-engine`, `tests/integration/engagement.test.js`, `docs/followup-workflow.md` |
 | Consent management (append-only events, per-merchant purposes, STOP handling, audience exclusion reasons, send-time recheck, erasure) | done | `packages/consent-management`, `docs/privacy-and-consent.md` |
-| MoranBuy Admin with real Muse telemetry | planned (Phase 10) | |
-| Moran-side integration drop-ins and Hermes research skill | planned (Phase 10) | |
+| MoranBuy Admin (merchants, verification, entitlements, ranking evidence and audited policy, consent lookup, campaigns, templates, follow-up, orders, billing and refunds, Muse telemetry with real test-connection, integration health, audit, settings) | done | `services/api/src/routes/admin.js`, `apps/admin/`, `tests/security/admin-and-tenancy.test.js` |
+| Moran-side integration: migration, register-MoranBuy admin route and button, forwarding webhook, signed internal router, owner listing switch, dashboard header entry, as a reviewed patch plus new files | done as a patch, not applied to production | `integrations/moran-backend/`, Moran's unit suite run on the patched tree (`docs/testing.md`) |
+| Hermes research agent config and skill, research client with allow-list and robots.txt, unverified web offers in ranking | done; off by default | `integrations/hermes/`, `packages/integrations/src/research.js`, `tests/unit/research.test.js` |
 
 Nothing above is claimed as working until its row says "done" and names a test or a run.
+
+## Still open for the owner
+
+- A Meta Model API key (`MUSE_API_KEY`) so Muse Spark runs live; every Muse path is tested with fakes and the admin page shows the real status.
+- Apply the Moran patch, register MoranBuy in Super Admin and connect its WhatsApp number.
+- Snippe credentials and the WhatsApp provider rate for campaign pricing.
+- Set the repository description on GitHub (settings writes are not possible from the build session).

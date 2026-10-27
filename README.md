@@ -4,7 +4,7 @@ MoranBuy is an AI-powered reverse marketplace. Customers describe the product th
 budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
 matches to the customer, prioritizing budget fit and total cost before location convenience.
 
-> Build status: Phase 9 of 15 done. The reverse-marketplace engine, budget-first ranking, Muse Spark
+> Build status: all 15 phases implemented. The reverse-marketplace engine, budget-first ranking, Muse Spark
 > client, customer web chat and the signed WhatsApp intake from Moran AI are implemented and tested.
 > Merchant platform, campaign engine, follow-up engine, consent management and the admin app are
 > being built phase by phase. `HACKATHON_CHANGES.md` says exactly what works today.
@@ -78,7 +78,13 @@ MoranBuy keeps its own database and never reads Moran AI's. It talks to Moran AI
 - the owner API with a linked merchant's own token (products, locations, template lifecycle);
 - a signed internal channel for the admin-managed MoranBuy business (inbound customer messages
   forwarded from Moran, outbound replies through Moran's outbound gate, listings of businesses
-  that opted in, admin-provided knowledge).
+  that opted in, admin-provided knowledge, merchant campaign sends from the merchant's own number).
+
+MoranBuy itself is registered in Moran AI's Super Admin like any business, with its own WhatsApp
+number, managed only by administrators. Its sales agent is limited to shopping, reads only the
+products of businesses that opted in, answers policy questions only from admin-written knowledge,
+and can look up public shop sites through an optional Hermes research agent whose results are
+always shown as "found online, not confirmed".
 
 The Moran-side pieces are shipped from this repository under `integrations/moran-backend/` as
 drop-in files for the Moran AI owner to review and apply. `docs/existing-system-assessment.md`
@@ -137,8 +143,9 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 
 ## Known limitations (today)
 
-- The admin app, Moran-side drop-ins and Hermes research skill are not built yet (Phase 10).
+- The Moran-side changes are shipped as a patch in `integrations/moran-backend/` and are not applied to production by this repository.
 - The WhatsApp provider rate for campaign pricing must be configured by an administrator; until then campaigns cannot be paid.
+- Web research (Hermes) is off by default and needs an allow-list of shop domains.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - Muse Spark is in US public preview; access needs a Meta Model API key.
 - Live campaign and follow-up sending stays in dry-run until every gate is verified in production.

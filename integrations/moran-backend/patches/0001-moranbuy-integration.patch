@@ -1,0 +1,230 @@
+diff --git a/admin-frontend/assets/js/pages/businesses.js b/admin-frontend/assets/js/pages/businesses.js
+index 2729c29..bced33e 100644
+--- a/admin-frontend/assets/js/pages/businesses.js
++++ b/admin-frontend/assets/js/pages/businesses.js
+@@ -50,6 +50,24 @@ bootPage({
+         { key: '_menu', label: '', render: (b) => moreMenu(businessActions(b, () => { table.reload(); stats.reload(); }), t('Actions for {b}', { b: b.businessName })) },
+       ],
+     });
+-    root.append(stats.el, table.el);
++    // MoranBuy (github.com/tito-devsec/moranbuy): one admin-managed business, registered from here like any other.
++    const moranbuy = h('div', { class: 'd-flex align-items-center gap-2 mb-3' });
++    const refreshMoranBuy = async () => {
++      const s = await api.get('/moranbuy');
++      moranbuy.replaceChildren(
++        h('span', { class: 'fw-bold', text: 'MoranBuy' }),
++        s.registered
++          ? h('a', { class: 'btn btn-sm btn-outline-secondary', href: `business.html?id=${encodeURIComponent(s.tenant.id)}`, text: `${t('Registered')} · WhatsApp ${s.tenant.whatsapp.status}` })
++          : h('button', { class: 'btn btn-sm btn-primary', text: t('Register MoranBuy'), on: { click: async () => {
++            const ownerEmail = prompt(t('Contact email for the MoranBuy business (admins sign in; this address never does):'));
++            if (!ownerEmail) return;
++            await api.post('/moranbuy/register', { ownerEmail, reason: 'Registered from the Businesses page' });
++            await refreshMoranBuy(); table.reload(); stats.reload();
++          } } }),
++        s.service.secretConfigured ? null : h('span', { class: 'text-danger small', text: t('MORANBUY_SHARED_SECRET is not set on the backend') }),
++      );
++    };
++    refreshMoranBuy().catch(() => {});
++    root.append(moranbuy, stats.el, table.el);
+   },
+ });
+diff --git a/docs/admin-api-reference.md b/docs/admin-api-reference.md
+index 795e532..851a563 100644
+--- a/docs/admin-api-reference.md
++++ b/docs/admin-api-reference.md
+@@ -7,7 +7,7 @@ the zod schemas of its path parameters, query string and body. Concepts, respons
+ metric definitions and error codes are in [admin-api.md](./admin-api.md); example responses are in
+ [admin-api.examples.json](./admin-api.examples.json).
+ 
+-298 routes.
++300 routes.
+ 
+ ## Contents
+ 
+@@ -28,6 +28,7 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
+ - [feedback](#feedback)
+ - [conversations](#conversations)
+ - [leads](#leads)
++- [moranbuy](#moranbuy)
+ - [customers](#customers)
+ - [channels](#channels)
+ - [campaigns](#campaigns)
+@@ -1576,6 +1577,24 @@ Query:
+ 
+ Other parameters are read by the service: `days`, list parameters (`page`, `pageSize`, `sort`, `order`) and the filters in admin-api.md §4.
+ 
++## moranbuy
++
++### `GET /api/admin/moranbuy`
++
++- **Access:** Bearer token with `businesses.read`.
++
++### `POST /api/admin/moranbuy/register`
++
++- **Access:** Bearer token with `businesses.read` and `businesses.manage`.
++
++Body:
++
++| Field | Type | |
++|---|---|---|
++| `businessName` | string, min 2, max 160 | optional, default `"MoranBuy"` |
++| `ownerEmail` | email, max 255 | required |
++| `reason` | string, max 500 | optional |
++
+ ## customers
+ 
+ ### `GET /api/admin/customers`
+diff --git a/frontend/config.js b/frontend/config.js
+index f50c66a..e4040c3 100644
+--- a/frontend/config.js
++++ b/frontend/config.js
+@@ -1,5 +1,7 @@
+ window.MORAN_CONFIG = {
+   API_BASE_URL: 'https://api.moranai.co.tz',
++  // The MoranBuy service (github.com/tito-devsec/moranbuy); blank hides the header entry.
++  MORANBUY_URL: '',
+   FB_SDK_VERSION: 'v25.0',
+   // Moran's sales and support line on WhatsApp, for owners who want to reach
+   // Moran (cash onboarding).
+diff --git a/frontend/moran-app.js b/frontend/moran-app.js
+index 3c5521a..85fd64a 100644
+--- a/frontend/moran-app.js
++++ b/frontend/moran-app.js
+@@ -1019,6 +1019,27 @@
+     groups.forEach((g) => g.classList.toggle('hidden', !show));
+   }
+ 
++  // ---- MoranBuy entry at the right-hand side of the header (github.com/tito-devsec/moranbuy) ----
++  // One link on every page, before the notification bell, to the MoranBuy business app, where the
++  // owner lists products on the reverse marketplace, runs campaigns and follow-up. Shown only when
++  // MORANBUY_URL is set in config.js; the server decides what the owner may do there.
++  function mountMoranBuyEntry(attempt = 0) {
++    const url = CFG.MORANBUY_URL;
++    if (!url || document.getElementById('moranBuyEntry')) return;
++    const bell = document.querySelector('header [x-data*="notificationBell"]');
++    if (!bell) { if (attempt < 20) setTimeout(() => mountMoranBuyEntry(attempt + 1), 150); return; }
++    const a = document.createElement('a');
++    a.id = 'moranBuyEntry';
++    a.href = `${String(url).replace(/\/+$/, '')}/business/`;
++    a.target = '_blank';
++    a.rel = 'noopener';
++    a.title = 'MoranBuy: list your products on the reverse marketplace';
++    a.className = 'hidden sm:inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 mr-2';
++    a.textContent = 'MoranBuy';
++    bell.parentElement.insertBefore(a, bell);
++  }
++  document.addEventListener('DOMContentLoaded', () => mountMoranBuyEntry());
++
+   // ---- the workspace switcher in the header of every dashboard page ----------------------------
+   // "Agent Workspace" shows the whole account at once, each agent narrows the whole dashboard to
+   // that agent (its one catalogue), and "Manage Workspace" opens services.html, where agents are made.
+diff --git a/src/api/routes/admin/index.js b/src/api/routes/admin/index.js
+index 242eb57..2339974 100644
+--- a/src/api/routes/admin/index.js
++++ b/src/api/routes/admin/index.js
+@@ -23,6 +23,7 @@ import { agentsRouter, feedbackRouter } from './agents.routes.js';
+ import { agentCatalogRouter } from './agent-catalog.routes.js';
+ import { conversationsRouter } from './conversations.routes.js';
+ import { leadsRouter } from './leads.routes.js';
++import { moranbuyAdminRouter } from './moranbuy.routes.js';
+ import { customersRouter } from './customers.routes.js';
+ import { channelsRouter } from './channels.routes.js';
+ import { campaignsRouter } from './campaigns.routes.js';
+@@ -83,6 +84,7 @@ adminApiRouter.use('/agent-catalog', agentCatalogRouter);
+ adminApiRouter.use('/feedback', feedbackRouter);
+ adminApiRouter.use('/conversations', conversationsRouter);
+ adminApiRouter.use('/leads', leadsRouter);
++adminApiRouter.use('/moranbuy', moranbuyAdminRouter);
+ adminApiRouter.use('/customers', customersRouter);
+ adminApiRouter.use('/channels', channelsRouter);
+ adminApiRouter.use('/campaigns', campaignsRouter);
+diff --git a/src/api/routes/auth.routes.js b/src/api/routes/auth.routes.js
+index e44d3cf..0553144 100644
+--- a/src/api/routes/auth.routes.js
++++ b/src/api/routes/auth.routes.js
+@@ -82,6 +82,11 @@ authRouter.post('/login', validateBody(loginSchema), async (req, res) => {
+     const tenant = await db('tenants').whereRaw('LOWER(owner_email) = ?', [identifier.toLowerCase()]).first();
+     if (tenant) {
+       ownerChecked = true;
++      // An admin-managed account (the MoranBuy business) has no owner sign-in; Super Admin runs it.
++      if (tenant.admin_managed) {
++        recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_failed', identifier, reason: 'admin_managed' });
++        return res.status(403).json({ error: 'ADMIN_MANAGED', message: 'This account is managed by Moran AI administrators.' });
++      }
+       if (await verifyPassword(password, tenant.owner_password_hash)) {
+         recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_success', identifier });
+         return res.json(await issueSession(tenant, {}, null, { via: 'web' }));
+diff --git a/src/api/routes/whatsapp-webhook.routes.js b/src/api/routes/whatsapp-webhook.routes.js
+index e5a7702..6fc5645 100644
+--- a/src/api/routes/whatsapp-webhook.routes.js
++++ b/src/api/routes/whatsapp-webhook.routes.js
+@@ -6,6 +6,7 @@ import { resolveTenantByPhoneNumberId, isTenantOperational, invalidateTenantCach
+ import { runAgent } from '../../core/agent-runner.js';
+ import { handleTableMessage } from '../../services/restaurant/reply.service.js';
+ import { handleMediaTrustMessage } from '../../agents/media-trust/mediaTrustAgent.js';
++import { isMoranBuyTenant, forwardInboundToMoranBuy } from '../../services/moranbuy.service.js';
+ import { upsertCustomer, updateCustomerInterest } from '../../services/customer.service.js';
+ import { detectIntent, createFollowUp, extractPromisedDate } from '../../services/followup.service.js';
+ import { notifyOwnerOfHandover, pingOwnerDashboard } from '../../services/owner-notify.service.js';
+@@ -884,6 +885,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+       }
+     }
+ 
++    // MoranBuy business (docs/moranbuy.md): the reverse-marketplace service answers, through this backend's outbound gate.
++    if (isMoranBuyTenant(tenant)) {
++      await forwardInboundToMoranBuy({ tenant, message, inbound, customerNumber, profileName: change?.contacts?.[0]?.profile?.name || null });
++      return;
++    }
++
+     // MediSure workspace — route to media trust agent instead of business agent
+     if (tenant.workspace_type === 'media') {
+       logger.info({ tenantId: tenant.id }, 'Routing to the MediSure agent instead of the business agent');
+diff --git a/src/config/index.js b/src/config/index.js
+index 8863974..b254b07 100644
+--- a/src/config/index.js
++++ b/src/config/index.js
+@@ -103,6 +103,13 @@ export const config = {
+     baseUrl: process.env.N8N_BASE_URL || 'http://127.0.0.1:5678',
+   },
+ 
++  // MoranBuy (github.com/tito-devsec/moranbuy): where customer messages to the MoranBuy business are
++  // forwarded, and the secret both sides sign with. Unset, the MoranBuy business answers nothing.
++  moranbuy: {
++    apiUrl: process.env.MORANBUY_API_URL,
++    sharedSecret: process.env.MORANBUY_SHARED_SECRET,
++  },
++
+   // Snippe mobile-money payments (M-Pesa, Airtel, Mixx, Halotel — Tanzania).
+   snippe: {
+     apiKey: process.env.SNIPPE_API_KEY,
+diff --git a/src/server.js b/src/server.js
+index 19d43c7..43b6ceb 100644
+--- a/src/server.js
++++ b/src/server.js
+@@ -56,6 +56,8 @@ import { setupRouter } from './api/routes/setup.routes.js';
+ import { adminApiRouter } from './api/routes/admin/index.js';
+ import { appConfigRouter } from './api/routes/app-config.routes.js';
+ import { webhookEventsRouter } from './api/routes/webhook-events.routes.js';
++import { moranbuyInternalRouter } from './api/routes/moranbuy-internal.routes.js';
++import { moranbuyOwnerRouter } from './api/routes/moranbuy-owner.routes.js';
+ import { globalErrorHandler, notFoundHandler } from './api/middleware/error.middleware.js';
+ import { corsOptions } from './api/allowed-origins.js';
+ import { bearsAdminToken } from './api/middleware/admin.middleware.js';
+@@ -88,6 +90,8 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+ app.use('/webhook/whatsapp', express.raw({ type: 'application/json' }));
+ // The shop screens' endpoint (docs/whatsapp-shop.md): signed over the raw body, like the webhook.
+ app.use('/webhook/flows', express.raw({ type: () => true, limit: '1mb' }));
++// MoranBuy's signed internal channel (docs/moranbuy.md): signed over the raw body like the webhooks.
++app.use('/internal/moranbuy', express.raw({ type: () => true, limit: '1mb' }));
+ // MoranAI MCP (docs/mcp.md): a JSON-RPC message is small; a token's share of a minute is counted
+ // after parsing, so the body must be small before anything is looked at.
+ app.use('/mcp', mcpBodyParser());
+@@ -311,6 +315,8 @@ app.get('/share/:token', async (req, res) => {
+   }
+ });
+ app.use('/api/tenant', tenantRouter);
++app.use('/api/moranbuy', moranbuyOwnerRouter);
++app.use('/internal/moranbuy', moranbuyInternalRouter);
+ app.use('/api/team', teamRouter);
+ app.use('/api/products', productsRouter);
+ app.use('/api/catalog', catalogRouter);

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoranBuy Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-900" x-data="adminApp()" x-init="init()">
+  <div x-show="!me" x-cloak class="min-h-screen flex items-center justify-center">
+    <form class="bg-white rounded-xl border p-6 w-80 space-y-3" @submit.prevent="login()">
+      <h1 class="font-semibold text-lg">MoranBuy Admin</h1>
+      <input class="w-full border rounded-lg p-2" type="email" placeholder="Email" x-model="form.email" required>
+      <input class="w-full border rounded-lg p-2" type="password" placeholder="Password" x-model="form.password" required>
+      <button class="w-full bg-gray-900 text-white rounded-lg p-2">Sign in</button>
+      <p class="text-red-700 text-sm" x-text="error"></p>
+    </form>
+  </div>
+
+  <div x-show="me" x-cloak class="flex min-h-screen">
+    <aside class="w-60 bg-gray-900 text-gray-200 p-4 space-y-1 shrink-0">
+      <div class="font-semibold text-white mb-3">MoranBuy Admin</div>
+      <template x-for="s in sections" :key="s"><button class="block w-full text-left px-3 py-1.5 rounded-lg text-sm" :class="section === s ? 'bg-gray-700 text-white' : 'hover:bg-gray-800'" @click="go(s)" x-text="s"></button></template>
+      <button class="block w-full text-left px-3 py-1.5 text-sm text-gray-400 mt-4" @click="logout()">Sign out</button>
+    </aside>
+    <main class="flex-1 p-6 overflow-x-auto">
+      <div class="flex justify-between items-center mb-4"><h2 class="font-semibold text-lg" x-text="section"></h2><span class="text-sm text-gray-500" x-text="me?.admin.email + ' · ' + me?.admin.role"></span></div>
+      <p class="text-red-700 text-sm mb-2" x-text="error"></p>
+      <p class="text-green-700 text-sm mb-2" x-text="notice"></p>
+
+      <template x-if="section === 'Overview'"><div class="grid md:grid-cols-3 gap-4">
+        <template x-for="[k, v] in Object.entries(data.overview || {}).filter(([k]) => k !== 'muse')" :key="k"><div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1" x-text="k"></div><pre class="text-xs" x-text="JSON.stringify(v, null, 1)"></pre></div></template>
+        <div class="bg-white rounded-xl border p-4 md:col-span-3"><div class="font-semibold mb-1">Muse Spark (last 24 h, from stored requests)</div><pre class="text-xs" x-text="JSON.stringify(data.overview?.muse, null, 1)"></pre></div>
+      </div></template>
+
+      <template x-if="['Standalone Businesses', 'Registered Businesses', 'Verification'].includes(section)"><div class="bg-white rounded-xl border overflow-x-auto">
+        <table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Business</th><th class="p-2">Type</th><th class="p-2">Verification</th><th class="p-2">Status</th><th class="p-2">Listings</th><th class="p-2">Services</th><th class="p-2"></th></tr></thead>
+          <tbody><template x-for="m in data.merchants || []" :key="m.id"><tr class="border-t">
+            <td class="p-2"><button class="underline" @click="openMerchant(m.id)" x-text="m.businessName"></button><div class="text-xs text-gray-500" x-text="m.moranTenantId ? 'Moran tenant ' + m.moranTenantId : m.contactEmail"></div></td>
+            <td class="p-2" x-text="m.registrationType"></td><td class="p-2" x-text="m.verificationStatus"></td><td class="p-2" x-text="m.status"></td><td class="p-2" x-text="m.listings"></td>
+            <td class="p-2 text-xs" x-text="m.entitlements.map(e => `${e.service}: ${e.status}/${e.billingState}`).join(', ')"></td>
+            <td class="p-2 whitespace-nowrap">
+              <button class="underline mr-2" x-show="m.verificationStatus === 'pending'" @click="decide(m, 'verified')">Verify</button>
+              <button class="underline mr-2" x-show="m.verificationStatus === 'pending'" @click="decide(m, 'rejected')">Reject</button>
+              <button class="underline mr-2" x-show="m.status === 'active'" @click="setStatus(m, 'suspended')">Suspend</button>
+              <button class="underline" x-show="m.status !== 'active'" @click="setStatus(m, 'active')">Reactivate</button>
+            </td></tr></template></tbody></table>
+      </div></template>
+
+      <template x-if="section === 'Merchant'"><div class="space-y-4">
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold" x-text="data.merchant?.merchant.businessName"></div><pre class="text-xs mt-2" x-text="JSON.stringify(data.merchant?.merchant, null, 1)"></pre></div>
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-2">Entitlements</div>
+          <template x-for="e in data.merchant?.entitlements || []" :key="e.id"><div class="text-sm flex gap-3 items-center py-1"><span class="w-48" x-text="e.service"></span><span class="font-mono text-xs" x-text="`${e.status} · ${e.billing_state}`"></span><button class="underline" @click="entitlement(e.service, 'activate')">Activate</button><button class="underline" @click="entitlement(e.service, 'pause')">Pause</button></div></template>
+          <div class="text-sm mt-2 flex gap-2"><select class="border rounded p-1" x-model="newService"><option value="">Add a service…</option><template x-for="s in ['campaign_engine','new_product_outreach','paid_followup','conversation_agent']" :key="s"><option :value="s" x-text="s"></option></template></select><button class="underline" x-show="newService" @click="entitlement(newService, 'activate')">Activate</button></div>
+        </div>
+        <template x-for="k in ['users','listings','locations','campaigns','followup','payments','orders']" :key="k"><div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1" x-text="k"></div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.merchant?.[k], null, 1)"></pre></div></template>
+      </div></template>
+
+      <template x-if="section === 'Products and Catalogues'"><div class="bg-white rounded-xl border p-4 text-sm">Products are shown per merchant: open a business from Standalone or Registered Businesses. Source of truth: Moran AI for imported products, MoranBuy for standalone ones.</div></template>
+
+      <template x-if="section === 'Product Matching and Ranking'"><div class="space-y-4">
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-2">Policy (budget first, location second is fixed in code; these are the tuning values)</div><pre class="text-xs" x-text="JSON.stringify(data.policy, null, 1)"></pre>
+          <div class="flex gap-2 mt-2 text-sm"><input class="border rounded p-1 w-64" placeholder='{"priceSimilarityPct": 2}' x-model="policyJson"><input class="border rounded p-1 w-64" placeholder="Reason (required, audited)" x-model="policyReason"><button class="underline" @click="savePolicy()">Save</button></div></div>
+        <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">When</th><th class="p-2">Product</th><th class="p-2">Budget</th><th class="p-2">Candidates</th><th class="p-2">Ranked</th><th class="p-2">Over</th><th class="p-2">Excluded</th><th class="p-2">Muse</th><th class="p-2"></th></tr></thead>
+          <tbody><template x-for="r in data.runs || []" :key="r.id"><tr class="border-t"><td class="p-2" x-text="r.created_at"></td><td class="p-2" x-text="r.request_json.productType"></td><td class="p-2" x-text="r.request_json.maxBudget"></td><td class="p-2" x-text="r.candidates"></td><td class="p-2" x-text="r.ranked"></td><td class="p-2" x-text="r.over_budget"></td><td class="p-2" x-text="r.excluded"></td><td class="p-2" x-text="r.muse_status"></td><td class="p-2"><button class="underline" @click="openRun(r.id)">Evidence</button></td></tr></template></tbody></table></div>
+        <div class="bg-white rounded-xl border p-4" x-show="data.run"><div class="font-semibold mb-2">Run evidence</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.run, null, 1)"></pre></div>
+      </div></template>
+
+      <template x-if="section === 'Locations'"><div class="bg-white rounded-xl border p-4 text-sm">Locations are listed per merchant on the merchant page, with their source (pin, geocoded, imported from Moran AI) and delivery facts. A location without coordinates shows no distance to customers.</div></template>
+
+      <template x-if="section === 'Customer Consent'"><div class="bg-white rounded-xl border p-4 space-y-2">
+        <div class="flex gap-2 text-sm"><input class="border rounded p-1 w-64" placeholder="Phone number" x-model="consentPhone"><button class="underline" @click="lookupConsent()">Look up</button></div>
+        <pre class="text-xs" x-text="JSON.stringify(data.consent, null, 1)"></pre>
+      </div></template>
+
+      <template x-if="['Campaign Engine', 'New-Product Outreach'].includes(section)"><div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Business</th><th class="p-2">Name</th><th class="p-2">Kind</th><th class="p-2">Status</th><th class="p-2">Dry run</th><th class="p-2">Queued/sent/failed/skipped</th><th class="p-2">Gates</th><th class="p-2"></th></tr></thead>
+        <tbody><template x-for="c in (data.campaigns || []).filter(c => section === 'Campaign Engine' ? c.kind === 'campaign' : c.kind === 'new_product_outreach')" :key="c.id"><tr class="border-t"><td class="p-2" x-text="c.businessName"></td><td class="p-2" x-text="c.name"></td><td class="p-2" x-text="c.kind"></td><td class="p-2" x-text="c.status"></td><td class="p-2" x-text="c.dryRun"></td><td class="p-2" x-text="`${c.counts.queued}/${c.counts.sent}/${c.counts.failed}/${c.counts.skipped}`"></td><td class="p-2 text-xs" x-text="Object.entries(c.gateResults || {}).map(([k, v]) => `${k}:${v.ok ? 'ok' : 'no'}`).join(' ')"></td><td class="p-2"><button class="underline" x-show="c.status === 'dispatching'" @click="pauseCampaign(c)">Pause</button></td></tr></template></tbody></table></div></template>
+
+      <template x-if="section === 'Templates and Media'"><div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Name</th><th class="p-2">Language</th><th class="p-2">Header</th><th class="p-2">Status (from Meta via Moran)</th><th class="p-2">Reason</th></tr></thead><tbody><template x-for="t in data.templates || []" :key="t.id"><tr class="border-t"><td class="p-2" x-text="t.name"></td><td class="p-2" x-text="t.language"></td><td class="p-2" x-text="t.headerFormat"></td><td class="p-2" x-text="t.status"></td><td class="p-2" x-text="t.statusReason || ''"></td></tr></template></tbody></table></div></template>
+
+      <template x-if="section === 'Follow-up Operations'"><div class="grid md:grid-cols-2 gap-4"><div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Leads</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.followup?.leads, null, 1)"></pre></div><div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Tasks</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.followup?.tasks, null, 1)"></pre></div></div></template>
+
+      <template x-if="section === 'Orders and Enquiries'"><div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Ref</th><th class="p-2">Business</th><th class="p-2">Product</th><th class="p-2">Known total</th><th class="p-2">Confirmed</th><th class="p-2">Status</th><th class="p-2">When</th></tr></thead><tbody><template x-for="o in data.orders?.orders || []" :key="o.id"><tr class="border-t"><td class="p-2 font-mono" x-text="o.order_ref"></td><td class="p-2" x-text="o.business_name"></td><td class="p-2" x-text="o.listing_name"></td><td class="p-2" x-text="o.known_total"></td><td class="p-2" x-text="o.total_confirmed"></td><td class="p-2" x-text="o.status"></td><td class="p-2" x-text="o.created_at"></td></tr></template></tbody></table></div></template>
+
+      <template x-if="section === 'Billing and Refunds'"><div class="space-y-4">
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Campaign pricing</div><pre class="text-xs" x-text="JSON.stringify(data.pricing, null, 1)"></pre><div class="flex gap-2 mt-2 text-sm"><input class="border rounded p-1 w-64" placeholder='{"providerUnitTzs": 60}' x-model="pricingJson"><input class="border rounded p-1 w-64" placeholder="Reason (required, audited)" x-model="pricingReason"><button class="underline" @click="savePricing()">Save</button></div></div>
+        <div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">Business</th><th class="p-2">Purpose</th><th class="p-2">Provider</th><th class="p-2">Reference</th><th class="p-2">Amount</th><th class="p-2">Status</th><th class="p-2"></th></tr></thead><tbody><template x-for="p in data.payments || []" :key="p.id"><tr class="border-t"><td class="p-2" x-text="p.business_name"></td><td class="p-2" x-text="p.purpose"></td><td class="p-2" x-text="p.provider"></td><td class="p-2 font-mono text-xs" x-text="p.reference"></td><td class="p-2" x-text="p.amount + ' ' + p.currency"></td><td class="p-2" x-text="p.status"></td><td class="p-2"><button class="underline" x-show="p.status === 'completed'" @click="refund(p)">Record refund</button></td></tr></template></tbody></table></div>
+      </div></template>
+
+      <template x-if="section === 'Muse Spark Intelligence'"><div class="space-y-4">
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Configuration (no key shown)</div><pre class="text-xs" x-text="JSON.stringify(data.muse?.status, null, 1)"></pre><button class="underline text-sm mt-2" @click="testMuse()">Test connection (makes one real request)</button><pre class="text-xs mt-2" x-text="JSON.stringify(data.museTest, null, 1)"></pre></div>
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Telemetry from stored requests</div><pre class="text-xs" x-text="JSON.stringify(data.muse?.telemetry, null, 1)"></pre></div>
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Recent requests (redacted)</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.muse?.recent, null, 1)"></pre></div>
+      </div></template>
+
+      <template x-if="section === 'Integration Health'"><div class="bg-white rounded-xl border p-4"><pre class="text-xs" x-text="JSON.stringify(data.integrations, null, 1)"></pre></div></template>
+      <template x-if="section === 'Audit Logs'"><div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">When</th><th class="p-2">Actor</th><th class="p-2">Action</th><th class="p-2">Target</th><th class="p-2">Reason</th></tr></thead><tbody><template x-for="e in data.audit || []" :key="e.id"><tr class="border-t"><td class="p-2 whitespace-nowrap" x-text="e.created_at"></td><td class="p-2" x-text="e.actor_type + (e.actor_id ? ' ' + e.actor_id.slice(0, 8) : '')"></td><td class="p-2" x-text="e.action"></td><td class="p-2 text-xs" x-text="(e.target_type || '') + ' ' + (e.target_id || '')"></td><td class="p-2" x-text="e.reason || ''"></td></tr></template></tbody></table></div></template>
+      <template x-if="section === 'Security and Settings'"><div class="bg-white rounded-xl border p-4"><pre class="text-xs" x-text="JSON.stringify(data.settings, null, 1)"></pre></div></template>
+    </main>
+  </div>
+
+  <script>
+    // Thin admin client: every section loads from /api/admin/* and shows what the server returns; nothing is computed in the browser.
+    function adminApp() {
+      const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+      const set = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} };
+      const api = async (path, { method = 'GET', body } = {}) => {
+        const res = await fetch(`/api/admin${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${get('moranbuy_admin_access') || ''}` }, body: body ? JSON.stringify(body) : undefined });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw Object.assign(new Error(d.message || d.error || `HTTP ${res.status}`), { status: res.status });
+        return d;
+      };
+      return {
+        me: null, section: 'Overview', data: {}, error: '', notice: '', form: { email: '', password: '' }, newService: '', policyJson: '', policyReason: '', pricingJson: '', pricingReason: '', consentPhone: '',
+        sections: ['Overview', 'Standalone Businesses', 'Registered Businesses', 'Verification', 'Products and Catalogues', 'Product Matching and Ranking', 'Locations', 'Customer Consent', 'Campaign Engine', 'New-Product Outreach', 'Templates and Media', 'Follow-up Operations', 'Orders and Enquiries', 'Billing and Refunds', 'Muse Spark Intelligence', 'Integration Health', 'Audit Logs', 'Security and Settings'],
+        async init() { if (get('moranbuy_admin_access')) { try { this.me = await api('/me'); await this.go('Overview'); } catch { set('moranbuy_admin_access', null); } } },
+        async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.message; if (e.status === 401) { this.me = null; set('moranbuy_admin_access', null); } } },
+        login() { return this.run(async () => { const d = await api('/auth/login', { method: 'POST', body: this.form }); set('moranbuy_admin_access', d.accessToken); this.me = { admin: d.admin }; await this.go('Overview'); }); },
+        logout() { set('moranbuy_admin_access', null); this.me = null; },
+        async go(s) { this.section = s; return this.run(async () => {
+          if (s === 'Overview') this.data.overview = await api('/overview');
+          if (s === 'Standalone Businesses') this.data.merchants = (await api('/merchants?type=standalone')).merchants;
+          if (s === 'Registered Businesses') this.data.merchants = (await api('/merchants?type=moran')).merchants;
+          if (s === 'Verification') this.data.merchants = (await api('/merchants?verification=pending')).merchants;
+          if (s === 'Product Matching and Ranking') { this.data.policy = await api('/ranking/policy'); this.data.runs = (await api('/ranking/runs')).runs; }
+          if (['Campaign Engine', 'New-Product Outreach'].includes(s)) this.data.campaigns = (await api('/campaigns')).campaigns;
+          if (s === 'Templates and Media') this.data.templates = (await api('/templates')).templates;
+          if (s === 'Follow-up Operations') this.data.followup = await api('/followup');
+          if (s === 'Orders and Enquiries') this.data.orders = await api('/orders');
+          if (s === 'Billing and Refunds') { this.data.pricing = await api('/pricing'); this.data.payments = (await api('/payments')).payments; }
+          if (s === 'Muse Spark Intelligence') this.data.muse = await api('/muse');
+          if (s === 'Integration Health') this.data.integrations = await api('/integrations');
+          if (s === 'Audit Logs') this.data.audit = (await api('/audit')).events;
+          if (s === 'Security and Settings') this.data.settings = await api('/settings');
+        }); },
+        openMerchant(id) { this.section = 'Merchant'; return this.run(async () => { this.data.merchant = await api(`/merchants/${id}`); }); },
+        decide(m, decision) { const reason = prompt('Reason:') || undefined; return this.run(async () => { await api(`/merchants/${m.id}/verification`, { method: 'POST', body: { decision, reason } }); await this.go(this.section); }); },
+        setStatus(m, status) { const reason = prompt('Reason (required):'); if (!reason) return; return this.run(async () => { await api(`/merchants/${m.id}/status`, { method: 'POST', body: { status, reason } }); await this.go(this.section); }); },
+        entitlement(service, action) { const reason = prompt(`Reason to ${action} ${service} (required, audited):`); if (!reason) return; return this.run(async () => { await api(`/merchants/${this.data.merchant.merchant.id}/entitlements/${service}`, { method: 'POST', body: { action, reason, billingState: 'paid' } }); await this.openMerchant(this.data.merchant.merchant.id); this.newService = ''; }, `${service}: ${action} recorded.`); },
+        openRun(id) { return this.run(async () => { this.data.run = await api(`/ranking/runs/${id}`); }); },
+        savePolicy() { return this.run(async () => { await api('/ranking/policy', { method: 'PUT', body: { ...JSON.parse(this.policyJson || '{}'), reason: this.policyReason } }); await this.go('Product Matching and Ranking'); }, 'Policy saved and audited.'); },
+        savePricing() { return this.run(async () => { await api('/pricing', { method: 'PUT', body: { ...JSON.parse(this.pricingJson || '{}'), reason: this.pricingReason } }); await this.go('Billing and Refunds'); }, 'Pricing saved and audited.'); },
+        lookupConsent() { return this.run(async () => { this.data.consent = await api(`/consent/${encodeURIComponent(this.consentPhone)}`); }); },
+        pauseCampaign(c) { const reason = prompt('Reason:'); if (!reason) return; return this.run(async () => { await api(`/campaigns/${c.id}/pause`, { method: 'POST', body: { reason } }); await this.go(this.section); }); },
+        refund(p) { const amount = Number(prompt(`Refund amount (max ${p.amount}):`)); const reason = prompt('Reason:'); if (!amount || !reason) return; return this.run(async () => { await api(`/payments/${p.id}/refund`, { method: 'POST', body: { amount, reason } }); await this.go(this.section); }); },
+        testMuse() { return this.run(async () => { this.data.museTest = await api('/muse/test', { method: 'POST' }); await this.go('Muse Spark Intelligence'); }); },
+      };
+    }
+  </script>
+</body>
+</html>

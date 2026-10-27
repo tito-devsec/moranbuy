@@ -5,6 +5,7 @@ import { shoppingRequestSchema, mergeRequest } from './request.js';
 import { fallbackExtract } from './parse.js';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
+import { researchResultsToOffers } from '@moranbuy/integrations';
 import { buildFacts, renderReply } from './present.js';
 import { upsertContact, recordConsent } from '@moranbuy/consent-management';
 import { createLead, followupSettings } from '@moranbuy/followup-engine';
@@ -13,8 +14,8 @@ const SESSION_TTL_MS = 6 * 3600000;
 
 // The customer-facing shopping engine: one call per inbound message, returns the replies to send and the new session state.
 export class ShoppingEngine {
-  constructor({ db, muse, geocoder, policyLoader = null, now = Date.now }) {
-    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.now = now;
+  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, now = Date.now }) {
+    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.now = now;
   }
 
   // Finds the customer's open session or starts one.
@@ -66,13 +67,20 @@ export class ShoppingEngine {
   async match(session, customer, request, { museStatus, context }) {
     const started = this.now();
     const offers = await discoverOffers(this.db, request);
+    // Web research, when switched on, adds unverified "found online" offers; they never outrank verified in-budget ones and cannot be ordered here.
+    let researchStatus = null;
+    if (this.researcher) {
+      const r = await this.researcher.research(request).catch(() => ({ ok: false, status: 'error', results: [] }));
+      researchStatus = r.status;
+      if (r.ok) offers.push(...researchResultsToOffers(r.results));
+    }
     const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
     const result = rankOffers({ request, offers, policy, now: this.now() });
     const facts = buildFacts(result, request);
     const [run] = await this.db('matching_runs').insert({
       session_id: session.id, request_json: request, policy_json: result.policy, candidates: offers.length, ranked: result.ranked.length,
       over_budget: result.overBudget.length, excluded: result.excluded.length, none_within_budget: result.noneWithinBudget,
-      excluded_json: JSON.stringify(result.excluded), muse_status: museStatus, duration_ms: this.now() - started,
+      excluded_json: JSON.stringify(result.excluded), muse_status: researchStatus ? `${museStatus};research:${researchStatus}` : museStatus, duration_ms: this.now() - started,
     }).returning('*');
     const rows = [];
     for (const group of ['ranked', 'overBudget']) {
@@ -100,6 +108,7 @@ export class ShoppingEngine {
     const presented = (session.context_json?.presented || []).find((p) => p.option === option);
     const lang = request.language || 'sw';
     if (!presented) return this.reply(session, [{ text: lang === 'en' ? 'Please reply with one of the option numbers shown.' : 'Tafadhali jibu kwa namba ya chaguo lililoonyeshwa.' }]);
+    if (String(presented.listingId || '').startsWith('web:')) return this.reply(session, [{ text: lang === 'en' ? 'That one was found online and is not a MoranBuy merchant, so I cannot order it for you. Pick another option or ask me to search again.' : 'Hilo limepatikana mtandaoni na si muuzaji wa MoranBuy, kwa hiyo siwezi kuliagiza. Chagua namba nyingine au niambie nitafute tena.' }]);
     const listing = await this.db('listings as l').join('merchants as m', 'm.id', 'l.merchant_id').where('l.id', presented.listingId).whereNull('l.deleted_at').first('l.*', 'm.business_name', 'm.status as merchant_status');
     if (!listing || listing.status !== 'active' || listing.merchant_status !== 'active' || (listing.stock !== null && listing.stock < (request.quantity || 1))) {
       await this.save(session, { state: 'presented' });
