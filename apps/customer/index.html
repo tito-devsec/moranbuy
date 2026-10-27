@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoranBuy</title>
+  <style>
+    :root { --teal: #0f766e; --bg: #f6f8f8; --ink: #111827; --muted: #6b7280; --card: #fff; --line: #e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+    header { background: var(--teal); color: #fff; padding: 14px 16px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    header p { margin: 2px 0 0; font-size: 13px; opacity: .9; }
+    main { max-width: 720px; margin: 0 auto; padding: 16px; }
+    .chat { display: flex; flex-direction: column; gap: 10px; min-height: 50vh; }
+    .msg { max-width: 85%; padding: 10px 12px; border-radius: 14px; white-space: pre-wrap; }
+    .me { align-self: flex-end; background: #111827; color: #fff; border-bottom-right-radius: 4px; }
+    .bot { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    .bot img { max-width: 100%; border-radius: 10px; display: block; margin-bottom: 6px; }
+    .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    form { display: flex; gap: 8px; margin-top: 14px; position: sticky; bottom: 0; background: var(--bg); padding: 8px 0; }
+    input[type=text] { flex: 1; padding: 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; }
+    button { padding: 12px 16px; border: 0; border-radius: 12px; background: var(--teal); color: #fff; font: inherit; cursor: pointer; }
+    button.ghost { background: #fff; color: var(--teal); border: 1px solid var(--teal); }
+    .hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  </style>
+</head>
+<body>
+  <header><h1>MoranBuy</h1><p>Sema unachohitaji na bajeti yako. Tunakuletea ofa zinazofaa, bei na bajeti kwanza, kisha ukaribu.</p></header>
+  <main>
+    <p class="hint">Mfano: <em>Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana.</em></p>
+    <div class="chat" id="chat"></div>
+    <form id="form">
+      <input type="text" id="text" placeholder="Andika ujumbe..." autocomplete="off" required>
+      <button type="button" class="ghost" id="loc" title="Tuma location yako">📍</button>
+      <button type="submit">Tuma</button>
+    </form>
+  </main>
+  <script>
+    // A thin client over POST /api/shop/messages; the customer token keeps the session in this browser only.
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const input = document.getElementById('text');
+    let token = null;
+    try { token = localStorage.getItem('moranbuy_customer') || null; } catch {}
+    let pendingLocation = null;
+
+    function add(role, text, imageUrl, meta) {
+      const el = document.createElement('div');
+      el.className = `msg ${role}`;
+      if (imageUrl) { const img = document.createElement('img'); img.src = imageUrl; img.alt = ''; el.appendChild(img); }
+      el.appendChild(document.createTextNode(text || ''));
+      if (meta) { const m = document.createElement('div'); m.className = 'meta'; m.textContent = meta; el.appendChild(m); }
+      chat.appendChild(el);
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    async function send(text) {
+      add('me', text || '📍 location');
+      const body = { customerToken: token || undefined, text, location: pendingLocation || undefined };
+      pendingLocation = null;
+      const res = await fetch('/api/shop/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { add('bot', data.message || 'Samahani, kuna hitilafu.'); return; }
+      token = data.customerToken;
+      try { localStorage.setItem('moranbuy_customer', token); } catch {}
+      for (const r of data.replies) add('bot', r.text || r.caption, r.imageUrl, r.imageUrl ? '' : `state: ${data.state}${data.museStatus ? ` · muse: ${data.museStatus}` : ''}`);
+    }
+
+    form.addEventListener('submit', async (e) => { e.preventDefault(); const t = input.value.trim(); if (!t && !pendingLocation) return; input.value = ''; await send(t); });
+    document.getElementById('loc').addEventListener('click', () => {
+      if (!navigator.geolocation) return add('bot', 'Kivinjari hiki hakitoi location.');
+      navigator.geolocation.getCurrentPosition((p) => { pendingLocation = { lat: p.coords.latitude, lng: p.coords.longitude }; send(input.value.trim()); input.value = ''; }, () => add('bot', 'Sikuweza kupata location yako. Andika mtaa na mji.'));
+    });
+    add('bot', 'Karibu MoranBuy. Niambie bidhaa unayotaka, bajeti yako ya juu, na ulipo.');
+  </script>
+</body>
+</html>

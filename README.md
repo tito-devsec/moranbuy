@@ -4,9 +4,9 @@ MoranBuy is an AI-powered reverse marketplace. Customers describe the product th
 budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
 matches to the customer, prioritizing budget fit and total cost before location convenience.
 
-> Build status: Phase 2 of 15. The repository skeleton, configuration validation, foundation schema,
-> CI and policies are in place and tested. The reverse-marketplace engine, merchant platform,
-> campaign engine, follow-up engine, consent management, Muse Spark integration and admin app are
+> Build status: Phase 4 of 15 done. The reverse-marketplace engine, budget-first ranking, Muse Spark
+> client, customer web chat and the signed WhatsApp intake from Moran AI are implemented and tested.
+> Merchant platform, campaign engine, follow-up engine, consent management and the admin app are
 > being built phase by phase. `HACKATHON_CHANGES.md` says exactly what works today.
 
 ## The problem
@@ -60,7 +60,7 @@ extract attributes and constraints, draft recommendations from matched data, dra
 campaign messages, and summarise follow-up leads. Muse Spark never decides prices, budgets,
 rankings, consent, authorization, payments or order state; deterministic code does. If Muse Spark
 is unavailable, MoranBuy says so and uses only configured fallback behaviour.
-See `docs/muse-integration.md` (written in Phase 4).
+See `docs/muse-integration.md`.
 
 ## Campaigns, outreach and follow-up
 
@@ -137,6 +137,7 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 
 ## Known limitations (today)
 
-- No shopping, merchant, campaign, follow-up, consent or admin functionality exists yet; only the skeleton.
+- Merchant registration, product import, campaigns, follow-up, consent and the admin app are not built yet; listings today come from seeds and tests.
+- Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - Muse Spark is in US public preview; access needs a Meta Model API key.
 - Live campaign and follow-up sending stays in dry-run until every gate is verified in production.
