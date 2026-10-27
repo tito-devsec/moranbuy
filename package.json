@@ -18,9 +18,9 @@
     "lint": "node scripts/lint.mjs",
     "check": "node scripts/check-syntax.mjs",
     "test": "node --test \"tests/unit/**/*.test.js\"",
-    "test:integration": "node --test \"tests/integration/**/*.test.js\"",
-    "test:security": "node --test \"tests/security/**/*.test.js\"",
-    "test:e2e": "node --test \"tests/end-to-end/**/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"tests/integration/**/*.test.js\"",
+    "test:security": "node --test --test-concurrency=1 \"tests/security/**/*.test.js\"",
+    "test:e2e": "node --test --test-concurrency=1 \"tests/end-to-end/**/*.test.js\"",
     "test:all": "npm run check && npm test && npm run test:integration && npm run test:security && npm run test:e2e",
     "hooks": "git config core.hooksPath scripts/githooks"
   },
