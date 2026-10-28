@@ -1,4 +1,5 @@
-# MoranBuy on the Moran VPS as its own stack: own Postgres and Redis containers, the API on 127.0.0.1:4000 for Nginx.
+# MoranBuy on the Moran VPS as its own stack: own Postgres and Redis containers; the API joins Moran's Docker network so Moran's nginx reaches it as moranbuy-api:4000.
+# Memory limits keep the stack inside a small VPS next to Moran; 127.0.0.1:4000 stays open for local checks.
 # Run from the repository root:  docker compose -f deploy/docker-compose.vps.yml --env-file .env up -d --build
 services:
   moranbuy-postgres:
@@ -15,12 +16,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 384m
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
   moranbuy-redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    mem_limit: 192m
     volumes:
       - moranbuy_redisdata:/data
 
@@ -38,6 +41,8 @@ services:
     volumes:
       - moranbuy_uploads:/app/data/uploads
     ports: ["127.0.0.1:4000:4000"]
+    networks: [default, moran]
+    mem_limit: 512m
     depends_on:
       moranbuy-postgres: { condition: service_healthy }
       moranbuy-redis: { condition: service_started }
@@ -53,6 +58,7 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
       REDIS_URL: redis://moranbuy-redis:6379
     command: ["node", "services/api/src/workers/main.js"]
+    mem_limit: 384m
     # The retention purge removes expired customer photos from the same volume.
     volumes:
       - moranbuy_uploads:/app/data/uploads
@@ -64,3 +70,10 @@ volumes:
   moranbuy_uploads:
   moranbuy_pgdata:
   moranbuy_redisdata:
+
+networks:
+  default: {}
+  # Moran's Compose network (project moran-backend); override with MORAN_DOCKER_NETWORK if it is named differently.
+  moran:
+    external: true
+    name: ${MORAN_DOCKER_NETWORK:-moran-backend_default}

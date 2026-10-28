@@ -68,6 +68,8 @@ test('a job whose worker died comes back after its lease; failures retry with a 
 });
 
 test('the feeder loads what Postgres says is due, and each job handles only the item it names', async () => {
+  // No quiet hours here, so the result does not depend on the hour the suite runs (21:00 to 08:00 EAT would hold the reminder).
+  await db('platform_settings').insert({ key: 'notification_schedule_reminder', value: JSON.stringify({ quietFrom: 0, quietTo: 0 }) }).onConflict('key').merge();
   const c = await acceptedCustomer('255700000901');
   await db('customers').where({ id: c.id }).update({ last_seen_at: new Date() });
   const [due] = await db('customer_schedules').insert({ customer_id: c.id, kind: 'purchase_plan', due_at: new Date(Date.now() - 1000), when_text: 'leo' }).returning('*');
