@@ -29,12 +29,11 @@ CI (`.github/workflows/ci.yml`) runs the same on every push: https://github.com/
 
 ## Moran AI side
 
-The patch in `integrations/moran-backend/` was applied to a local clone of `moran-backend`
-(commit `965c247`) with its dependencies installed. Every patched and new file passes
-`node --check` and imports cleanly. Moran's own unit suite (`npm test`, 1,528 tests) was run on
-the patched tree: 1,523 passed; the 2 failures are Moran's own cases marked `TODO known fault`
-in its source (healthcare and sales evaluation cases), unrelated to the patch. The admin API
-reference check, which failed when the new admin route was added, passes after regenerating the
-reference, which is part of the patch. Not run: Moran's database-backed suites, anything
-against a live Meta number, and the Super Admin MoranBuy page in a browser (checked by `node --check`
-and by reading the helpers it uses).
+The patch in `integrations/moran-backend/` was applied to a clean checkout of `moran-backend` `main`
+(commit `680d6f5`, the commit on the production VPS) with its dependencies installed, and the result matches
+`patches/0001-moranbuy-integration.sha256` file for file. Every patched and new file passes `node --check`.
+Moran's own unit suite (`npm test`, 1,668 tests) was run on the patched tree: 1,666 passed, 1 is skipped as todo, and the
+one failure is Moran's own `sales-camera-ngapi-not-price`, marked `TODO known fault` in its source and failing on `main` too.
+Moran's database-backed schema check passed against a database migrated from empty to `20260101000103_moranbuy.js`, and the
+MoranBuy migration rolls down and up again. The admin API reference was regenerated with Moran's own `npm run docs:admin-api`.
+Not run here: anything against a live Meta number, and the Super Admin MoranBuy page in a browser.

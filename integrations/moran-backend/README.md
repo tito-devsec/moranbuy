@@ -5,8 +5,8 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 
 ## Contents
 
-- `patches/0001-moranbuy-integration.patch`: a `git diff` against `moran-backend` commit `965c247`
-  (27 October 2026) touching 11 existing files. It is a zero-context diff: it carries only the new lines and the three existing lines they replace, so no other Moran code is published here; apply it with `--unidiff-zero`. Config block, raw-body mount and router mounts in
+- `patches/0001-moranbuy-integration.patch`: a `git diff` against `moran-backend` `main` at commit `680d6f5`
+  (28 October 2026) touching 11 existing files. It is a zero-context diff: it carries only the new lines and the three existing lines they replace, so no other Moran code is published here; apply it with `--unidiff-zero`. Config block, raw-body mount and router mounts in
   `server.js`, the webhook forward, the owner-login refusal, the admin router registration, the
   Super Admin register button and the MoranBuy navigation entry, the delivery-receipt forward, the weare CSP for Facebook's
   Embedded Signup window, the dashboard header entry and `MORANBUY_URL`, and the regenerated admin
@@ -15,7 +15,7 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 
 | Copy to | File |
 |---|---|
-| `src/db/migrations/20260101000102_moranbuy.js` | `files/20260101000102_moranbuy.js` |
+| `src/db/migrations/20260101000103_moranbuy.js` | `files/20260101000103_moranbuy.js` |
 | `src/services/moranbuy.service.js` | `files/moranbuy.service.js` |
 | `src/api/routes/moranbuy-internal.routes.js` | `files/moranbuy-internal.routes.js` |
 | `src/api/routes/moranbuy-owner.routes.js` | `files/moranbuy-owner.routes.js` |
@@ -28,7 +28,7 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 
 ```bash
 cd moran-backend && git checkout -b moranbuy-integration
-cp ../moranbuy/integrations/moran-backend/files/20260101000102_moranbuy.js src/db/migrations/
+cp ../moranbuy/integrations/moran-backend/files/20260101000103_moranbuy.js src/db/migrations/
 cp ../moranbuy/integrations/moran-backend/files/moranbuy.service.js src/services/
 cp ../moranbuy/integrations/moran-backend/files/moranbuy-internal.routes.js src/api/routes/
 cp ../moranbuy/integrations/moran-backend/files/moranbuy-owner.routes.js src/api/routes/
@@ -36,9 +36,15 @@ cp ../moranbuy/integrations/moran-backend/files/moranbuy.routes.js src/api/route
 cp ../moranbuy/integrations/moran-backend/files/admin-moranbuy.html admin-frontend/moranbuy.html
 cp ../moranbuy/integrations/moran-backend/files/admin-pages-moranbuy.js admin-frontend/assets/js/pages/moranbuy.js
 cp ../moranbuy/integrations/moran-backend/files/docs-moranbuy.md docs/moranbuy.md
+git apply --check --unidiff-zero ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.patch
 git apply --unidiff-zero ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.patch
-npm test && npm run migrate
+sha256sum -c ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.sha256
+npm test
 ```
+
+A zero-context hunk is placed by its line number, so apply the patch only on `680d6f5`; on any other commit
+`--check` can pass while a line lands in the wrong place. `sha256sum -c` proves the result: all 19 files must read `OK`.
+The migration is numbered `...103` because Moran's `...102` is `testimonial_words`. Moran's backend container runs it when it starts.
 
 Set `MORANBUY_API_URL` and `MORANBUY_SHARED_SECRET` in Moran's `.env`, and `MORANBUY_URL` in
 `frontend/config.js`. Redeploy the admin front-end (`admin-frontend/deploy.sh`) and reload Nginx

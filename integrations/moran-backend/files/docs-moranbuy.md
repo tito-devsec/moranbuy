@@ -8,7 +8,7 @@ second. Inside Moran it is **one admin-managed business** plus a signed channel.
 
 | Piece | File |
 |---|---|
-| `tenants.admin_managed`, `tenants.moranbuy_listed`, `services.moranbuy_listed`, one `moranbuy` workspace | `src/db/migrations/20260101000102_moranbuy.js` |
+| `tenants.admin_managed`, `tenants.moranbuy_listed`, `services.moranbuy_listed`, one `moranbuy` workspace | `src/db/migrations/20260101000103_moranbuy.js` |
 | Register the MoranBuy business, sign and verify the channel, forward inbound, send from the MoranBuy number or a listed merchant's number, listings of listed businesses, MoranBuy knowledge | `src/services/moranbuy.service.js` |
 | `/internal/moranbuy/*` (signed): `POST send` (text, image, buttons, template, and `audio` for spoken replies, the Ogg Opus bytes in the body), `POST send-template`, `GET listings`, `GET knowledge/search`, `POST orders` (a MoranBuy order into a listed business's own orders, `MB-` prefixed, idempotent), `PATCH orders/:orderRef` (status in step with MoranBuy) | `src/api/routes/moranbuy-internal.routes.js` |
 | `/api/admin/moranbuy` (`GET`, `POST register`) | `src/api/routes/admin/moranbuy.routes.js` |
