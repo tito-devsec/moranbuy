@@ -14,8 +14,8 @@ const SESSION_TTL_MS = 6 * 3600000;
 
 // The customer-facing shopping engine: one call per inbound message, returns the replies to send and the new session state.
 export class ShoppingEngine {
-  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, profileLoader = null, now = Date.now }) {
-    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.profileLoader = profileLoader; this.now = now;
+  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, profileLoader = null, onOrderConfirmed = null, now = Date.now }) {
+    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.profileLoader = profileLoader; this.onOrderConfirmed = onOrderConfirmed; this.now = now;
   }
 
   // Finds the customer's open session or starts one.
@@ -131,11 +131,13 @@ export class ShoppingEngine {
     if (!sel) return this.reply(session, [{ text: lang === 'en' ? 'Pick an option first.' : 'Chagua chaguo kwanza.' }]);
     const ref = shortRef('MB');
     const fulfilment = request.fulfilment === 'pickup' ? 'pickup' : request.fulfilment === 'delivery' ? 'delivery' : 'pickup';
-    await this.db('orders').insert({
+    const [order] = await this.db('orders').insert({
       order_ref: ref, customer_id: customer.id, session_id: session.id, merchant_id: sel.merchantId, listing_id: sel.listingId, quantity: request.quantity || 1,
       unit_price: sel.price, delivery_fee: sel.totalConfirmed ? sel.knownTotal - sel.price * (request.quantity || 1) : null, known_total: sel.knownTotal, total_confirmed: sel.totalConfirmed,
       currency: request.currency || 'TZS', fulfilment, customer_location_json: request.location ? JSON.stringify(request.location) : null, status: 'pending_merchant', confirmed_at: new Date(this.now()),
-    });
+    }).returning('*');
+    // The business owner is told at once; a failure to tell them never undoes the order and is recorded for admins.
+    if (this.onOrderConfirmed) await this.onOrderConfirmed(order).catch((err) => this.db('merchant_notifications').insert({ merchant_id: order.merchant_id, event: 'order_confirmed', target_type: 'order', target_id: order.id, channel: 'whatsapp', kind: 'text', status: 'failed', error: String(err.message).slice(0, 500), idempotency_key: `order_confirmed:${order.id}:err` }).catch(() => {}));
     await this.save(session, { state: 'confirmed' });
     // The merchant now has a real relationship with this customer: a contact and service consent for the order, and a lead only where follow-up was accepted.
     if (customer.channel === 'whatsapp') {

@@ -21,6 +21,7 @@ import { engagementDeps } from '../services/engagement.js';
 import { merchantDeps } from '../services/merchants.js';
 import { describeCredentials, saveCredentials, CREDENTIAL_FIELDS } from '../services/runtime-settings.js';
 import { proxiedAdmin } from '../middleware/proxied-admin.js';
+import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '../services/merchant-notify.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -256,6 +257,21 @@ adminRouter.put('/agent-profile', manage, validate({ body: z.object({ name: z.st
   await db('platform_settings').insert({ key: 'agent_profile', value: JSON.stringify(profile), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
   await act(req, { action: 'agent_profile.changed', targetType: 'settings', targetId: 'agent_profile', before, after: profile, reason: why });
   res.json({ profile });
+}));
+
+// ---- the message business owners get when an order is confirmed; wording and template set here ----
+adminRouter.get('/notifications/order-confirmed', asyncHandler(async (_req, res) => {
+  const settings = await loadOrderAlertSettings();
+  const sample = { order_ref: 'MB-7K2P9Q', product: 'Sofa ya watu watatu', quantity: 1, total: 'TSh 305,000', fulfilment: 'delivery', customer_phone: '+2557…78', customer_location: ', Sinza, Dar es Salaam', merchant: 'Duka la Mfano' };
+  res.json({ settings, defaults: DEFAULT_ORDER_ALERT, preview: { sw: renderOrderAlert(settings.textSw, sample), en: renderOrderAlert(settings.textEn, sample) }, placeholders: Object.keys(sample), recent: await db('merchant_notifications as n').join('merchants as m', 'm.id', 'n.merchant_id').orderBy('n.created_at', 'desc').limit(50).select('n.*', 'm.business_name') });
+}));
+adminRouter.put('/notifications/order-confirmed', manage, validate({ body: z.object({ enabled: z.boolean().optional(), templateName: z.string().max(120).regex(/^[a-z0-9_]*$/).optional(), templateLanguage: z.string().max(8).optional(), textSw: z.string().min(10).max(1000).optional(), textEn: z.string().min(10).max(1000).optional(), templateParams: z.array(z.string().max(30)).max(10).optional(), reason: z.string().min(3).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...patch } = req.body;
+  const before = await loadOrderAlertSettings();
+  const next = { ...before, ...patch };
+  await db('platform_settings').insert({ key: 'notification_order_confirmed', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'notifications.order_confirmed_changed', targetType: 'settings', targetId: 'notification_order_confirmed', before, after: next, reason: why });
+  res.json({ settings: next });
 }));
 
 adminRouter.get('/settings', asyncHandler(async (_req, res) => res.json({ settings: await db('platform_settings').orderBy('key'), admins: await db('admin_users').select('id', 'email', 'name', 'role', 'is_active', 'last_login_at') })));

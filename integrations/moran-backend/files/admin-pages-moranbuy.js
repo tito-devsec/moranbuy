@@ -5,7 +5,7 @@ import { bootPage } from '../core/page.js';
 import { simpleTable } from '../core/table.js';
 import { badge, drawer, loadInto, toast, toastError, button, busy, confirmAction } from '../core/ui.js';
 import { card } from '../core/widgets.js';
-import { input, select, readForm } from '../core/forms.js';
+import { input, select, textarea, readForm } from '../core/forms.js';
 import { formatDateTime, formatInt } from '../core/format.js';
 
 /*
@@ -114,7 +114,7 @@ function setupCard(state, onDone) {
 }
 
 // ---- the dashboard: the MoranBuy admin sections, read through the signed proxy ----
-const SECTIONS = ['Overview', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Audit'];
+const SECTIONS = ['Overview', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Audit'];
 
 function dashboard() {
   const body = h('div');
@@ -136,6 +136,7 @@ async function load(name) {
     case 'Templates': return mb.get('templates');
     case 'Follow-up': return mb.get('followup');
     case 'Orders': return mb.get('orders');
+    case 'Notifications': return mb.get('notifications/order-confirmed');
     case 'Billing': return { pricing: await mb.get('pricing'), payments: (await mb.get('payments')).payments };
     case 'Muse Spark': return { muse: await mb.get('muse'), credentials: (await mb.get('credentials')).credentials };
     case 'Credentials': return mb.get('credentials');
@@ -184,6 +185,18 @@ function render(name, d, reload) {
     case 'Templates': return card({ title: t('Templates (status is what Meta told Moran)'), body: simpleTable([{ key: 'name', label: t('Name') }, { key: 'language', label: t('Language') }, { key: 'headerFormat', label: t('Header') }, { key: 'status', label: t('Status'), render: (x) => badge(x.status) }, { key: 'statusReason', label: t('Reason') }], d.templates) });
     case 'Follow-up': return h('div', { class: 'row g-3' }, h('div', { class: 'col-lg-6' }, card({ title: t('Leads'), body: simpleTable([{ key: 'business_name', label: t('Business') }, { key: 'phone', label: t('Customer') }, { key: 'state', label: t('State'), render: (l) => `${l.state}${l.stop_reason ? ` (${l.stop_reason})` : ''}` }, { key: 'attempts', label: t('Attempts'), render: (l) => `${l.attempts}/${l.max_attempts}` }], d.leads) })), h('div', { class: 'col-lg-6' }, card({ title: t('Tasks'), body: simpleTable([{ key: 'due_at', label: t('Due'), render: (x) => formatDateTime(x.due_at) }, { key: 'status', label: t('Status') }, { key: 'skip_reason', label: t('Reason') }, { key: 'dry_run', label: t('Dry run'), render: (x) => (x.dry_run ? t('yes') : t('no')) }], d.tasks) })));
     case 'Orders': return card({ title: t('Orders'), body: simpleTable([{ key: 'order_ref', label: t('Ref') }, { key: 'business_name', label: t('Business') }, { key: 'listing_name', label: t('Product') }, { key: 'known_total', label: t('Known total'), render: (o) => `${money(o.known_total, o.currency)}${o.total_confirmed ? '' : ` (${t('delivery not confirmed')})`}` }, { key: 'status', label: t('Status'), render: (o) => badge(o.status) }, { key: 'created_at', label: t('When'), render: (o) => formatDateTime(o.created_at) }], d.orders.orders) });
+    case 'Notifications': {
+      const st = d.settings;
+      const form = h('div', { class: 'row g-2' },
+        h('div', { class: 'col-md-6' }, textarea({ name: 'textSw', label: t('Message to the business owner (Swahili)'), value: st.textSw, rows: 3, maxlength: 1000 })),
+        h('div', { class: 'col-md-6' }, textarea({ name: 'textEn', label: t('Message to the business owner (English)'), value: st.textEn, rows: 3, maxlength: 1000 })),
+        h('div', { class: 'col-md-4' }, input({ name: 'templateName', label: t('Approved template on the MoranBuy number (blank: plain text)'), value: st.templateName, placeholder: 'moranbuy_order_alert', help: t('Needed when the owner has not written to MoranBuy in the last 24 hours; create and submit it on the MoranBuy business page → Templates with 6 body variables in this order: order ref, product, quantity, total, fulfilment, customer phone.') })),
+        h('div', { class: 'col-md-2' }, input({ name: 'templateLanguage', label: t('Template language'), value: st.templateLanguage })),
+        h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+      const save = button(t('Save notification'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('notifications/order-confirmed', f); toast(t('Saved.')); reload(); }).catch(toastError) });
+      return h('div', {}, card({ title: t('When a customer confirms an order, the business owner gets this on WhatsApp'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Placeholders: {p}', { p: d.placeholders.map((x) => `{${x}}`).join(' ') }) }), form, h('div', { class: 'mt-2' }, save), h('div', { class: 'mt-3 fs-sm' }, h('div', { class: 'fw-bold', text: t('Preview') }), h('div', { class: 'text-muted', text: d.preview.sw }), h('div', { class: 'text-muted', text: d.preview.en }))) }),
+        card({ cls: 'mt-3', title: t('Recent alerts sent'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (n) => formatDateTime(n.created_at) }, { key: 'business_name', label: t('Business') }, { key: 'kind', label: t('Kind') }, { key: 'status', label: t('Status'), render: (n) => badge(n.status) }, { key: 'skip_reason', label: t('Reason'), render: (n) => n.skip_reason || n.error || '' }], d.recent) }));
+    }
     case 'Billing': {
       const form = h('div', { class: 'row g-2 align-items-end' }, h('div', { class: 'col-md-3' }, input({ name: 'providerUnitTzs', label: t('WhatsApp provider rate per message (TZS)'), type: 'number', value: d.pricing.effective.providerUnitTzs ?? '' })), h('div', { class: 'col-md-3' }, input({ name: 'serviceFeeUnitTzs', label: t('MoranBuy fee per message'), type: 'number', value: d.pricing.effective.serviceFeeUnitTzs })), h('div', { class: 'col-md-2' }, input({ name: 'taxPct', label: t('Tax %'), type: 'number', value: d.pricing.effective.taxPct })), h('div', { class: 'col-md-4' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const save = button(t('Save pricing'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('pricing', f); toast(t('Pricing saved.')); reload(); }).catch(toastError) });

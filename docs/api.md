@@ -46,6 +46,7 @@ which signs each request (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature` over ti
 path and body) and carries `X-MoranBuy-Admin-Email`, `-Name`, `-Role`. The same routes accept a
 MoranBuy admin token for the fallback app.
 
+- `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
 - `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`
 - `POST /api/admin/auth/login`, `/auth/refresh`, `GET /me`, `GET /overview`
 - `GET /merchants?type=&status=&verification=&search=`, `GET /merchants/:id`, `POST /merchants/:id/verification`, `POST /merchants/:id/status`, `POST /merchants/:id/entitlements/:service`

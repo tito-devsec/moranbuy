@@ -2,6 +2,7 @@ import { config } from '@moranbuy/core';
 import { MuseClient } from '@moranbuy/muse-intelligence';
 import { Geocoder, MoranInternalClient, RuntimeResearcher } from '@moranbuy/integrations';
 import { museRuntimeConfig, researchRuntimeConfig } from './runtime-settings.js';
+import { notifyMerchantOfOrder } from './merchant-notify.js';
 import { recordMuseRequest } from '@moranbuy/muse-intelligence';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
@@ -31,7 +32,7 @@ export function shoppingDeps() {
       moran: new MoranInternalClient({ cfg: c }),
     };
     shared.researcher = new RuntimeResearcher({ resolve: () => researchRuntimeConfig(), cfg: c, deps: { recorder: (r) => recordMuseRequest(db, r) } });
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db) });
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db), onOrderConfirmed: (order) => notifyMerchantOfOrder({ moran: shared.moran, order }) });
   }
   return shared;
 }

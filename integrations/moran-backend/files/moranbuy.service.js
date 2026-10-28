@@ -89,11 +89,17 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
 }
 
 /** A reply from the MoranBuy number (text or image), through the outbound gate like every message. */
-export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, idempotencyKey }) {
+export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], idempotencyKey }) {
   const tenant = await moranBuyTenant();
   if (!tenant?.whatsapp_phone_number_id) throw Object.assign(new Error('MORANBUY_NOT_CONNECTED'), { code: 'MORANBUY_NOT_CONNECTED', status: 409 });
   const common = { phoneNumberId: tenant.whatsapp_phone_number_id, accessTokenEncrypted: tenant.wa_access_token_encrypted, to, kind: 'moranbuy', idempotencyKey, tenantId: tenant.id };
   if (type === 'image') return sendWhatsAppImage({ ...common, imageUrl, caption });
+  if (type === 'template') {
+    // A business-initiated message (an order alert to a merchant) must be a template Meta approved on the MoranBuy number.
+    const template = await db('whatsapp_templates').where({ tenant_id: tenant.id, name: templateName, language }).first('status');
+    if (!template || template.status !== 'APPROVED') throw Object.assign(new Error('TEMPLATE_NOT_APPROVED'), { code: 'TEMPLATE_NOT_APPROVED', status: 409 });
+    return sendTemplateMessage({ ...common, templateName, languageCode: language, components });
+  }
   return sendWhatsAppText({ ...common, body });
 }
 

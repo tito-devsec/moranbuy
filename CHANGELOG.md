@@ -5,6 +5,7 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 ## Unreleased
 
 ### 2026-10-28
+- Owner alert on confirmed orders: WhatsApp text or approved template from the MoranBuy number, wording and template set in Super Admin → MoranBuy → Notifications, every outcome recorded in `merchant_notifications`.
 - Super Admin integration: a MoranBuy page in weare.moranai.co.tz (register, connect to WhatsApp with Embedded Signup, choose the name, open the dashboard), a signed admin proxy on the Moran backend that carries the admin's identity, MoranBuy accepts it in place of its own login, agent name greeting, weare CSP for Facebook.
 - Go-live: admin-entered credentials for Muse Spark, Snippe and Hermes (encrypted, masked, audited, used at runtime without restart), production Compose stack, Nginx site and `.env` example for buy.moranai.co.tz, VPS guide.
 - Phase 10 to 15: admin API and app, Moran-side integration patch and drop-in files, Hermes research agent config, skill and client with unverified web offers, security tests, demo seed, architecture, API, deployment, testing and demo docs.

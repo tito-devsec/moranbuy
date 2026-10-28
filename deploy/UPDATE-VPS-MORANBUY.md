@@ -61,6 +61,12 @@ curl -s https://buy.moranai.co.tz/ready
   (the same Snippe account). Register `https://buy.moranai.co.tz/webhooks/payments` as a webhook
   URL in Snippe. Optional: Hermes base URL, key and the allowed shop domains.
 - **Billing** tab: set the WhatsApp provider rate per message to Meta's current marketing rate.
+- **Notifications** tab: the message business owners get when an order is confirmed. On the
+  MoranBuy business page in Super Admin → Templates, create `moranbuy_order_alert` (category
+  UTILITY, Swahili, body with `{{1}}` order ref, `{{2}}` product, `{{3}}` quantity, `{{4}}` total,
+  `{{5}}` fulfilment, `{{6}}` customer phone), submit it, and once Meta approves it enter its name
+  here; until then alerts go as plain text, which WhatsApp only delivers to owners who wrote to the
+  MoranBuy number in the last 24 hours.
 
 Only a Super Admin (`super_admin`) may change credentials; other roles read. Every change is
 audited in MoranBuy under the admin's email. `https://buy.moranai.co.tz/admin/` remains as a

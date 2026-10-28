@@ -26,6 +26,11 @@ yes, an order. One call per inbound message: `ShoppingEngine.handleMessage`.
    read back and a YES/NO is requested.
 10. **Confirmation.** Only an explicit yes creates an `orders` row, status `pending_merchant`, with
     the reference sent to the customer. A no closes the session without an order.
+11. **Owner alert.** The business owner is texted on WhatsApp from the MoranBuy number with the
+    wording set in Super Admin → MoranBuy → Notifications (order ref, product, quantity, known
+    total or "delivery not confirmed", fulfilment, customer phone and place). Outside a 24-hour
+    window WhatsApp requires an approved template, so the setting also names one on the MoranBuy
+    number; every alert's outcome (sent, failed, skipped, dry run) is in `merchant_notifications`.
 
 ## Channels
 

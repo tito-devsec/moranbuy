@@ -30,6 +30,9 @@ export class MoranInternalClient {
   // Sends a text reply from the MoranBuy WhatsApp number through Moran's outbound gate.
   sendText({ to, body, idempotencyKey }) { return this.call('/send', { body: { type: 'text', to, body, idempotencyKey } }); }
 
+  // Sends an approved template from the MoranBuy number itself (business-initiated messages to merchants).
+  sendMoranBuyTemplate({ to, templateName, language, components = [], idempotencyKey }) { return this.call('/send', { body: { type: 'template', to, templateName, language, components, idempotencyKey } }); }
+
   // Sends a product photo with a caption.
   sendImage({ to, imageUrl, caption, idempotencyKey }) { return this.call('/send', { body: { type: 'image', to, imageUrl, caption, idempotencyKey } }); }
 
@@ -54,6 +57,7 @@ export class FakeMoranInternalClient {
   constructor({ listings = [], knowledge = [] } = {}) { this.sent = []; this.listingRows = listings; this.knowledge = knowledge; this.configured = true; }
   async sendText(m) { this.sent.push({ type: 'text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendImage(m) { this.sent.push({ type: 'image', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async sendMoranBuyTemplate(m) { this.sent.push({ type: 'moranbuy_template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMerchantText(m) { this.sent.push({ type: 'merchant_text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendTemplate(m) { if (this.failNext) { this.failNext = false; return { ok: false, status: 'http_502', data: { error: 'META_ERROR' } }; } this.sent.push({ type: 'template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async listings() { return { ok: true, status: 'ok', data: { listings: this.listingRows, nextPage: null } }; }
