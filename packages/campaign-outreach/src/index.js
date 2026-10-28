@@ -7,7 +7,7 @@ export async function offerOutreachForListing(db, { merchantId, listingId, trigg
   const selected = await db('merchant_entitlements').where({ merchant_id: merchantId, service: 'new_product_outreach' }).first();
   if (!selected) return null;
   const listing = await db('listings').where({ id: listingId, merchant_id: merchantId }).whereNull('deleted_at').first();
-  if (!listing || listing.status !== 'active' || !listing.moranbuy_visible) return null;
+  if (!listing || listing.status !== 'active' || !listing.moranbuy_visible || listing.admin_hidden_at) return null;
   const open = await db('campaigns').where({ merchant_id: merchantId, kind: 'new_product_outreach', listing_id: listingId }).whereIn('status', ['offered', 'draft', 'approved', 'priced', 'awaiting_payment', 'paid', 'ready']).first();
   if (open) return open;
   const [row] = await db('campaigns').insert({ merchant_id: merchantId, kind: 'new_product_outreach', name: `New product: ${listing.name}`.slice(0, 160), objective: `Tell customers about ${listing.name}`, listing_id: listingId, status: 'offered', audience_json: JSON.stringify({ segment: 'consented_contacts' }), draft_history_json: JSON.stringify([{ by: 'system', note: trigger, at: new Date().toISOString() }]) }).returning('*');

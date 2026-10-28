@@ -61,3 +61,6 @@ yes, an order. One call per inbound message: `ShoppingEngine.handleMessage`.
 `tests/unit/parse.test.js`, `tests/unit/ranking.test.js`, `tests/integration/shopping-flow.test.js`
 (seeded merchants, a Swahili conversation, forwarded WhatsApp messages with signature, duplicate
 delivery, selection, refusal, confirmation and order status).
+
+
+A product an administrator hid from customer search (`listings.admin_hidden_at`, with the reason shown to the business) is never discovered, whatever the business's own visibility switch or a Moran sync says. Hiding and showing again are audited.

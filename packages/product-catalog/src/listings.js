@@ -32,7 +32,7 @@ export function publicListing(row, locations = []) {
   return {
     id: row.id, merchantId: row.merchant_id, name: row.name, description: row.description, category: row.category, productType: row.product_type,
     attributes: row.attributes || {}, variants: row.variants || [], price: Number(row.price), currency: row.currency, priceStatus: row.price_status,
-    stock: row.stock === null ? null : Number(row.stock), condition: row.condition, status: row.status, moranbuyVisible: row.moranbuy_visible, imageUrl: row.image_url,
+    stock: row.stock === null ? null : Number(row.stock), condition: row.condition, status: row.status, moranbuyVisible: row.moranbuy_visible, adminHidden: row.admin_hidden_at ? { at: row.admin_hidden_at, reason: row.admin_hidden_reason } : null, imageUrl: row.image_url,
     source: row.source, sourceProductId: row.source_product_id, sourceSku: row.source_sku, moranServiceId: row.moran_service_id, syncedAt: row.synced_at, sourceUpdatedAt: row.source_updated_at,
     editable: row.source === 'moran' ? { local: [...MORANBUY_FIELDS], viaMoran: [...MORAN_OWNED_FIELDS] } : { local: [...MORANBUY_FIELDS, ...MORAN_OWNED_FIELDS, 'variants'], viaMoran: [] },
     locationIds: locations.map((l) => l.location_id), createdAt: row.created_at, updatedAt: row.updated_at,

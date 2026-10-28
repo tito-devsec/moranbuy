@@ -141,7 +141,7 @@
                   <td class="p-2" x-text="l.stock === null ? 'unknown' : l.stock"></td>
                   <td class="p-2" x-text="l.status"></td>
                   <td class="p-2" x-text="l.source === 'moran' ? 'Moran AI' : 'MoranBuy'"></td>
-                  <td class="p-2" x-text="l.moranbuyVisible ? 'yes' : 'no'"></td>
+                  <td class="p-2"><span x-text="l.adminHidden ? 'hidden by MoranBuy' : (l.moranbuyVisible ? 'yes' : 'no')"></span><span class="block text-xs text-red-700" x-show="l.adminHidden" x-text="l.adminHidden?.reason"></span></td>
                   <td class="p-2 whitespace-nowrap"><button class="underline mr-2" @click="edit(l)">Edit</button><button class="underline mr-2" x-show="l.source === 'moran'" @click="editMoranPrice(l)">Moran price</button><button class="underline text-red-700" x-show="l.source !== 'moran'" @click="removeListing(l)">Delete</button></td>
                 </tr>
               </template>

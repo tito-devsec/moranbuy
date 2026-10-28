@@ -58,6 +58,8 @@ which signs each request (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature` over ti
 path and body) and carries `X-MoranBuy-Admin-Email`, `-Name`, `-Role`. The same routes accept a
 MoranBuy admin token for the fallback app.
 
+- `GET /listings?search=&merchantId=&source=&status=&category=&priceMin=&priceMax=&flag=&sort=&page=&pageSize=&format=json|csv|csv_json` (products across all businesses with problem flags and totals; `csv_json` returns the CSV inside JSON for the Super Admin proxy; exports are audited), `POST /listings/:id/visibility` `{ visible, reason }` (hide from customer search or show again)
+- `GET /locations?search=&merchantId=&region=&source=&placed=yes|no&delivery=yes|no|unknown&page=&pageSize=` (locations with what each is missing, coverage by region, businesses selling with no placed location), `POST /locations/:id/position` `{ latitude, longitude, region?, district?, reason }` (MoranBuy-owned locations only, inside Tanzania)
 - `POST /summary` `{ section: overview|campaigns|followup|orders|payments|muse|demand|retention }` → counts, rule checks and Muse's reading (20 per minute)
 - `GET /merchants/:id/uploads`, `GET /uploads/:id` (a private file as base64 for review; audited)
 - `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`

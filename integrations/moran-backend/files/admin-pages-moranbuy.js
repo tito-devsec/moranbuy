@@ -114,7 +114,7 @@ function setupCard(state, onDone) {
 }
 
 // ---- the dashboard: the MoranBuy admin sections, read through the signed proxy ----
-const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Retention', 'Audit'];
+const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Products', 'Locations', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Retention', 'Audit'];
 
 function dashboard() {
   const body = h('div');
@@ -131,6 +131,8 @@ async function load(name) {
     case 'Overview': return mb.get('overview');
     case 'Insights': return { overview: await mb.get('insights?days=30&language=en'), schedules: (await mb.get('schedules')).schedules, uploads: (await mb.get('catalog-uploads')).uploads };
     case 'Merchants': return mb.get('merchants');
+    case 'Products': return mb.get('listings', cleanQuery(filters.Products));
+    case 'Locations': return mb.get('locations', cleanQuery(filters.Locations));
     case 'Verification': return mb.get('merchants', { verification: 'pending' });
     case 'Ranking': return { policy: await mb.get('ranking/policy'), runs: (await mb.get('ranking/runs')).runs };
     case 'Campaigns': case 'Outreach': return mb.get('campaigns');
@@ -156,6 +158,77 @@ async function openUpload(u) {
     const bytes = Uint8Array.from(atob(r.dataBase64), (c) => c.charCodeAt(0));
     window.open(URL.createObjectURL(new Blob([bytes], { type: r.upload.mime })), '_blank', 'noopener');
   } catch (err) { toastError(err); }
+}
+
+// Filters kept per section while the page is open; empty values are not sent.
+const filters = { Products: { page: 1, pageSize: 50, sort: 'updated' }, Locations: { page: 1, pageSize: 50 } };
+const cleanQuery = (q) => Object.fromEntries(Object.entries(q || {}).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+
+// A filter row: reading it sets the section's filters and reloads from the first page.
+function filterBar(name, fields, reload) {
+  const form = h('div', { class: 'row g-2 align-items-end' }, ...fields.map((f) => h('div', { class: f.cls || 'col-md-2' }, f.options ? select({ name: f.name, label: t(f.label), options: [{ value: '', label: t('Any') }, ...f.options], value: filters[name][f.name] ?? '' }) : input({ name: f.name, label: t(f.label), type: f.type || 'text', value: filters[name][f.name] ?? '' }))));
+  const apply = button(t('Apply'), { size: 'sm', onClick: () => { const v = readForm(form); filters[name] = { ...filters[name], ...v, page: 1 }; reload(); } });
+  const clear = button(t('Clear'), { size: 'sm', variant: 'secondary', onClick: () => { filters[name] = { page: 1, pageSize: 50, ...(name === 'Products' ? { sort: 'updated' } : {}) }; reload(); } });
+  return h('div', {}, form, h('div', { class: 'd-flex gap-2 mt-2' }, apply, clear));
+}
+
+// Previous and next page buttons under a table.
+function pager(name, d, reload) {
+  const pages = Math.max(1, Math.ceil(d.total / d.pageSize));
+  const go = (p) => { filters[name].page = p; reload(); };
+  return h('div', { class: 'd-flex gap-2 align-items-center mt-2' }, button(t('Previous'), { size: 'sm', variant: 'secondary', onClick: () => d.page > 1 && go(d.page - 1) }), h('span', { class: 'fs-xs text-muted', text: t('Page {p} of {n} · {t} results', { p: d.page, n: pages, t: d.total }) }), button(t('Next'), { size: 'sm', variant: 'secondary', onClick: () => d.page < pages && go(d.page + 1) }));
+}
+
+const FLAG_LABEL = { stale: 'not updated recently', no_image: 'no photo', stock_unknown: 'stock unknown', out_of_stock: 'out of stock', no_type: 'no product type', no_location: 'business has no placed location', hidden_by_business: 'hidden by the business', hidden_by_admin: 'hidden by MoranBuy' };
+
+// Every product across all businesses, with the problems that hurt its ranking.
+function productsPage(d, reload) {
+  const s = d.summary;
+  const chip = (k) => button(`${t(FLAG_LABEL[k] || k)}: ${formatInt(s.flags[k])}`, { size: 'sm', variant: filters.Products.flag === k ? 'primary' : 'secondary', onClick: () => { filters.Products = { ...filters.Products, flag: filters.Products.flag === k ? '' : k, page: 1 }; reload(); } });
+  const hide = (l) => confirmAction({ title: l.adminHidden ? t('Show {p} to customers again', { p: l.name }) : t('Hide {p} from customer search', { p: l.name }), requireReason: true, danger: !l.adminHidden, action: async (reason) => { await mb.post(`listings/${l.id}/visibility`, { visible: !!l.adminHidden, reason }); toast(t('Saved.')); reload(); } });
+  const exportCsv = button(t('Export CSV'), { size: 'sm', variant: 'secondary', onClick: () => busy(exportCsv, async () => { const r = await mb.get('listings', cleanQuery({ ...filters.Products, format: 'csv_json', page: undefined })); const a = h('a', { attrs: { href: URL.createObjectURL(new Blob([r.csv], { type: 'text/csv' })), download: r.filename } }); a.click(); toast(t('{n} products exported.', { n: r.rows })); }).catch(toastError) });
+  return h('div', {},
+    card({ title: t('Products across all businesses: {n}', { n: formatInt(s.total) }), body: h('div', {},
+      h('p', { class: 'fs-xs text-muted', text: t('By source: {s}. By status: {st}. "Not updated recently" means older than {d} days, the ranking policy\'s limit.', { s: Object.entries(s.bySource).map(([k, v]) => `${k} ${v}`).join(', '), st: Object.entries(s.byStatus).map(([k, v]) => `${k} ${v}`).join(', '), d: d.staleAfterDays }) }),
+      h('div', { class: 'd-flex flex-wrap gap-1 mb-3' }, ...Object.keys(s.flags).map(chip)),
+      filterBar('Products', [{ name: 'search', label: 'Search product or business', cls: 'col-md-3' }, { name: 'source', label: 'Source', options: ['moranbuy', 'moran', 'whatsapp_chat', 'web'].map((v) => ({ value: v, label: v })) }, { name: 'status', label: 'Status', options: ['active', 'draft', 'archived'].map((v) => ({ value: v, label: v })) }, { name: 'category', label: 'Category', options: s.categories.map((v) => ({ value: v, label: v })) }, { name: 'priceMin', label: 'Price from', type: 'number', cls: 'col-md-1' }, { name: 'priceMax', label: 'Price to', type: 'number', cls: 'col-md-1' }, { name: 'sort', label: 'Sort', options: [{ value: 'updated', label: t('Recently updated') }, { value: 'price', label: t('Price') }, { value: 'name', label: t('Name') }, { value: 'merchant', label: t('Business') }] }], reload),
+      h('div', { class: 'mt-2' }, exportCsv)) }),
+    card({ cls: 'mt-3', title: t('Products'), body: h('div', {}, simpleTable([
+      { key: 'imageUrl', label: '', render: (l) => (l.imageUrl ? h('img', { attrs: { src: l.imageUrl, alt: '', width: 40, height: 40 }, style: 'object-fit:cover;border-radius:4px' }) : '') },
+      { key: 'name', label: t('Product'), render: (l) => h('div', {}, h('div', { text: l.name }), h('div', { class: 'fs-xs text-muted', text: [l.productType, l.category].filter(Boolean).join(' · ') })) },
+      { key: 'merchant', label: t('Business'), render: (l) => h('a', { attrs: { href: '#' }, text: l.merchant, on: { click: (e) => { e.preventDefault(); merchantDrawer(l.merchantId); } } }) },
+      { key: 'price', label: t('Price'), align: 'end', render: (l) => money(l.price, l.currency) },
+      { key: 'stock', label: t('Stock'), align: 'end', render: (l) => (l.stock === null ? t('unknown') : l.stock) },
+      { key: 'source', label: t('Source') },
+      { key: 'status', label: t('Status'), render: (l) => h('div', {}, badge(l.status), l.adminHidden ? h('div', { class: 'fs-xs text-danger', text: t('Hidden by MoranBuy: {r}', { r: l.adminHidden.reason }) }) : null) },
+      { key: 'flags', label: t('Problems'), render: (l) => l.flags.filter((f) => f !== 'hidden_by_admin').map((f) => t(FLAG_LABEL[f] || f)).join(', ') || '—' },
+      { key: '_', label: '', render: (l) => button(l.adminHidden ? t('Show') : t('Hide'), { size: 'sm', variant: l.adminHidden ? 'secondary' : 'danger', onClick: () => hide(l) }) },
+    ], d.listings, { empty: t('No products match.') }), pager('Products', d, reload)) }));
+}
+
+// Every business location, with what is missing for distance and delivery to work, and admin pin correction.
+function locationsPage(d, reload) {
+  const s = d.summary;
+  const place = (l) => {
+    const form = h('div', { class: 'row g-2' }, h('div', { class: 'col-6' }, input({ name: 'latitude', label: t('Latitude'), type: 'number', step: 'any', value: l.latitude ?? '' })), h('div', { class: 'col-6' }, input({ name: 'longitude', label: t('Longitude'), type: 'number', step: 'any', value: l.longitude ?? '' })), h('div', { class: 'col-6' }, input({ name: 'region', label: t('Region'), value: l.region ?? '' })), h('div', { class: 'col-6' }, input({ name: 'district', label: t('District'), value: l.district ?? '' })), h('div', { class: 'col-12' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+    const save = button(t('Save position'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); await mb.post(`locations/${l.id}/position`, { latitude: Number(f.latitude), longitude: Number(f.longitude), region: f.region || undefined, district: f.district || undefined, reason: f.reason }); toast(t('Saved.')); reload(); }).catch(toastError) });
+    drawer({ title: t('Place {n}', { n: l.name || l.merchant }), subtitle: l.address || '', body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Copy the coordinates from a map (a long press on Google Maps shows them). Region and district are filled from the address when left empty.') }), form, h('div', { class: 'mt-2' }, save)) });
+  };
+  return h('div', {},
+    h('div', { class: 'row g-3' },
+      h('div', { class: 'col-lg-7' }, card({ title: t('Locations: {n} ({u} not placed, delivery unknown {du}, delivery fee unknown {df})', { n: s.total, u: s.unplaced, du: s.deliveryUnknown, df: s.deliveryFeeUnknown }), body: simpleTable([{ key: 'region', label: t('Region'), render: (r) => h('a', { attrs: { href: '#' }, text: r.region, on: { click: (e) => { e.preventDefault(); filters.Locations = { ...filters.Locations, region: r.region, page: 1 }; reload(); } } }) }, { key: 'locations', label: t('Locations'), align: 'end' }, { key: 'unplaced', label: t('Not placed'), align: 'end' }], s.byRegion) })),
+      h('div', { class: 'col-lg-5' }, card({ title: t('Businesses selling with no placed location ({n})', { n: s.merchantsWithoutPlacedLocation.length }), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Their products cannot be ranked by distance or delivery.') }), simpleTable([{ key: 'businessName', label: t('Business'), render: (m) => h('a', { attrs: { href: '#' }, text: m.businessName, on: { click: (e) => { e.preventDefault(); merchantDrawer(m.id); } } }) }, { key: 'registrationType', label: t('Type') }], s.merchantsWithoutPlacedLocation, { empty: t('None.') })) }))),
+    card({ cls: 'mt-3', title: t('Filter'), body: filterBar('Locations', [{ name: 'search', label: 'Search place or business', cls: 'col-md-3' }, { name: 'region', label: 'Region' }, { name: 'source', label: 'Source', options: [{ value: 'moranbuy', label: 'MoranBuy' }, { value: 'moran', label: 'Moran AI' }] }, { name: 'placed', label: 'Placed on the map', options: [{ value: 'yes', label: t('Yes') }, { value: 'no', label: t('No') }] }, { name: 'delivery', label: 'Delivery', options: [{ value: 'yes', label: t('Yes') }, { value: 'no', label: t('No') }, { value: 'unknown', label: t('Unknown') }] }], reload) }),
+    card({ cls: 'mt-3', title: t('Locations'), body: h('div', {}, simpleTable([
+      { key: 'merchant', label: t('Business'), render: (l) => h('a', { attrs: { href: '#' }, text: l.merchant, on: { click: (e) => { e.preventDefault(); merchantDrawer(l.merchantId); } } }) },
+      { key: 'name', label: t('Location'), render: (l) => h('div', {}, h('div', { text: `${l.name || '—'}${l.isDefault ? ` (${t('main')})` : ''}` }), h('div', { class: 'fs-xs text-muted', text: [l.district, l.region].filter(Boolean).join(', ') || l.address || '' })) },
+      { key: 'latitude', label: t('Position'), render: (l) => (l.latitude === null ? t('not placed') : h('a', { attrs: { href: `https://www.openstreetmap.org/?mlat=${l.latitude}&mlon=${l.longitude}#map=16/${l.latitude}/${l.longitude}`, target: '_blank', rel: 'noopener' }, text: `${l.latitude.toFixed(4)}, ${l.longitude.toFixed(4)}` })) },
+      { key: 'positionSource', label: t('How placed') },
+      { key: 'deliveryAvailable', label: t('Delivery'), render: (l) => (l.deliveryAvailable === null ? t('unknown') : l.deliveryAvailable ? `${t('yes')}${l.deliveryFee !== null ? ` · ${money(l.deliveryFee)}` : ''}${l.deliveryRadiusKm ? ` · ${l.deliveryRadiusKm} km` : ''}` : t('no')) },
+      { key: 'source', label: t('Source') },
+      { key: 'issues', label: t('Missing'), render: (l) => l.issues.map((i) => t(i.replace(/_/g, ' '))).join(', ') || '—' },
+      { key: '_', label: '', render: (l) => (l.source === 'moran' ? h('span', { class: 'fs-xs text-muted', text: t('fix in Moran AI') }) : button(l.latitude === null ? t('Place') : t('Correct'), { size: 'sm', variant: 'secondary', onClick: () => place(l) })) },
+    ], d.locations, { empty: t('No locations match.') }), pager('Locations', d, reload)) }));
 }
 
 // Which admin section Muse can explain, by the section's tab name.
@@ -246,6 +319,8 @@ function render(name, d, reload) {
     }
     case 'Overview': return h('div', { class: 'row g-3' }, Object.entries(d).map(([k, v]) => h('div', { class: 'col-md-4' }, card({ title: t(k), body: pre(v) }))));
     case 'Merchants': case 'Verification': return card({ title: t(name), body: mTable(d.merchants) });
+    case 'Products': return productsPage(d, reload);
+    case 'Locations': return locationsPage(d, reload);
     case 'Ranking': {
       const form = h('div', { class: 'row g-2 align-items-end' }, h('div', { class: 'col-md-3' }, input({ name: 'priceSimilarityPct', label: t('Price band % of budget'), type: 'number', value: d.policy.effective.priceSimilarityPct, step: 0.5 })), h('div', { class: 'col-md-3' }, input({ name: 'staleAfterDays', label: t('Stale after days'), type: 'number', value: d.policy.effective.staleAfterDays })), h('div', { class: 'col-md-3' }, input({ name: 'overBudgetShowPct', label: t('Show over budget up to %'), type: 'number', value: d.policy.effective.overBudgetShowPct })), h('div', { class: 'col-md-3' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const save = button(t('Save policy'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('ranking/policy', f); toast(t('Policy saved.')); reload(); }).catch(toastError) });

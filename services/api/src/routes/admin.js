@@ -26,6 +26,7 @@ import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 import { demandOverview } from '../services/insights.js';
 import { readUpload, publicUpload } from '../services/uploads.js';
 import { adminSummary, SUMMARY_SECTIONS } from '../services/admin-summary.js';
+import { adminListings, adminLocations, setListingVisibility, correctLocation, listingsCsv, LISTING_FLAGS } from '../services/admin-catalog.js';
 import { loadReminderSettings, renderReminder, DEFAULT_SCHEDULE_REMINDER } from '../services/schedule-reminders.js';
 import { loadRetention, purgeExpired, retentionFloor, DEFAULT_RETENTION, NEVER_PURGED } from '../services/retention.js';
 
@@ -76,6 +77,31 @@ adminRouter.get('/overview', asyncHandler(async (_req, res) => {
 adminRouter.get('/insights', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(365).default(30), merchantId: z.string().uuid().optional(), language: z.enum(['sw', 'en']).default('en') }).passthrough() }), asyncHandler(async (req, res) => res.json(await demandOverview({ muse: shoppingDeps().muse, merchantId: req.query.merchantId || null, days: req.query.days, language: req.query.language }))));
 adminRouter.get('/schedules', asyncHandler(async (_req, res) => res.json({ schedules: await db('customer_schedules as s').join('customers as c', 'c.id', 's.customer_id').leftJoin('merchants as m', 'm.id', 's.merchant_id').where('s.status', 'scheduled').orderBy('s.due_at', 'asc').limit(200).select('s.*', 'c.region', 'c.district', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, customer_id: undefined }))) })));
 adminRouter.get('/catalog-uploads', asyncHandler(async (_req, res) => res.json({ uploads: await db('catalog_uploads as u').join('merchants as m', 'm.id', 'u.merchant_id').orderBy('u.created_at', 'desc').limit(200).select('u.id', 'u.kind', 'u.status', 'u.reason', 'u.muse_status', 'u.listing_id', 'u.created_at', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, from_phone: undefined }))) })));
+
+// ---- products and locations across all businesses ----
+const listingQuery = z.object({ search: z.string().max(80).optional(), merchantId: z.string().uuid().optional(), source: z.enum(['moranbuy', 'moran', 'web', 'whatsapp_chat']).optional(), status: z.string().max(16).optional(), category: z.string().max(40).optional(), priceMin: z.coerce.number().int().nonnegative().optional(), priceMax: z.coerce.number().int().nonnegative().optional(), flag: z.enum(LISTING_FLAGS).optional(), sort: z.enum(['updated', 'price', 'name', 'merchant']).optional(), page: z.coerce.number().int().min(1).optional(), pageSize: z.coerce.number().int().min(1).max(200).optional(), format: z.enum(['json', 'csv', 'csv_json']).optional() }).passthrough();
+adminRouter.get('/listings', validate({ query: listingQuery }), asyncHandler(async (req, res) => {
+  if (req.query.format === 'csv' || req.query.format === 'csv_json') {
+    // An export carries every matching product, up to 10,000, and is audited.
+    const out = await adminListings({ q: { ...req.query, page: 1, pageSize: 200 } });
+    const rows = [...out.listings];
+    for (let p = 2; rows.length < Math.min(out.total, 10000); p += 1) rows.push(...(await adminListings({ q: { ...req.query, page: p, pageSize: 200 } })).listings);
+    await act(req, { action: 'listings.exported', targetType: 'listings', targetId: null, after: { count: rows.length, filters: req.query } });
+    // Through the Super Admin proxy, which carries JSON only, the file comes back inside JSON.
+    if (req.query.format === 'csv_json') return res.json({ filename: 'moranbuy-products.csv', rows: rows.length, csv: listingsCsv(rows) });
+    return res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="moranbuy-products.csv"' }).send(listingsCsv(rows));
+  }
+  res.json(await adminListings({ q: req.query }));
+}));
+adminRouter.post('/listings/:id/visibility', manage, validate({ params: idParams, body: z.object({ visible: z.boolean(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const row = await setListingVisibility({ id: req.params.id, visible: req.body.visible, reason: req.body.reason, admin: req.admin });
+  res.json({ listing: { id: row.id, adminHidden: !!row.admin_hidden_at, visibleToCustomers: row.moranbuy_visible && !row.admin_hidden_at } });
+}));
+adminRouter.get('/locations', validate({ query: z.object({ search: z.string().max(80).optional(), merchantId: z.string().uuid().optional(), region: z.string().max(80).optional(), source: z.enum(['moranbuy', 'moran']).optional(), placed: z.enum(['yes', 'no']).optional(), delivery: z.enum(['yes', 'no', 'unknown']).optional(), page: z.coerce.number().int().min(1).optional(), pageSize: z.coerce.number().int().min(1).max(200).optional() }).passthrough() }), asyncHandler(async (req, res) => res.json(await adminLocations({ q: req.query }))));
+adminRouter.post('/locations/:id/position', manage, validate({ params: idParams, body: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), region: z.string().max(80).optional(), district: z.string().max(80).optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const row = await correctLocation({ id: req.params.id, ...req.body, admin: req.admin });
+  res.json({ location: { id: row.id, latitude: Number(row.latitude), longitude: Number(row.longitude), region: row.region, district: row.district, positionSource: row.location_source } });
+}));
 
 // ---- Muse explains a section ----
 // Counts for one section, rule checks, and Muse's plain-English reading when it is on; each request is recorded in Muse telemetry.

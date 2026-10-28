@@ -8,6 +8,7 @@ export async function discoverOffers(db, request, { limit = 200 } = {}) {
     .leftJoin('merchant_locations as loc', function j() { this.on('loc.merchant_id', 'm.id').andOn('loc.is_default', db.raw('true')).andOnNull('loc.deleted_at'); })
     .whereNull('l.deleted_at')
     .where('l.moranbuy_visible', true)
+    .whereNull('l.admin_hidden_at')
     .where('m.status', 'active')
     .select('l.*', 'm.business_name', 'm.status as merchant_status', 'm.verification_status', 'm.registration_type',
       'loc.id as location_id', 'loc.latitude', 'loc.longitude', 'loc.formatted_address', 'loc.region', 'loc.district', 'loc.ward',
