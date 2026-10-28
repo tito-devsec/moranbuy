@@ -53,6 +53,9 @@ const schema = z.object({
   FOLLOWUP_DRY_RUN: flag(true),
   REMINDER_DRY_RUN: flag(true),
   RETENTION_DRY_RUN: flag(true),
+  UPLOAD_DIR: opt(),
+  UPLOAD_MAX_IMAGE_MB: int(5),
+  UPLOAD_MAX_PDF_MB: int(10),
   CAMPAIGN_SEND_INTERVAL_MS: int(150),
 
   GEOCODER_BASE_URL: z.string().url().default('https://nominatim.openstreetmap.org'),

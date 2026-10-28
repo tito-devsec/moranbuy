@@ -97,5 +97,8 @@ Migrations run on start. Back up first: `docker exec $(docker compose -f deploy/
 
 ## 8. Turning live sending on
 
+Before this release's update, reload Nginx with the new site file: uploads need `client_max_body_size 12m`.
+The compose file adds the `moranbuy_uploads` volume to the API and worker; `up -d --build` creates it.
+
 Only after step 6 and a one-recipient campaign read in the ledger: set `CAMPAIGN_DRY_RUN=false`
 (and later `FOLLOWUP_DRY_RUN=false`) in `.env` and `up -d` again.

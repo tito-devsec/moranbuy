@@ -61,8 +61,8 @@ merchantRouter.post('/services/:service/pay', validate({ params: z.object({ serv
 }));
 merchantRouter.get('/payments', asyncHandler(async (req, res) => res.json({ payments: await db('payments').where({ merchant_id: req.merchant.id }).orderBy('created_at', 'desc').limit(50).select('id', 'purpose', 'target_id', 'provider', 'reference', 'amount', 'currency', 'status', 'settled_at', 'created_at') })));
 
-merchantRouter.post('/verification', validate({ body: z.object({ registrationNumber: z.string().max(80).nullable().optional(), taxId: z.string().max(80).nullable().optional(), documentUrls: z.array(z.string().url()).max(10).optional(), notes: z.string().max(1000).nullable().optional() }) }), asyncHandler(async (req, res) => {
-  const row = await submitVerification(db, req.merchant.id, { ...req.body, documentUrls: req.body.documentUrls || [], ...actor(req) });
+merchantRouter.post('/verification', validate({ body: z.object({ registrationNumber: z.string().max(80).nullable().optional(), taxId: z.string().max(80).nullable().optional(), documentUrls: z.array(z.string().url()).max(10).optional(), documentUploadIds: z.array(z.string().uuid()).max(10).optional(), notes: z.string().max(1000).nullable().optional() }) }), asyncHandler(async (req, res) => {
+  const row = await submitVerification(db, req.merchant.id, { ...req.body, documentUrls: req.body.documentUrls || [], documentUploadIds: [...new Set(req.body.documentUploadIds || [])], ...actor(req) });
   res.json({ merchant: publicMerchant(row) });
 }));
 

@@ -35,6 +35,8 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
       REDIS_URL: redis://moranbuy-redis:6379
     command: ["sh", "-c", "npm run migrate && npm run seed && node services/api/src/server.js"]
+    volumes:
+      - moranbuy_uploads:/app/data/uploads
     ports: ["127.0.0.1:4000:4000"]
     depends_on:
       moranbuy-postgres: { condition: service_healthy }
@@ -51,10 +53,14 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
       REDIS_URL: redis://moranbuy-redis:6379
     command: ["node", "services/api/src/workers/main.js"]
+    # The retention purge removes expired customer photos from the same volume.
+    volumes:
+      - moranbuy_uploads:/app/data/uploads
     depends_on:
       moranbuy-api: { condition: service_started }
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
 volumes:
+  moranbuy_uploads:
   moranbuy_pgdata:
   moranbuy_redisdata:

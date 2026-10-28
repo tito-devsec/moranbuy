@@ -1,3 +1,4 @@
+import { merchantUploadsRouter, mediaRouter } from './routes/uploads.js';
 import { shopRouter } from './routes/shop.js';
 import { internalInboundRouter } from './routes/internal-inbound.js';
 import { merchantAuthRouter } from './routes/merchant-auth.js';
@@ -13,6 +14,8 @@ export const routers = [
   { path: '/api/shop', router: shopRouter },
   { path: '/internal/inbound', router: internalInboundRouter },
   { path: '/api/merchants/auth', router: merchantAuthRouter },
+  { path: '/api/merchant/uploads', router: merchantUploadsRouter },
+  { path: '/media', router: mediaRouter },
   { path: '/api/merchant', router: merchantRouter },
   { path: '/api/merchant/campaigns', router: campaignsRouter },
   { path: '/api/merchant/followup', router: followupRouter },

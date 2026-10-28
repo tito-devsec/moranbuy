@@ -29,10 +29,10 @@ export class ShoppingEngine {
   }
 
   // Handles one inbound message end to end and returns { replies: [{text, imageUrl?}], session, run }.
-  async handleMessage({ customer, text = '', imageUrl = null, sharedLocation = null, kind = null }) {
+  async handleMessage({ customer, text = '', imageUrl = null, imageDataUrl = null, sharedLocation = null, kind = null }) {
     let session = await this.openSession(customer.id);
     const sourceKind = kind || (imageUrl ? 'image' : sharedLocation ? 'location' : 'text');
-    await this.db('session_messages').insert({ session_id: session.id, direction: 'in', content: text || (imageUrl ? `[image] ${imageUrl}` : '[location]'), content_type: imageUrl ? 'image' : sharedLocation ? 'location' : 'text', kind: sourceKind });
+    await this.db('session_messages').insert({ session_id: session.id, direction: 'in', content: [text, imageUrl ? `[image] ${imageUrl}` : null].filter(Boolean).join(' ') || '[location]', content_type: imageUrl ? 'image' : sharedLocation ? 'location' : 'text', kind: sourceKind });
     // A voice note Moran could not transcribe cannot be shopped from; the customer is asked to type or send a photo.
     if (sourceKind === 'voice' && (!text || /^\[/.test(text.trim()))) {
       const lang = customer.language === 'en' ? 'en' : 'sw';
@@ -44,7 +44,7 @@ export class ShoppingEngine {
     // Read the message with Muse when available, with the deterministic parser as the recorded fallback.
     let museStatus = 'disabled';
     let extracted = null;
-    const museResult = await museExtractRequest(this.muse, { text, imageUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, requestRef: session.id } });
+    const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, requestRef: session.id } });
     if (museResult.ok && museResult.json) { extracted = sanitizeExtraction(museResult.json); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;

@@ -120,7 +120,7 @@ function dashboard() {
   const body = h('div');
   const tabs = h('ul', { class: 'nav nav-pills flex-wrap gap-1 mb-3' });
   let active = 'Overview';
-  const show = (name) => { active = name; [...tabs.children].forEach((li) => li.firstChild.classList.toggle('active', li.dataset.name === name)); loadInto(body, () => load(name), (d) => render(name, d, () => show(name))); };
+  const show = (name) => { active = name; [...tabs.children].forEach((li) => li.firstChild.classList.toggle('active', li.dataset.name === name)); loadInto(body, () => load(name), (d) => h('div', {}, explainBar(name), render(name, d, () => show(name)))); };
   SECTIONS.forEach((name) => tabs.append(h('li', { class: 'nav-item', dataset: { name } }, h('a', { class: 'nav-link', attrs: { href: '#' }, text: t(name), on: { click: (e) => { e.preventDefault(); show(name); } } }))));
   show(active);
   return h('div', {}, tabs, body);
@@ -148,8 +148,33 @@ async function load(name) {
   }
 }
 
+// Opens an uploaded file for review in a new tab; private files come through the signed proxy and each view is audited.
+async function openUpload(u) {
+  try {
+    if (u.url) { window.open(u.url, '_blank', 'noopener'); return; }
+    const r = await mb.get(`uploads/${u.id}`);
+    const bytes = Uint8Array.from(atob(r.dataBase64), (c) => c.charCodeAt(0));
+    window.open(URL.createObjectURL(new Blob([bytes], { type: r.upload.mime })), '_blank', 'noopener');
+  } catch (err) { toastError(err); }
+}
+
+// Which admin section Muse can explain, by the section's tab name.
+const EXPLAIN = { Overview: 'overview', Insights: 'demand', Campaigns: 'campaigns', Outreach: 'campaigns', 'Follow-up': 'followup', Orders: 'orders', Billing: 'payments', 'Muse Spark': 'muse', Retention: 'retention' };
+
+// Asks MoranBuy for the section's counts, rule checks and Muse's reading, and shows them in place.
+function explainBar(name) {
+  const section = EXPLAIN[name];
+  if (!section) return null;
+  const out = h('div', { class: 'mt-2' });
+  const btn = button(t('Explain with Muse'), { size: 'sm', variant: 'secondary', onClick: () => busy(btn, async () => {
+    const r = await mb.post('summary', { section });
+    out.replaceChildren(card({ title: t(r.source === 'muse' ? 'Muse Spark reading' : 'Rule checks (Muse is off or its reading did not match the numbers)'), body: h('div', {}, h('p', { text: r.summary }), r.checks.length ? h('ul', { class: 'mb-0' }, ...r.checks.map((c) => h('li', { text: c }))) : h('p', { class: 'text-muted mb-0', text: t('No checks raised.') })) }));
+  }).catch(toastError) });
+  return h('div', { class: 'mb-3' }, btn, out);
+}
+
 function merchantDrawer(id) {
-  mb.get(`merchants/${id}`).then((d) => {
+  Promise.all([mb.get(`merchants/${id}`), mb.get(`merchants/${id}/uploads`).catch(() => ({ uploads: [] }))]).then(([d, up]) => { d.uploads = up.uploads;
     const ent = (service, action) => confirmAction({ title: t('{a} {s}', { a: action, s: service }), requireReason: true, action: async (reason) => { await mb.post(`merchants/${id}/entitlements/${service}`, { action, reason, billingState: 'paid' }); toast(t('Saved.')); } });
     drawer({ title: d.merchant.businessName, subtitle: `${d.merchant.registrationType} · ${d.merchant.verificationStatus} · ${d.merchant.status}`, width: 'mo-drawer-wide', body: h('div', {},
       h('h3', { class: 'fs-sm fw-bold mt-2', text: t('Services') }),
@@ -158,6 +183,8 @@ function merchantDrawer(id) {
       simpleTable([{ key: 'name', label: t('Product') }, { key: 'price', label: t('Price'), render: (l) => money(l.price, l.currency) }, { key: 'stock', label: t('Stock'), render: (l) => (l.stock === null ? t('unknown') : l.stock) }, { key: 'status', label: t('Status') }, { key: 'source', label: t('Source') }], d.listings),
       h('h3', { class: 'fs-sm fw-bold mt-3', text: t('Locations') }),
       simpleTable([{ key: 'name', label: t('Name') }, { key: 'formattedAddress', label: t('Address') }, { key: 'latitude', label: t('Position'), render: (l) => (l.latitude === null ? t('not placed') : `${l.latitude}, ${l.longitude}`) }, { key: 'deliveryFee', label: t('Delivery fee'), render: (l) => money(l.deliveryFee) }], d.locations),
+      h('h3', { class: 'fs-sm fw-bold mt-3', text: t('Verification documents and uploads') }),
+      simpleTable([{ key: 'purpose', label: t('Purpose') }, { key: 'originalName', label: t('File'), render: (u) => u.originalName || u.mime }, { key: 'sizeBytes', label: t('Size'), render: (u) => `${Math.round(u.sizeBytes / 1024)} KB` }, { key: '_', label: '', render: (u) => button(t('Open'), { size: 'sm', variant: 'secondary', onClick: () => openUpload(u) }) }], d.uploads || [], { empty: t('No uploads.') }),
       h('h3', { class: 'fs-sm fw-bold mt-3', text: t('Orders, campaigns, payments') }), pre({ orders: d.orders.length, campaigns: d.campaigns.length, payments: d.payments.length, followup: d.followup.settings }),
     ) });
   }).catch(toastError);

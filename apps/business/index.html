@@ -89,6 +89,8 @@
             <button class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm" @click="syncMoran()">Sync products and locations from Moran AI</button>
           </div>
           <div class="mt-3" x-show="me?.merchant.verificationStatus === 'unverified'">
+            <label class="block text-sm mb-2">Registration or licence documents (PDF or photo, up to 10 MB each): <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" @change="uploadVerificationDocs($event)"></label>
+            <ul class="text-xs text-gray-600 mb-2" x-show="verificationDocs.length"><template x-for="d in verificationDocs" :key="d.id"><li x-text="`${d.originalName || d.mime} · ${Math.round(d.sizeBytes / 1024)} KB`"></li></template></ul>
             <button class="px-3 py-1.5 rounded-lg border text-sm" @click="submitVerification()">Submit verification details</button>
           </div>
         </div>
@@ -120,7 +122,8 @@
           <input class="border rounded-lg p-2" placeholder="Category" x-model="editing.category" :disabled="editing.source === 'moran'">
           <input class="border rounded-lg p-2" type="number" min="0" placeholder="Price (TZS)" x-model.number="editing.price" required :disabled="editing.source === 'moran'">
           <input class="border rounded-lg p-2" type="number" min="0" placeholder="Stock (blank = unknown)" x-model.number="editing.stock" :disabled="editing.source === 'moran'">
-          <input class="border rounded-lg p-2" placeholder="Image URL" x-model="editing.imageUrl" :disabled="editing.source === 'moran'">
+          <div class="flex gap-2 items-center"><input class="border rounded-lg p-2 flex-1" placeholder="Image URL" x-model="editing.imageUrl" :disabled="editing.source === 'moran'"><label class="text-sm underline cursor-pointer" x-show="editing.source !== 'moran'">Upload photo<input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadProductImage($event)"></label></div>
+          <img class="h-20 rounded border object-cover" x-show="editing.imageUrl" :src="editing.imageUrl" alt="">
           <input class="border rounded-lg p-2 md:col-span-2" placeholder='Attributes as key=value, comma separated (seats=3, color=grey)' x-model="editing.attributesText">
           <label class="text-sm flex items-center gap-2"><input type="checkbox" x-model="editing.moranbuyVisible"> Visible on MoranBuy</label>
           <textarea class="border rounded-lg p-2 md:col-span-3" placeholder="Description" x-model="editing.description" :disabled="editing.source === 'moran'"></textarea>
@@ -304,7 +307,7 @@
       return {
         me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns', 'Follow-up'],
         templates: [], offers: [], campaigns: [], senderInfo: null, followup: { question: '', decision: null, registrationUrl: null, active: false, settings: { scheduleText: '24, 72', maxAttempts: 2, paused: false }, leads: [], summary: '' }, error: '', notice: '',
-        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, insights: null, sendAt: {}, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
+        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, insights: null, sendAt: {}, verificationDocs: [], registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
         async init() { if (this.registrationToken) this.tab = 'Follow-up'; if (MoranBuy.session.loggedIn()) await this.loadMe(); },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
@@ -334,7 +337,11 @@
         logout() { MoranBuy.api('/api/merchants/auth/logout', { method: 'POST' }).catch(() => {}); MoranBuy.session.clear(); this.me = null; },
         syncMoran() { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/sync/moran', { method: 'POST' }); await this.loadMe(); this.notice = `Products: ${d.products.created} new, ${d.products.updated} updated, ${d.products.archived} archived. Locations: ${d.locations.imported}.`; }); },
         selectService(s) { return this.run(async () => { await MoranBuy.api('/api/merchant/services', { method: 'POST', body: { services: [s] } }); await this.loadMe(); }, 'Service selected. It activates after payment is verified.'); },
-        submitVerification() { const n = prompt('Business registration number (or leave blank):') ?? ''; return this.run(async () => { await MoranBuy.api('/api/merchant/verification', { method: 'POST', body: { registrationNumber: n || null } }); await this.loadMe(); }, 'Verification submitted for review.'); },
+        // Uploads a product photo and puts its public address on the product being edited.
+        uploadProductImage(e) { const f = e.target.files[0]; if (!f) return; return this.run(async () => { const u = await MoranBuy.upload(f, 'product_image'); this.editing.imageUrl = u.url; e.target.value = ''; }, 'Photo uploaded. Save the product to use it.'); },
+        // Verification documents stay private: only this business and MoranBuy admins can open them.
+        uploadVerificationDocs(e) { const files = [...e.target.files]; return this.run(async () => { for (const f of files) this.verificationDocs.push(await MoranBuy.upload(f, 'verification_document')); e.target.value = ''; }, 'Documents uploaded. Submit verification to send them for review.'); },
+        submitVerification() { const n = prompt('Business registration number (or leave blank):') ?? ''; return this.run(async () => { await MoranBuy.api('/api/merchant/verification', { method: 'POST', body: { registrationNumber: n || null, documentUploadIds: this.verificationDocs.map((d) => d.id) } }); this.verificationDocs = []; await this.loadMe(); }, 'Verification submitted for review.'); },
         blankListing() { return { name: '', productType: '', category: '', price: null, stock: null, imageUrl: '', attributesText: '', description: '', moranbuyVisible: true }; },
         edit(l) { this.editing = { ...l, attributesText: Object.entries(l.attributes || {}).map(([k, v]) => `${k}=${v}`).join(', ') }; },
         saveListing() { return this.run(async () => {

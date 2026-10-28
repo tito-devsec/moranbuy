@@ -24,8 +24,18 @@
     return data;
   }
 
+  // Sends one file as the request body; the server reads its real type from the bytes.
+  async function upload(file, purpose, retry = true) {
+    const res = await fetch(`/api/merchant/uploads?purpose=${encodeURIComponent(purpose)}&name=${encodeURIComponent(file.name || '')}`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', ...(get(ACCESS) ? { Authorization: `Bearer ${get(ACCESS)}` } : {}) }, body: file });
+    if (res.status === 401 && retry && (await refresh())) return upload(file, purpose, false);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.message || data.error || `HTTP ${res.status}`), { code: data.error, status: res.status });
+    return data.upload;
+  }
+
   window.MoranBuy = {
     api,
+    upload,
     session: { save: (d) => { set(ACCESS, d.accessToken); set(REFRESH, d.refreshToken); }, clear: () => { set(ACCESS, null); set(REFRESH, null); }, loggedIn: () => !!get(ACCESS) },
     money: (n, c = 'TZS') => (n === null || n === undefined ? 'not stated' : `${c === 'TZS' ? 'TSh' : c} ${Number(n).toLocaleString('en-US')}`),
     label: (s) => String(s || '').replace(/_/g, ' '),

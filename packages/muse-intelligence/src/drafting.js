@@ -33,10 +33,13 @@ export async function museSummarizeLeads(muse, { leads, language = 'sw', merchan
   return muse.complete({ feature: 'followup_summary', system: LEADS, messages: [{ role: 'user', content: JSON.stringify({ language, leads }) }], maxTokens: 400, merchantId });
 }
 
-const ADMIN = `You help a MoranBuy administrator read redacted operational data. Explain what the data shows and what to check next, in plain English, from the data only. Answer as JSON: {"summary": "...", "checks": ["..."]}.`;
+const ADMIN = `You help a MoranBuy administrator read redacted operational data for one section of the admin dashboard.
+Explain in plain English what the data shows and what needs attention, from the data only: say what is healthy, what is stuck or failing, and why it matters.
+Use only numbers that appear in the data; do not add, round or change any. Three to six sentences. Then list the concrete things to check next, most urgent first.
+Answer as JSON: {"summary": "...", "checks": ["..."]}.`;
 
-export async function museAdminSummary(muse, { data }) {
-  return muse.complete({ feature: 'admin_summary', system: ADMIN, messages: [{ role: 'user', content: JSON.stringify(data).slice(0, 12000) }], maxTokens: 500 });
+export async function museAdminSummary(muse, { data, section = 'overview' }) {
+  return muse.complete({ feature: 'admin_summary', system: ADMIN, messages: [{ role: 'user', content: JSON.stringify({ section, data }).slice(0, 12000) }], maxTokens: 600, requestRef: `admin:${section}` });
 }
 
 // Every number in a drafted text must come from the facts; otherwise the deterministic text is used instead.

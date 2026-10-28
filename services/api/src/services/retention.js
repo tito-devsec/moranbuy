@@ -1,5 +1,6 @@
 import { audit, logger } from '@moranbuy/observability';
 import { db } from '../db/connection.js';
+import { deleteUpload } from './uploads.js';
 
 // How long each kind of record is kept, in days; administrators can lengthen or shorten these in Super Admin, never below the floors.
 export const DEFAULT_RETENTION = Object.freeze({
@@ -16,6 +17,8 @@ export const DEFAULT_RETENTION = Object.freeze({
   webhookEventsDays: 90,      // duplicate-delivery guard
   inactiveCustomersDays: 730, // customers who never ordered and have not written since
   orderLocationDays: 730,     // the customer's delivery location on old orders (the order itself is kept)
+  customerPhotosDays: 90,     // photos web customers sent to show what they want
+  unusedProductImagesDays: 30, // product photos no listing shows
 });
 const FLOORS = { webhookEventsDays: 7 };
 const MIN_DAYS = 30;
@@ -51,6 +54,9 @@ function rules(d, r, now) {
     // A customer is removed only with no order or enquiry on record and no message for the whole period; their sessions, signals and schedules go with them.
     { key: 'inactiveCustomersDays', table: 'customers', where: (q) => q.where((s) => s.where('last_seen_at', '<', before(r.inactiveCustomersDays)).orWhere((n) => n.whereNull('last_seen_at').where('created_at', '<', before(r.inactiveCustomersDays)))).whereNotExists(d('orders').select(d.raw('1')).whereRaw('orders.customer_id = customers.id')).whereNotExists(d('enquiries').select(d.raw('1')).whereRaw('enquiries.customer_id = customers.id')) },
     { key: 'orderLocationDays', table: 'orders', scrub: { customer_location_json: null }, where: (q) => q.where('created_at', '<', before(r.orderLocationDays)).whereNotNull('customer_location_json') },
+    // Uploaded files: the file on disk and its record go together.
+    { key: 'customerPhotosDays', table: 'uploads', files: true, where: (q) => q.where({ purpose: 'customer_photo' }).where('created_at', '<', before(r.customerPhotosDays)) },
+    { key: 'unusedProductImagesDays', table: 'uploads', label: 'uploads:unused_product_images', files: true, where: (q) => q.where({ purpose: 'product_image' }).where('created_at', '<', before(r.unusedProductImagesDays)).whereNotExists(d('listings').select(d.raw('1')).whereNull('listings.deleted_at').whereRaw("listings.image_url like '%/media/' || uploads.storage_key")) },
     // Spent refresh tokens are not personal history; they are cleared after thirty days.
     { key: null, table: 'refresh_tokens', where: (q) => q.where((s) => s.where('expires_at', '<', before(30)).orWhere('revoked_at', '<', before(30))) },
   ];
@@ -62,13 +68,20 @@ export async function purgeExpired({ dbImpl = db, dryRun = true, now = Date.now(
   const started = Date.now();
   const result = {};
   for (const rule of rules(dbImpl, r, now)) {
-    const label = rule.table + (rule.scrub ? ':scrubbed' : '');
+    const label = rule.label || rule.table + (rule.scrub ? ':scrubbed' : '');
     const count = Number((await rule.where(dbImpl(rule.table)).count('* as n').first()).n);
     result[label] = { expired: count, removed: 0, keepDays: rule.key ? r[rule.key] : 30 };
     if (dryRun || !count) continue;
     let removed = 0;
     // Batches keep each statement short so the live service is never locked for long.
     for (;;) {
+      if (rule.files) {
+        const rows = await rule.where(dbImpl('uploads')).limit(BATCH);
+        for (const row of rows) await deleteUpload(dbImpl, row);
+        removed += rows.length;
+        if (rows.length < BATCH) break;
+        continue;
+      }
       const ids = rule.where(dbImpl(rule.table)).select(dbImpl.raw('ctid')).limit(BATCH);
       const n = rule.scrub
         ? await dbImpl(rule.table).whereIn(dbImpl.raw('ctid'), ids).update(rule.scrub)

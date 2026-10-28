@@ -24,6 +24,8 @@ import { proxiedAdmin } from '../middleware/proxied-admin.js';
 import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '../services/merchant-notify.js';
 import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 import { demandOverview } from '../services/insights.js';
+import { readUpload, publicUpload } from '../services/uploads.js';
+import { adminSummary, SUMMARY_SECTIONS } from '../services/admin-summary.js';
 import { loadReminderSettings, renderReminder, DEFAULT_SCHEDULE_REMINDER } from '../services/schedule-reminders.js';
 import { loadRetention, purgeExpired, retentionFloor, DEFAULT_RETENTION, NEVER_PURGED } from '../services/retention.js';
 
@@ -74,6 +76,20 @@ adminRouter.get('/overview', asyncHandler(async (_req, res) => {
 adminRouter.get('/insights', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(365).default(30), merchantId: z.string().uuid().optional(), language: z.enum(['sw', 'en']).default('en') }).passthrough() }), asyncHandler(async (req, res) => res.json(await demandOverview({ muse: shoppingDeps().muse, merchantId: req.query.merchantId || null, days: req.query.days, language: req.query.language }))));
 adminRouter.get('/schedules', asyncHandler(async (_req, res) => res.json({ schedules: await db('customer_schedules as s').join('customers as c', 'c.id', 's.customer_id').leftJoin('merchants as m', 'm.id', 's.merchant_id').where('s.status', 'scheduled').orderBy('s.due_at', 'asc').limit(200).select('s.*', 'c.region', 'c.district', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, customer_id: undefined }))) })));
 adminRouter.get('/catalog-uploads', asyncHandler(async (_req, res) => res.json({ uploads: await db('catalog_uploads as u').join('merchants as m', 'm.id', 'u.merchant_id').orderBy('u.created_at', 'desc').limit(200).select('u.id', 'u.kind', 'u.status', 'u.reason', 'u.muse_status', 'u.listing_id', 'u.created_at', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, from_phone: undefined }))) })));
+
+// ---- Muse explains a section ----
+// Counts for one section, rule checks, and Muse's plain-English reading when it is on; each request is recorded in Muse telemetry.
+adminRouter.post('/summary', rateLimit({ windowMs: 60_000, max: 20 }), validate({ body: z.object({ section: z.enum(SUMMARY_SECTIONS) }) }), asyncHandler(async (req, res) => res.json(await adminSummary({ muse: shoppingDeps().muse, section: req.body.section }))));
+
+// ---- uploads ----
+adminRouter.get('/merchants/:id/uploads', validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ uploads: (await db('uploads').where({ merchant_id: req.params.id }).orderBy('created_at', 'desc').limit(200)).map(publicUpload) })));
+// A verification document is opened for review only; every view is audited.
+adminRouter.get('/uploads/:id', validate({ params: idParams }), asyncHandler(async (req, res) => {
+  const row = await db('uploads').where({ id: req.params.id }).whereNot({ purpose: 'customer_photo' }).first();
+  if (!row) throw notFound('UPLOAD_NOT_FOUND');
+  await act(req, { merchantId: row.merchant_id, action: 'upload.viewed', targetType: 'upload', targetId: row.id, after: { purpose: row.purpose } });
+  res.json({ upload: publicUpload(row), dataBase64: (await readUpload(row)).toString('base64') });
+}));
 
 // ---- retention ----
 // How long each record is kept, what the last runs did, and what would go now.

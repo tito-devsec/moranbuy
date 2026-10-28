@@ -36,9 +36,19 @@ production database; MoranBuy never migrates Moran's database.
 
 ## Queue workers
 
-`node services/api/src/workers/main.js` runs two polling workers. Run one instance per
-environment or several: recipients and tasks are claimed with conditional updates, so duplicates
-cannot happen across instances.
+`node services/api/src/workers/main.js` runs the polling workers: campaign schedule (30 s), campaign
+dispatch, follow-up delivery (30 s), customer schedule reminders (60 s), Moran listings pull
+(10 min) and the retention purge (6 h). Run one instance per environment or several: every row is
+claimed with a conditional update, so duplicates cannot happen across instances.
+
+## Uploaded files
+
+Product photos, verification documents and web customer photos are written to `UPLOAD_DIR`
+(`/app/data/uploads` in the containers), a named volume shared by the API and the worker (the
+worker's purge deletes expired files). Back it up with the database. Nginx allows request bodies up
+to 12 MB; the API accepts images up to `UPLOAD_MAX_IMAGE_MB` (5) and PDFs up to
+`UPLOAD_MAX_PDF_MB` (10), and decides the type from the file's bytes. Product photos are public at
+`/media/<random name>`; documents and customer photos are never served publicly.
 
 ## Webhooks and HTTPS
 
@@ -54,7 +64,7 @@ ship them to your log store. Muse Spark usage is in Admin → Muse Spark Intelli
 
 ## Backup, rollback, rate limits
 
-- Backup Postgres daily; the Redis contents are disposable.
+- Backup Postgres daily, and the uploads volume with it; the Redis contents are disposable.
 - Rollback: redeploy the previous image; `npm run migrate:rollback` only if the release's migration must go.
 - API rate limit 300 requests per minute per IP; sign-in failures 10 per 15 minutes per account; campaign daily cap per merchant from the entitlement limits (default 1000).
 

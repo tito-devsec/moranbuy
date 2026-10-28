@@ -13,6 +13,7 @@ sends a message, charges anyone or activates a service on its own.
 | Read a product a registered business sends by chat (text or photo) into its catalogue | `museExtractProduct` → `handleMerchantChat` | a name is required; a new product needs a price; the canonical product type comes from the vocabulary | `fallbackExtractProduct` |
 | Draft follow-up messages and campaign and outreach announcements | `museDraftFollowup`, `museDraftCampaign`, `museDraftOutreach` | grounded numbers; a follow-up must carry the STOP line | `followupMessage`, `fallbackDraft` |
 | Judge which customers fit a business's offer (best-fit audience for campaigns and outreach) | `fitScores` (deterministic score), `museAudienceFit` (reasons, reorder) | Muse can only reorder and explain the candidates it was given; consent and frequency caps are applied before it sees anyone | the deterministic scores and reasons |
+| Explain an admin section in plain English: what is healthy, what is stuck, what to check next | `sectionData` (aggregate counts only), `ruleChecks`, `museAdminSummary` → `POST /api/admin/summary` | grounded numbers; rule checks always shown; Muse's checks with numbers not in the data are dropped | `ruleChecks` |
 | Explain demand statistics: what people ask for most, where, budgets, best sellers, unmet demand | `demandStats`, `museDemandOverview` | grounded numbers | `renderOverview` |
 
 ## Who may use follow-up and outreach

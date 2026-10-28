@@ -11,5 +11,7 @@ Object.assign(process.env, {
   PAYMENT_PROVIDER: 'sandbox',
   CAMPAIGN_DRY_RUN: 'true',
   FOLLOWUP_DRY_RUN: 'true',
+  // Uploaded files in tests go to a throwaway folder, never into the repository.
+  UPLOAD_DIR: process.env.UPLOAD_DIR || `${(process.env.TMPDIR || '/tmp').replace(/\/+$/, '')}/moranbuy-test-uploads`,
 });
 if (/prod|moranai\.co\.tz/i.test(process.env.DATABASE_URL)) throw new Error('Refusing to run tests against what looks like production');

@@ -71,6 +71,8 @@ audited with a reason.
 | Webhook duplicate guard | 90 |
 | Customers who never ordered or enquired and have not written since | 730 |
 | Delivery location on old orders (the order itself stays) | 730 |
+| Photos web customers uploaded (file and record) | 90 |
+| Product photos no listing shows (file and record) | 30 |
 
 Never purged here: orders, payments, consent events, contacts, merchants, listings and the audit
 trail. Erasure on request (`DELETE /api/merchant/contacts/:phone`) is separate and immediate.

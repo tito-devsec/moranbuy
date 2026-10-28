@@ -43,9 +43,12 @@ export function publicMerchant(m) {
 }
 
 // Stores verification documents' references and marks the merchant pending review.
-export async function submitVerification(db, merchantId, { registrationNumber = null, taxId = null, documentUrls = [], notes = null, actorId, ip = null }) {
+export async function submitVerification(db, merchantId, { registrationNumber = null, taxId = null, documentUrls = [], documentUploadIds = [], notes = null, actorId, ip = null }) {
   const before = await db('merchants').where({ id: merchantId }).first('verification_status', 'verification_json');
-  const payload = { registrationNumber, taxId, documentUrls, notes, submittedAt: new Date().toISOString() };
+  // Uploaded documents must be this business's own verification files; their ids are kept, not their contents.
+  const docs = documentUploadIds.length ? await db('uploads').whereIn('id', documentUploadIds).where({ merchant_id: merchantId, purpose: 'verification_document' }).select('id', 'mime', 'size_bytes', 'original_name') : [];
+  if (docs.length !== documentUploadIds.length) throw new ApiError(400, 'BAD_DOCUMENT', 'A document is not one of your verification uploads.');
+  const payload = { registrationNumber, taxId, documentUrls, documents: docs.map((d) => ({ uploadId: d.id, mime: d.mime, sizeBytes: d.size_bytes, name: d.original_name })), notes, submittedAt: new Date().toISOString() };
   const [row] = await db('merchants').where({ id: merchantId }).update({ verification_status: 'pending', verification_json: JSON.stringify(payload), updated_at: db.fn.now() }).returning('*');
   await audit(db, { actorType: 'merchant', actorId, merchantId, action: 'merchant.verification_submitted', targetType: 'merchant', targetId: merchantId, before, after: { verificationStatus: 'pending' }, ip });
   return row;

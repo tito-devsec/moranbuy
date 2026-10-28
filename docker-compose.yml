@@ -30,6 +30,8 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
       REDIS_URL: redis://redis:6379
     command: ["sh", "-c", "npm run migrate && node services/api/src/server.js"]
+    volumes:
+      - uploads:/app/data/uploads
     ports: ["4000:4000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -43,6 +45,8 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
       REDIS_URL: redis://redis:6379
     command: ["node", "services/api/src/workers/main.js"]
+    volumes:
+      - uploads:/app/data/uploads
     depends_on:
       api: { condition: service_started }
 
@@ -60,5 +64,6 @@ services:
     expose: ["8642"]
 
 volumes:
+  uploads:
   pgdata:
   redisdata:

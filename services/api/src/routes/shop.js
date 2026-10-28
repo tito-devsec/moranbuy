@@ -7,6 +7,9 @@ import { shoppingDeps, upsertCustomer } from '../services/shopping.js';
 import { db } from '../db/connection.js';
 import { notFound } from '@moranbuy/core';
 import { termsGate } from '../services/terms.js';
+import { ApiError } from '@moranbuy/core';
+import { saveUpload, uploadDataUrl } from '../services/uploads.js';
+import { rawFile } from './uploads.js';
 
 export const shopRouter = express.Router();
 
@@ -14,6 +17,7 @@ const messageBody = z.object({
   customerToken: z.string().min(8).max(80).optional(),
   text: z.string().max(2000).default(''),
   imageUrl: z.string().url().max(600).optional(),
+  photoUploadId: z.string().uuid().optional(),
   location: z.object({ lat: z.number(), lng: z.number(), label: z.string().max(200).optional() }).optional(),
   language: z.enum(['sw', 'en']).optional(),
   acceptTerms: z.boolean().optional(),
@@ -25,10 +29,24 @@ shopRouter.post('/messages', validate({ body: messageBody }), asyncHandler(async
   const token = req.body.customerToken || crypto.randomBytes(16).toString('hex');
   const customer = await upsertCustomer({ channel: 'web', channelRef: token, language: req.body.language || null });
   const gate = await termsGate({ customer, text: req.body.rejectTerms ? 'decline' : '', channel: 'web', acceptTerms: !!req.body.acceptTerms });
-  if (!gate.pass && !(gate.accepted && (req.body.text || req.body.imageUrl || req.body.location))) return res.json({ customerToken: token, state: gate.accepted ? 'terms_accepted' : gate.rejected ? 'terms_rejected' : 'terms_required', replies: gate.replies.map((r) => ({ text: r.text })), terms: gate.terms || null });
+  if (!gate.pass && !(gate.accepted && (req.body.text || req.body.imageUrl || req.body.photoUploadId || req.body.location))) return res.json({ customerToken: token, state: gate.accepted ? 'terms_accepted' : gate.rejected ? 'terms_rejected' : 'terms_required', replies: gate.replies.map((r) => ({ text: r.text })), terms: gate.terms || null });
   const { engine } = shoppingDeps();
-  const out = await engine.handleMessage({ customer, text: req.body.text, imageUrl: req.body.imageUrl || null, sharedLocation: req.body.location || null });
+  // A photo the customer uploaded stays private: Muse reads it as data, and the session records only its reference.
+  let photo = null;
+  if (req.body.photoUploadId) {
+    photo = await db('uploads').where({ id: req.body.photoUploadId, customer_id: customer.id, purpose: 'customer_photo' }).first();
+    if (!photo) throw notFound('UPLOAD_NOT_FOUND');
+  }
+  const out = await engine.handleMessage({ customer, text: req.body.text, imageUrl: req.body.imageUrl || (photo ? `upload:${photo.id}` : null), imageDataUrl: photo ? await uploadDataUrl(photo) : null, sharedLocation: req.body.location || null });
   res.json({ customerToken: token, sessionId: out.session.id, state: out.session.state, replies: out.replies, runId: out.run?.id || null, orderRef: out.orderRef || null, museStatus: out.museStatus || null });
+}));
+
+// A web customer's photo of what they want; only after accepting the terms, kept private and removed by the retention purge.
+shopRouter.post('/uploads', rawFile, validate({ query: z.object({ customerToken: z.string().min(8).max(80) }).passthrough() }), asyncHandler(async (req, res) => {
+  const customer = await db('customers').where({ channel: 'web', channel_ref: req.query.customerToken }).first();
+  if (!customer || customer.terms_status !== 'accepted') throw new ApiError(403, 'TERMS_REQUIRED', 'Accept the terms of service before sending a photo.');
+  const row = await saveUpload({ buffer: req.body, purpose: 'customer_photo', customerId: customer.id });
+  res.status(201).json({ uploadId: row.id, mime: row.mime, sizeBytes: row.size_bytes });
 }));
 
 // The evidence behind one matching run: the request, policy, every ranked offer with its reasons, and the exclusions.
