@@ -215,18 +215,27 @@ index e44d3cf..0553144 100644
          recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_success', identifier });
          return res.json(await issueSession(tenant, {}, null, { via: 'web' }));
 diff --git a/src/api/routes/whatsapp-webhook.routes.js b/src/api/routes/whatsapp-webhook.routes.js
-index e5a7702..6fc5645 100644
+index e5a7702..e2a2999 100644
 --- a/src/api/routes/whatsapp-webhook.routes.js
 +++ b/src/api/routes/whatsapp-webhook.routes.js
 @@ -6,6 +6,7 @@ import { resolveTenantByPhoneNumberId, isTenantOperational, invalidateTenantCach
  import { runAgent } from '../../core/agent-runner.js';
  import { handleTableMessage } from '../../services/restaurant/reply.service.js';
  import { handleMediaTrustMessage } from '../../agents/media-trust/mediaTrustAgent.js';
-+import { isMoranBuyTenant, forwardInboundToMoranBuy } from '../../services/moranbuy.service.js';
++import { isMoranBuyTenant, forwardInboundToMoranBuy, forwardStatusesToMoranBuy } from '../../services/moranbuy.service.js';
  import { upsertCustomer, updateCustomerInterest } from '../../services/customer.service.js';
  import { detectIntent, createFollowUp, extractPromisedDate } from '../../services/followup.service.js';
  import { notifyOwnerOfHandover, pingOwnerDashboard } from '../../services/owner-notify.service.js';
-@@ -884,6 +885,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+@@ -458,6 +459,8 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+         logger.error({ err: err.message }, 'Campaign status update failed'));
+       // The same receipts for Moran's own replies: when the last bubble was delivered and read.
+       recordReplyStatuses(change.statuses).catch(() => {});
++      // And for what MoranBuy sent (docs/moranbuy.md): its campaign and order alerts keep their own delivery ledger.
++      forwardStatusesToMoranBuy(change.statuses).catch(() => {});
+       // And for patient testimonials sent (services/healthcare/testimonials.service.js); none match otherwise.
+       import('../../services/healthcare/testimonials.service.js')
+         .then((m) => m.recordTestimonialStatuses(change.statuses)).catch(() => {});
+@@ -884,6 +887,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
        }
      }
  

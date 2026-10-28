@@ -10,6 +10,7 @@ import { detectOptOut, detectOptIn, optOut, optIn } from '@moranbuy/consent-mana
 import { stopLeadsForPhone } from '@moranbuy/followup-engine';
 import { handleMerchantOrderReply } from '../services/order-actions.js';
 import { termsGate } from '../services/terms.js';
+import { recordDeliveryStatus } from '@moranbuy/campaign-engine';
 
 export const internalInboundRouter = express.Router();
 
@@ -65,6 +66,31 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   }
   await db('webhook_events').where({ source: 'moran', event_id: String(messageId) }).update({ status: 'processed', processed_at: db.fn.now() });
   res.json({ ok: true, sessionId: out.session.id, state: out.session.state, sent });
+}));
+
+// Delivery receipts (sent, delivered, read, failed) for messages MoranBuy sent, forwarded by Moran; each only moves the ledger forward.
+internalInboundRouter.post('/status', asyncHandler(async (req, res) => {
+  const c = config();
+  const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body || {});
+  if (!verifySignedBody(c.MORAN_SHARED_SECRET, raw, req.headers['x-moranbuy-timestamp'], req.headers['x-moranbuy-signature'])) throw new ApiError(401, 'BAD_SIGNATURE', 'The request signature is not valid.');
+  let event; try { event = JSON.parse(raw); } catch { throw new ApiError(400, 'BAD_JSON', 'Body is not JSON.'); }
+  const statuses = Array.isArray(event.statuses) ? event.statuses : [];
+  const results = [];
+  for (const s of statuses) {
+    const status = String(s.status || '').toLowerCase();
+    if (!s.id || !['sent', 'delivered', 'read', 'failed'].includes(status)) continue;
+    const campaign = await recordDeliveryStatus(db, { providerMessageId: s.id, status });
+    const notified = await db('merchant_notifications').where({ provider_message_id: s.id }).update({ status: status === 'failed' ? 'failed' : 'sent', error: status === 'failed' ? (s.errors?.[0]?.title || 'Delivery failed') : null });
+    results.push({ id: s.id, status, campaign, notification: notified > 0 });
+  }
+  // Campaign counters follow the recipient ledger.
+  const ids = statuses.map((s) => s.id).filter(Boolean);
+  const touched = ids.length ? [...new Set(await db('campaign_recipients').whereIn('provider_message_id', ids).pluck('campaign_id'))] : [];
+  for (const id of touched) {
+    const counts = Object.fromEntries((await db('campaign_recipients').where({ campaign_id: id }).select('status').count('id as n').groupBy('status')).map((x) => [x.status, Number(x.n)]));
+    await db('campaigns').where({ id }).update({ count_sent: (counts.sent || 0) + (counts.delivered || 0) + (counts.read || 0), count_delivered: (counts.delivered || 0) + (counts.read || 0), count_failed: counts.failed || 0, updated_at: db.fn.now() });
+  }
+  res.json({ ok: true, results });
 }));
 
 // Constant-time comparison helper kept here for the WhatsApp verify handshake if Moran ever forwards it.

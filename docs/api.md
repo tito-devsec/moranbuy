@@ -22,7 +22,8 @@ last 15 minutes; refresh tokens rotate.
 - `GET|PATCH /api/merchant/profile`, `POST /services`, `POST /verification`
 - `GET|POST /api/merchant/listings`, `GET|PATCH|DELETE /listings/:id`, `PATCH /listings/:id/moran` (Moran-owned fields), `POST /sync/moran`
 - `GET|POST /api/merchant/locations`, `PATCH|DELETE /locations/:id`
-- `GET /api/merchant/orders`, `POST /orders/:id/status`, `GET /enquiries`
+- `GET /api/merchant/orders`, `POST /orders/:id/status` (also mirrored to the Moran order for linked businesses, `moranSync` in the response), `GET /enquiries`
+- `GET /services/pricing`, `POST /services/:service/pay` `{ phone? }` (starts a payment; a pending one under 15 minutes old is returned again; `409 SERVICE_NOT_PRICED` until an admin sets a price), `GET /payments`
 - `GET|POST /api/merchant/contacts`, `GET /contacts/:phone/consent`, `DELETE /contacts/:phone`
 
 ## Campaigns (entitlement `campaign_engine`)
@@ -33,11 +34,17 @@ last 15 minutes; refresh tokens rotate.
 
 ## Follow-up
 - `GET /api/merchant/followup/offer`, `POST /offer/answer` `{ accept }`
+- `GET /register/:token`, `POST /register/:token/accept-policy` (the acceptance link's steps)
 - entitlement `paid_followup`: `GET|PATCH /settings`, `GET|POST /leads`, `POST /leads/:id/stop`, `POST /leads/summary`
 
 ## Payments
 - `POST /webhooks/payments` (Snippe, signed over the raw body)
 - `POST /api/sandbox/payments/:reference/settle` (not in production)
+- A completed settlement of a payment with purpose `entitlement` activates that service for `periodDays` (default 30); nothing else activates a paid service automatically.
+
+## Moran channel (signed, `MORAN_SHARED_SECRET`)
+- `POST /internal/inbound` customer messages, button replies and locations from the MoranBuy number
+- `POST /internal/inbound/status` `{ statuses: [{ id, status, errors? }] }` delivery receipts for messages MoranBuy sent
 
 ## Admin
 
@@ -46,6 +53,7 @@ which signs each request (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature` over ti
 path and body) and carries `X-MoranBuy-Admin-Email`, `-Name`, `-Role`. The same routes accept a
 MoranBuy admin token for the fallback app.
 
+- `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
 - `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`
 - `POST /api/admin/auth/login`, `/auth/refresh`, `GET /me`, `GET /overview`

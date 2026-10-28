@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
-import { config } from '@moranbuy/core';
+import { config, ApiError } from '@moranbuy/core';
+import { loadServicePricing } from '../services/service-pricing.js';
 import { requireMerchantAuth, requireEntitlement } from '@moranbuy/authorization';
 import { offerFollowup, answerFollowupOffer, updateFollowupSettings, followupSettings, listLeads, createLead, stopLead } from '@moranbuy/followup-engine';
 import { museSummarizeLeads } from '@moranbuy/muse-intelligence';
@@ -16,6 +17,35 @@ const actor = (req) => ({ actorId: req.merchantUser.id, ip: req.ip });
 // The question, asked before anything is activated or charged.
 followupRouter.get('/offer', asyncHandler(async (req, res) => res.json({ ...(await offerFollowup(db, req.merchant.id, { language: req.query.lang === 'en' ? 'en' : 'sw' })), settings: followupSettings(req.merchant) })));
 followupRouter.post('/offer/answer', validate({ body: z.object({ accept: z.boolean() }) }), asyncHandler(async (req, res) => res.json(await answerFollowupOffer(db, req.merchant.id, { accept: req.body.accept, appUrl: config().APP_URL, ...actor(req) }))));
+
+// The registration the acceptance link opens: verification, the policy, payment; each step's state is read from the records, not from the link.
+const tokenParams = z.object({ token: z.string().min(10).max(80) });
+async function registration(req) {
+  const s = followupSettings(req.merchant);
+  const policyAcceptedAt = req.merchant.settings_json?.followup?.policyAcceptedAt || null;
+  if (!s.registrationToken || s.registrationToken !== req.params.token) throw new ApiError(404, 'REGISTRATION_NOT_FOUND', 'This registration link is not valid for your account.');
+  const pricing = await loadServicePricing();
+  const ent = await db('merchant_entitlements').where({ merchant_id: req.merchant.id, service: 'paid_followup' }).first();
+  const payment = await db('payments').where({ merchant_id: req.merchant.id, purpose: 'entitlement', target_id: 'paid_followup' }).orderBy('created_at', 'desc').first();
+  const paid = ent?.status === 'active' && ent?.billing_state === 'paid';
+  return {
+    steps: {
+      verification: { done: ['pending', 'verified'].includes(req.merchant.verification_status), status: req.merchant.verification_status },
+      policy: { done: !!policyAcceptedAt, acceptedAt: policyAcceptedAt, url: `${String(config().APP_URL).replace(/\/+$/, '')}/terms` },
+      payment: { done: paid, price: pricing.paid_followup, last: payment ? { reference: payment.reference, status: payment.status, amount: payment.amount } : null },
+    },
+    active: ent?.status === 'active' && ['paid', 'free'].includes(ent?.billing_state),
+  };
+}
+followupRouter.get('/register/:token', validate({ params: tokenParams }), asyncHandler(async (req, res) => res.json(await registration(req))));
+followupRouter.post('/register/:token/accept-policy', validate({ params: tokenParams }), asyncHandler(async (req, res) => {
+  await registration(req);
+  const merchant = await db('merchants').where({ id: req.merchant.id }).first();
+  const next = { ...(merchant.settings_json || {}), followup: { ...(merchant.settings_json?.followup || {}), policyAcceptedAt: new Date().toISOString(), policyAcceptedBy: req.merchantUser.id } };
+  await db('merchants').where({ id: req.merchant.id }).update({ settings_json: JSON.stringify(next), updated_at: db.fn.now() });
+  req.merchant.settings_json = next;
+  res.json(await registration(req));
+}));
 
 // Everything below needs an active, paid follow-up service.
 const needFollowup = requireEntitlement(db, 'paid_followup');

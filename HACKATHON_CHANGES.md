@@ -38,6 +38,8 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 ## Still open for the owner
 
+- Service prices: set them in Super Admin → MoranBuy → Billing before a business can pay for a service.
+
 - A Meta Model API key (`MUSE_API_KEY`) so Muse Spark runs live; every Muse path is tested with fakes and the admin page shows the real status.
 - Apply the Moran patch, register MoranBuy in Super Admin and connect its WhatsApp number.
 - Snippe credentials and the WhatsApp provider rate for campaign pricing.

@@ -12,6 +12,9 @@ import { db } from '../db/connection.js';
 import { merchantDeps } from '../services/merchants.js';
 import { shoppingDeps } from '../services/shopping.js';
 import { applyOrderStatus } from '../services/order-actions.js';
+import { engagementDeps } from '../services/engagement.js';
+import { startPayment } from '@moranbuy/billing';
+import { loadServicePricing } from '../services/service-pricing.js';
 
 export const merchantRouter = express.Router();
 merchantRouter.use(requireMerchantAuth(db));
@@ -41,6 +44,21 @@ merchantRouter.post('/services', validate({ body: z.object({ services: z.array(z
   await audit(db, { actorType: 'merchant', actorId: req.merchantUser.id, merchantId: req.merchant.id, action: 'merchant.services_selected', targetType: 'merchant', targetId: req.merchant.id, after: { services: req.body.services }, ip: req.ip });
   res.json({ entitlements: rows });
 }));
+
+// What the paid services cost and how to buy one; activation follows the verified payment, never this request.
+merchantRouter.get('/services/pricing', asyncHandler(async (_req, res) => res.json({ pricing: await loadServicePricing() })));
+merchantRouter.post('/services/:service/pay', validate({ params: z.object({ service: z.enum(['campaign_engine', 'new_product_outreach', 'paid_followup']) }), body: z.object({ phone: z.string().max(20).optional() }).default({}) }), asyncHandler(async (req, res) => {
+  const pricing = await loadServicePricing();
+  const price = pricing[req.params.service];
+  if (!price || price.monthlyTzs === null || price.monthlyTzs === undefined) throw new ApiError(409, 'SERVICE_NOT_PRICED', 'This service has no price yet; an administrator must set it.');
+  await selectServices(db, req.merchant.id, [req.params.service], { actor: `merchant:${req.merchantUser.id}` });
+  const pending = await db('payments').where({ merchant_id: req.merchant.id, purpose: 'entitlement', target_id: req.params.service, status: 'pending' }).orderBy('created_at', 'desc').first();
+  const pub = (p) => ({ id: p.id, reference: p.reference, amount: p.amount, currency: p.currency, status: p.status, provider: p.provider });
+  if (pending && Date.now() - new Date(pending.created_at).getTime() < 15 * 60000) return res.json({ payment: pub(pending), reused: true });
+  const payment = await startPayment(db, engagementDeps().payments, { merchantId: req.merchant.id, purpose: 'entitlement', targetId: req.params.service, amount: price.monthlyTzs, currency: pricing.currency, phone: req.body.phone || req.merchant.contact_phone || null, breakdown: { service: req.params.service, monthlyTzs: price.monthlyTzs, periodDays: price.periodDays || 30 }, actorId: req.merchantUser.id });
+  res.json({ payment: pub(payment) });
+}));
+merchantRouter.get('/payments', asyncHandler(async (req, res) => res.json({ payments: await db('payments').where({ merchant_id: req.merchant.id }).orderBy('created_at', 'desc').limit(50).select('id', 'purpose', 'target_id', 'provider', 'reference', 'amount', 'currency', 'status', 'settled_at', 'created_at') })));
 
 merchantRouter.post('/verification', validate({ body: z.object({ registrationNumber: z.string().max(80).nullable().optional(), taxId: z.string().max(80).nullable().optional(), documentUrls: z.array(z.string().url()).max(10).optional(), notes: z.string().max(1000).nullable().optional() }) }), asyncHandler(async (req, res) => {
   const row = await submitVerification(db, req.merchant.id, { ...req.body, documentUrls: req.body.documentUrls || [], ...actor(req) });
@@ -103,7 +121,7 @@ merchantRouter.post('/orders/:id/status', validate({ params: idParams, body: z.o
   if (!order) throw notFound('ORDER_NOT_FOUND');
   try {
     const out = await applyOrderStatus({ moran: shoppingDeps().moran, order, status: req.body.status, deliveryFee: req.body.deliveryFee ?? null, note: req.body.note || null, actor: { type: 'merchant', id: req.merchantUser.id, via: 'dashboard' } });
-    res.json({ order: out.order, customerAlert: out.customerAlert });
+    res.json({ order: out.order, customerAlert: out.customerAlert, moranSync: out.moranSync });
   } catch (err) { if (err.code === 'BAD_TRANSITION') throw new ApiError(409, 'BAD_TRANSITION', err.message); throw err; }
 }));
 

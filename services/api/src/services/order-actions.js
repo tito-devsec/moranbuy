@@ -2,6 +2,7 @@ import { formatMoney } from '@moranbuy/core';
 import { audit } from '@moranbuy/observability';
 import { toMsisdn } from '@moranbuy/consent-management';
 import { db } from '../db/connection.js';
+import { syncOrderStatusToMoran } from './moran-order-sync.js';
 
 const NEXT = { accepted: ['pending_merchant'], rejected: ['pending_merchant', 'accepted'], fulfilled: ['accepted', 'paid'], cancelled: ['pending_merchant', 'accepted'] };
 
@@ -13,7 +14,8 @@ export async function applyOrderStatus({ dbImpl = db, moran, order, status, deli
   const [row] = await dbImpl('orders').where({ id: order.id }).update(patch).returning('*');
   await audit(dbImpl, { actorType: actor.type, actorId: actor.id || null, merchantId: order.merchant_id, action: 'order.status_changed', targetType: 'order', targetId: order.id, before: { status: order.status }, after: { status, deliveryFee: patch.delivery_fee ?? null, via: actor.via } });
   const customerAlert = await notifyCustomerOfOrderStatus({ dbImpl, moran, order: row });
-  return { order: row, customerAlert };
+  const moranSync = await syncOrderStatusToMoran({ dbImpl, moran, order: row }).catch((err) => ({ ok: false, error: err.message }));
+  return { order: row, customerAlert, moranSync };
 }
 
 // Tells a WhatsApp customer what the merchant decided, from the MoranBuy number; web customers read the status page.

@@ -5,6 +5,9 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 ## Unreleased
 
 ### 2026-10-28
+- Order handoff into Moran: a confirmed order for a Moran-linked business is also written into that business's own Moran orders (`MB-` prefixed reference, verified prices, delivery line), its Moran id kept in `orders.external_ref`, and the merchant's accept, reject and delivered decisions are mirrored there; standalone businesses keep the WhatsApp alert only.
+- Paying for a service: monthly service prices set in Super Admin → MoranBuy → Billing (audited, blank keeps a service off sale), `POST /api/merchant/services/:service/pay` starts a Snippe or sandbox payment, and only the verified settlement activates the entitlement for the paid period; the follow-up acceptance link now opens a registration page (verification, policy, payment) in the business app.
+- Campaign delivery receipts: Moran forwards sent, delivered, read and failed receipts for messages MoranBuy sent to the signed `POST /internal/inbound/status`; campaign recipients and counts and order-alert records follow them, forward only.
 - Terms gate: the terms and privacy question with Accept and Reject buttons before anyone is answered, repeated until accepted, versioned and editable in Super Admin; bilingual terms and privacy pages at /terms and /privacy; customers told when the merchant marks an order delivered.
 - Scheduled pull of opted-in Moran businesses and products (auto-created merchants, duplicate-free, archiving on a full pass, manual pull from admin); merchants answer order alerts by WhatsApp reply (accept with delivery fee, reject, delivered) or from the dashboard; customers are told the merchant's decision.
 - Owner alert on confirmed orders: WhatsApp text or approved template from the MoranBuy number, wording and template set in Super Admin → MoranBuy → Notifications, every outcome recorded in `merchant_notifications`.

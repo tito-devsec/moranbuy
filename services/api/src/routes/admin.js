@@ -9,7 +9,7 @@ import { museTelemetry } from '@moranbuy/muse-intelligence';
 import { consentHistory, consentState, toMsisdn } from '@moranbuy/consent-management';
 import { publicCampaign, publicTemplate } from '@moranbuy/campaign-engine';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
-import { DEFAULT_PRICING } from '@moranbuy/billing';
+import { DEFAULT_PRICING, DEFAULT_SERVICE_PRICING } from '@moranbuy/billing';
 import { audit, redact, maskPhone } from '@moranbuy/observability';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validate } from '../middleware/validate.js';
@@ -193,6 +193,16 @@ adminRouter.post('/payments/:id/refund', manage, validate({ params: idParams, bo
   const [row] = await db('payments').where({ id: p.id }).update({ status: 'refunded', provider_json: db.raw('provider_json || ?::jsonb', [JSON.stringify({ refund: { amount: req.body.amount, providerReference: req.body.providerReference || null, by: req.admin.email, at: new Date().toISOString() } })]) }).returning('*');
   await act(req, { merchantId: p.merchant_id, action: 'payment.refund_recorded', targetType: 'payment', targetId: p.id, after: { amount: req.body.amount }, reason: req.body.reason });
   res.json({ payment: row });
+}));
+adminRouter.get('/service-pricing', asyncHandler(async (_req, res) => { const row = await db('platform_settings').where({ key: 'service_pricing' }).first(); res.json({ defaults: DEFAULT_SERVICE_PRICING, effective: { ...DEFAULT_SERVICE_PRICING, ...(row?.value || {}) } }); }));
+const servicePrice = z.object({ monthlyTzs: z.number().int().nonnegative().nullable(), periodDays: z.number().int().min(1).max(366).default(30) });
+adminRouter.put('/service-pricing', manage, validate({ body: z.object({ campaign_engine: servicePrice.optional(), new_product_outreach: servicePrice.optional(), paid_followup: servicePrice.optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...overrides } = req.body;
+  const before = (await db('platform_settings').where({ key: 'service_pricing' }).first())?.value || {};
+  const next = { ...before, ...overrides };
+  await db('platform_settings').insert({ key: 'service_pricing', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'service_pricing.changed', targetType: 'settings', targetId: 'service_pricing', before, after: next, reason: why });
+  res.json({ effective: { ...DEFAULT_SERVICE_PRICING, ...next } });
 }));
 adminRouter.get('/pricing', asyncHandler(async (_req, res) => { const row = await db('platform_settings').where({ key: 'campaign_pricing' }).first(); res.json({ defaults: DEFAULT_PRICING, overrides: row?.value || {}, effective: { ...DEFAULT_PRICING, ...(row?.value || {}) } }); }));
 adminRouter.put('/pricing', manage, validate({ body: z.object({ providerUnitTzs: z.number().nonnegative().nullable().optional(), serviceFeeUnitTzs: z.number().nonnegative().optional(), serviceFeeMinTzs: z.number().nonnegative().optional(), taxPct: z.number().min(0).max(50).optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {

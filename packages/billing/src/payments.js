@@ -1,4 +1,5 @@
 import { audit } from '@moranbuy/observability';
+import { activateEntitlement, PAID_SERVICES } from '@moranbuy/authorization';
 
 // Starts a payment and records it pending; nothing is marked paid here.
 export async function startPayment(db, provider, { merchantId, purpose, targetId, amount, currency = 'TZS', phone = null, breakdown = {}, actorId = null }) {
@@ -22,6 +23,12 @@ export async function settlePayment(db, { reference, status, settledAmount = nul
   const next = status === 'completed' && covers ? 'completed' : status === 'completed' ? 'failed' : status;
   const [updated] = await db('payments').where({ id: row.id }).update({ status: next, settled_at: db.fn.now(), provider_json: db.raw(`provider_json || ?::jsonb`, [JSON.stringify({ lastEvent: { status, settledAmount, eventId } })]) }).returning('*');
   await audit(db, { actorType: 'system', merchantId: row.merchant_id, action: 'payment.settled', targetType: 'payment', targetId: row.id, before: { status: row.status }, after: { status: next, covers } });
+  // A verified payment for a service activates it for the paid period; nothing else ever does so automatically.
+  if (next === 'completed' && row.purpose === 'entitlement' && PAID_SERVICES.includes(row.target_id)) {
+    const days = Number(row.breakdown_json?.periodDays || 30);
+    await activateEntitlement(db, row.merchant_id, row.target_id, { billingState: 'paid', actor: `payment:${row.reference}`, expiresAt: new Date(Date.now() + days * 86400000), limits: row.breakdown_json?.limits || {} });
+    await audit(db, { actorType: 'system', merchantId: row.merchant_id, action: 'entitlement.activated_by_payment', targetType: 'entitlement', targetId: row.target_id, after: { days, reference: row.reference } });
+  }
   return { payment: updated };
 }
 

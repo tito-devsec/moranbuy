@@ -19,7 +19,7 @@ Moran supplies only the template lifecycle with Meta and the merchant's own send
 | 9 | `POST /:id/readiness` | All gates: entitlement, payment, sender, template approved, draft approved, consent, rate limit, pricing. Results stored |
 | 10 | `POST /:id/confirm` with `{confirm: true}` | Gates re-run; recipient ledger written with idempotency keys; status `dispatching`. Second confirmation refused |
 | 11 | worker `processCampaignQueue` | Each recipient claimed with a conditional update, consent and template rechecked at send time, sent through the merchant's own number, status recorded; transient failures retried up to 3 times |
-| 12 | `recordDeliveryStatus` | Delivery and read receipts move the ledger forward only |
+| 12 | `POST /internal/inbound/status` → `recordDeliveryStatus` | Moran forwards Meta's receipts (sent, delivered, read, failed) for messages MoranBuy sent; the ledger and the campaign counts move forward only, and order-alert records take the same receipts |
 
 No campaign dispatches because a draft exists or because a payment arrived.
 

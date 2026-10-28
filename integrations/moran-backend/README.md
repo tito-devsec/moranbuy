@@ -8,7 +8,7 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 - `patches/0001-moranbuy-integration.patch`: a `git diff` against `moran-backend` commit `965c247`
   (27 October 2026) touching 11 existing files. Config block, raw-body mount and router mounts in
   `server.js`, the webhook forward, the owner-login refusal, the admin router registration, the
-  Super Admin register button and the MoranBuy navigation entry, the weare CSP for Facebook's
+  Super Admin register button and the MoranBuy navigation entry, the delivery-receipt forward, the weare CSP for Facebook's
   Embedded Signup window, the dashboard header entry and `MORANBUY_URL`, and the regenerated admin
   API reference.
 - `files/`: the new source files, the Super Admin MoranBuy page and one doc to copy in:

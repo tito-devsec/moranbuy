@@ -21,3 +21,6 @@ export function priceCampaign({ recipients, pricing = DEFAULT_PRICING }) {
     note: providerKnown ? 'Provider charges are an estimate from the configured rate; the settled amount is recorded after dispatch.' : 'The WhatsApp provider rate is not configured; the campaign cannot be paid until an administrator sets it.',
   };
 }
+
+// Monthly prices of the paid services, set by an administrator; null means not for sale yet.
+export const DEFAULT_SERVICE_PRICING = Object.freeze({ campaign_engine: { monthlyTzs: null, periodDays: 30 }, new_product_outreach: { monthlyTzs: null, periodDays: 30 }, paid_followup: { monthlyTzs: null, periodDays: 30 }, currency: 'TZS' });

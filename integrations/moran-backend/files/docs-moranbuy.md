@@ -10,10 +10,10 @@ second. Inside Moran it is **one admin-managed business** plus a signed channel.
 |---|---|
 | `tenants.admin_managed`, `tenants.moranbuy_listed`, `services.moranbuy_listed`, one `moranbuy` workspace | `src/db/migrations/20260101000102_moranbuy.js` |
 | Register the MoranBuy business, sign and verify the channel, forward inbound, send from the MoranBuy number or a listed merchant's number, listings of listed businesses, MoranBuy knowledge | `src/services/moranbuy.service.js` |
-| `/internal/moranbuy/*` (signed): `POST send`, `POST send-template`, `GET listings`, `GET knowledge/search` | `src/api/routes/moranbuy-internal.routes.js` |
+| `/internal/moranbuy/*` (signed): `POST send`, `POST send-template`, `GET listings`, `GET knowledge/search`, `POST orders` (a MoranBuy order into a listed business's own orders, `MB-` prefixed, idempotent), `PATCH orders/:orderRef` (status in step with MoranBuy) | `src/api/routes/moranbuy-internal.routes.js` |
 | `/api/admin/moranbuy` (`GET`, `POST register`) | `src/api/routes/admin/moranbuy.routes.js` |
 | `/api/moranbuy` (owner): `GET` status, `POST listing` the "List my products on MoranBuy" switch | `src/api/routes/moranbuy-owner.routes.js` |
-| Webhook: a message to the MoranBuy tenant is forwarded instead of answered by an agent | `src/api/routes/whatsapp-webhook.routes.js` |
+| Webhook: a message to the MoranBuy tenant is forwarded instead of answered by an agent; delivery receipts for messages MoranBuy sent (kinds `moranbuy`, `moranbuy_merchant`, `moranbuy_campaign` in `message_usage_log`) are forwarded to MoranBuy's `/internal/inbound/status` | `src/api/routes/whatsapp-webhook.routes.js` |
 | Owner login refused for admin-managed accounts | `src/api/routes/auth.routes.js` |
 | Super Admin: "Register MoranBuy" on Businesses | `admin-frontend/assets/js/pages/businesses.js` |
 | Super Admin → **MoranBuy** page (Operations): register, **Connect MoranBuy to WhatsApp** (Meta Embedded Signup, as an owner does), choose the name MoranBuy appears under, open the MoranBuy dashboard (merchants, ranking evidence, campaigns, follow-up, billing, Muse Spark key, Snippe keys, audit) | `admin-frontend/moranbuy.html`, `admin-frontend/assets/js/pages/moranbuy.js`, `assets/js/core/layout.js` |

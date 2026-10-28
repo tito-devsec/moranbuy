@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { verifyMoranBuySignature, sendFromMoranBuy, sendMerchantText, sendMerchantTemplate, listedProducts, moranBuyKnowledge } from '../../services/moranbuy.service.js';
+import { verifyMoranBuySignature, sendFromMoranBuy, sendMerchantText, sendMerchantTemplate, listedProducts, moranBuyKnowledge, createMoranBuyOrder, updateMoranBuyOrder } from '../../services/moranbuy.service.js';
 import { reportError } from '../../core/error-handler.js';
 import { logger } from '../../utils/logger.js';
 
@@ -78,4 +78,39 @@ moranbuyInternalRouter.get('/knowledge/search', async (req, res) => {
   const q = String(req.query.q || '').slice(0, 500);
   if (!q) return res.json({ passages: [] });
   res.json({ passages: await moranBuyKnowledge(q, Math.min(10, Number(req.query.limit) || 3)) });
+});
+
+const orderSchema = z.object({
+  tenantId: z.string().uuid(), orderRef: z.string().min(4).max(32), customerName: z.string().max(120).nullable().optional(), customerPhone: z.string().max(20).nullable().optional(),
+  items: z.array(z.object({ name: z.string().max(200), sku: z.string().max(120).nullable().optional(), productId: z.string().max(64).nullable().optional(), quantity: z.number().int().positive().default(1), unitPrice: z.number().nonnegative(), lineTotal: z.number().optional() })).min(1).max(20),
+  deliveryFee: z.number().nonnegative().nullable().optional(), totalAmount: z.number().nonnegative(), totalConfirmed: z.boolean().optional(), currency: z.string().max(8).default('TZS'),
+  fulfilment: z.string().max(20).nullable().optional(), customerLocation: z.string().max(200).nullable().optional(), notes: z.string().max(500).nullable().optional(),
+});
+
+// An order MoranBuy confirmed for a listed business lands in that business's own order list.
+moranbuyInternalRouter.post('/orders', async (req, res) => {
+  const parsed = orderSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR', details: parsed.error.issues });
+  try {
+    res.json(await createMoranBuyOrder(parsed.data));
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.code, message: err.message });
+    await reportError(err, { tier: 'WARNING', action: 'moranbuy_order' });
+    res.status(500).json({ error: 'ORDER_FAILED' });
+  }
+});
+
+const orderPatchSchema = z.object({ tenantId: z.string().uuid(), status: z.enum(['pending', 'confirmed', 'paid', 'fulfilled', 'cancelled']), totalAmount: z.number().nonnegative().nullable().optional(), deliveryFee: z.number().nonnegative().nullable().optional(), notes: z.string().max(500).nullable().optional() });
+
+// MoranBuy mirrors the merchant's accept, reject and delivered decisions onto the same order.
+moranbuyInternalRouter.patch('/orders/:orderRef', async (req, res) => {
+  const parsed = orderPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR', details: parsed.error.issues });
+  try {
+    res.json(await updateMoranBuyOrder({ ...parsed.data, orderRef: req.params.orderRef }));
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.code, message: err.message });
+    await reportError(err, { tier: 'WARNING', action: 'moranbuy_order_update' });
+    res.status(500).json({ error: 'ORDER_UPDATE_FAILED' });
+  }
 });

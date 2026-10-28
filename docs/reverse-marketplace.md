@@ -29,7 +29,7 @@ yes, an order. One call per inbound message: `ShoppingEngine.handleMessage`.
 9. **Selection.** A reply such as "1" picks an option. The listing is re-read now; if it is gone,
    inactive or out of stock the customer is told. The known total (or the unconfirmed delivery) is
    read back and a YES/NO is requested.
-10. **Confirmation.** Only an explicit yes creates an `orders` row, status `pending_merchant`, with
+10. **Confirmation.** Only an explicit yes creates an `orders` row, status `pending_merchant` (for a Moran-linked business the same order is written into Moran as `MB-<ref>` so it appears in that business's own dashboard, and `external_ref` keeps the Moran id), with
     the reference sent to the customer. A no closes the session without an order.
 11. **Owner alert and merchant answer.** A business with no MoranBuy login answers by WhatsApp:
     `KUBALI MB-XXXX 15000` accepts (with the delivery fee when it was unknown), `KATAA MB-XXXX`

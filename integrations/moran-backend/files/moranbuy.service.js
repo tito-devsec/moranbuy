@@ -126,6 +126,63 @@ export async function sendMerchantTemplate({ tenantId, to, templateName, languag
   return sendTemplateMessage({ phoneNumberId: tenant.whatsapp_phone_number_id, accessTokenEncrypted: tenant.wa_access_token_encrypted, to, templateName, languageCode: language, components, kind: 'moranbuy_campaign', idempotencyKey, tenantId: tenant.id });
 }
 
+/** MoranBuy orders carry this prefix in a business's order list, so they are told apart from the business's own. */
+const MORANBUY_ORDER_PREFIX = 'MB-';
+const MORANBUY_ORDER_STATUSES = new Set(['pending', 'confirmed', 'paid', 'fulfilled', 'cancelled']);
+
+/** Writes an order MoranBuy confirmed into the listed business's own orders, so it shows in that business's dashboard; repeated calls return the same row. */
+export async function createMoranBuyOrder({ tenantId, orderRef, customerName = null, customerPhone = null, items = [], deliveryFee = null, totalAmount = 0, currency = 'TZS', notes = null, customerLocation = null, fulfilment = null }) {
+  const tenant = await db('tenants').where({ id: tenantId }).first();
+  if (!tenant || !tenant.moranbuy_listed) throw Object.assign(new Error('TENANT_NOT_LISTED'), { code: 'TENANT_NOT_LISTED', status: 403 });
+  const ref = `${MORANBUY_ORDER_PREFIX}${String(orderRef).toUpperCase()}`.slice(0, 40);
+  const existing = await db('orders').where({ tenant_id: tenantId, order_ref: ref }).first('id', 'status');
+  if (existing) return { orderId: existing.id, orderRef: ref, duplicate: true };
+  // Lines keep the shape the agent writes, with the price MoranBuy verified against this business's catalogue.
+  const lines = items.map((i) => ({ name: String(i.name || 'item').slice(0, 200), qty: Math.max(1, Math.floor(Number(i.quantity) || 1)), unit_price: Math.round(Number(i.unitPrice) || 0), sku: i.sku || null, product_id: i.productId || null, price_verified: true }));
+  if (deliveryFee !== null && deliveryFee !== undefined) lines.push({ name: 'Delivery', qty: 1, unit_price: Math.round(Number(deliveryFee) || 0), price_verified: true });
+  const where = customerLocation ? ` Delivery to: ${String(customerLocation).slice(0, 200)}.` : '';
+  const [order] = await db('orders').insert({
+    tenant_id: tenantId, order_ref: ref, customer_name: customerName ? String(customerName).slice(0, 120) : null, customer_phone: customerPhone || null,
+    items: JSON.stringify(lines), total_amount: Math.round(Number(totalAmount) || 0), currency, status: 'pending',
+    notes: `Placed through MoranBuy${fulfilment ? ` (${fulfilment})` : ''}.${where}${notes ? ` ${String(notes).slice(0, 500)}` : ''}`,
+  }).returning('*');
+  logger.info({ tenantId, orderRef: ref, total: order.total_amount }, 'MoranBuy order written into the business orders');
+  return { orderId: order.id, orderRef: ref, duplicate: false };
+}
+
+/** Moves a MoranBuy order's status in step with MoranBuy; only MoranBuy's own orders can be touched this way. */
+export async function updateMoranBuyOrder({ tenantId, orderRef, status, totalAmount = null, notes = null }) {
+  const ref = `${MORANBUY_ORDER_PREFIX}${String(orderRef).toUpperCase()}`.slice(0, 40);
+  if (!MORANBUY_ORDER_STATUSES.has(status)) throw Object.assign(new Error('BAD_STATUS'), { code: 'BAD_STATUS', status: 400 });
+  const patch = { status, updated_at: db.fn.now() };
+  if (totalAmount !== null && totalAmount !== undefined) patch.total_amount = Math.round(Number(totalAmount) || 0);
+  if (notes) patch.notes = db.raw("coalesce(notes, '') || ?", [` ${String(notes).slice(0, 500)}`]);
+  const n = await db('orders').where({ tenant_id: tenantId, order_ref: ref }).update(patch);
+  if (!n) throw Object.assign(new Error('ORDER_NOT_FOUND'), { code: 'ORDER_NOT_FOUND', status: 404 });
+  return { orderRef: ref, status };
+}
+
+/** Delivery receipts for messages MoranBuy sent (its own number or a listed business's) are passed on to MoranBuy; others are not its business. */
+export async function forwardStatusesToMoranBuy(statuses = []) {
+  const base = config.moranbuy.apiUrl;
+  if (!base || !config.moranbuy.sharedSecret) return { ok: false, status: 'not_configured' };
+  const ids = statuses.map((s) => s?.id).filter(Boolean);
+  if (!ids.length) return { ok: true, forwarded: 0 };
+  const ours = new Set((await db('message_usage_log').whereIn('provider_message_id', ids).whereIn('kind', ['moranbuy', 'moranbuy_merchant', 'moranbuy_campaign']).pluck('provider_message_id')));
+  const mine = statuses.filter((s) => ours.has(s.id)).map((s) => ({ id: s.id, status: String(s.status || '').toLowerCase(), timestamp: s.timestamp || null, recipient: s.recipient_id || null, errors: Array.isArray(s.errors) ? s.errors.map((e) => ({ code: e.code, title: e.title || e.message || null })) : [] }));
+  if (!mine.length) return { ok: true, forwarded: 0 };
+  const raw = JSON.stringify({ statuses: mine });
+  const { timestamp, signature } = signMoranBuy(raw);
+  try {
+    const res = await fetch(`${String(base).replace(/\/+$/, '')}/internal/inbound/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': timestamp, 'X-MoranBuy-Signature': signature }, body: raw, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) logger.warn({ status: res.status }, 'MoranBuy did not accept the delivery receipts');
+    return { ok: res.ok, forwarded: mine.length };
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Forwarding delivery receipts to MoranBuy failed');
+    return { ok: false, status: 'network' };
+  }
+}
+
 /** Active products of listed businesses and services, with each business's default location, newest changes first. */
 export async function listedProducts({ since = null, page = 1, pageSize = 200 } = {}) {
   const limit = Math.min(500, Math.max(1, Number(pageSize) || 200));

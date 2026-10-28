@@ -12,6 +12,13 @@ was asked. `POST /offer/answer`:
   one-time registration link for verification, policy and payment, and still activates nothing.
   Activation happens after a verified payment or an audited admin action.
 
+The link opens the business app on the Follow-up tab (`#followup=<token>`), which reads
+`GET /api/merchant/followup/register/:token`: three steps, each judged from the records, never from
+the link. Verification (submitted or not), the policy (`POST /register/:token/accept-policy` records
+who accepted and when), and payment (the price administrators set for `paid_followup`; `POST
+/api/merchant/services/paid_followup/pay` starts it). The entitlement turns active only when the
+provider's settlement is verified; a short settlement never activates it.
+
 A follow-up-only merchant never receives the conversation agent; that is a separate entitlement.
 
 ## Leads

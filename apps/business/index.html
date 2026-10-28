@@ -85,9 +85,13 @@
           <h3 class="font-semibold mb-2">Services</h3>
           <ul class="text-sm space-y-1">
             <template x-for="e in me?.entitlements || []" :key="e.service">
-              <li class="flex justify-between"><span x-text="MoranBuy.label(e.service)"></span><span class="font-mono" x-text="`${e.status} · ${e.billing_state}`"></span></li>
+              <li class="flex justify-between items-center gap-2"><span x-text="MoranBuy.label(e.service)"></span><span class="font-mono text-xs" x-text="`${e.status} · ${e.billing_state}` + (e.expires_at ? ' · until ' + new Date(e.expires_at).toLocaleDateString() : '')"></span>
+                <button class="px-2 py-1 rounded border text-xs" x-show="e.billing_state !== 'paid' && e.billing_state !== 'free' && pricing[e.service]?.monthlyTzs != null" @click="payService(e.service)" x-text="'Pay ' + MoranBuy.money(pricing[e.service]?.monthlyTzs) + ' / ' + (pricing[e.service]?.periodDays || 30) + ' days'"></button>
+                <span class="text-xs text-gray-500" x-show="e.billing_state !== 'paid' && e.billing_state !== 'free' && pricing[e.service]?.monthlyTzs == null">Not priced yet</span>
+              </li>
             </template>
           </ul>
+          <div class="mt-2 text-xs rounded-lg bg-amber-50 border border-amber-200 p-2" x-show="lastPayment"><span x-text="`Payment ${lastPayment?.reference} (${lastPayment?.provider}) is ${lastPayment?.status}.`"></span> <span x-show="lastPayment?.provider === 'sandbox'">Sandbox: <button class="underline" @click="settleSandbox()">mark as paid</button> to see the activation.</span></div>
           <p class="text-xs text-gray-500 mt-2">Paid services are activated only after payment is verified. Nothing is switched on automatically.</p>
           <div class="mt-3 flex gap-2 flex-wrap">
             <template x-for="s in ['campaign_engine','new_product_outreach','paid_followup']" :key="s">
@@ -242,6 +246,15 @@
       </div>
 
       <div x-show="tab === 'Follow-up'" class="space-y-4">
+        <div class="bg-white rounded-xl border p-5 text-sm" x-show="registration">
+          <h3 class="font-semibold mb-2">Complete your follow-up registration</h3>
+          <ol class="space-y-2 list-decimal ml-5">
+            <li><span class="font-medium">Business verification</span> — <span x-text="registration?.steps.verification.done ? 'submitted (' + registration?.steps.verification.status + ')' : 'not submitted'"></span> <button class="underline ml-2" x-show="!registration?.steps.verification.done" @click="submitVerification().then(() => loadRegistration())">Submit now</button></li>
+            <li><span class="font-medium">Follow-up policy</span> — <span x-text="registration?.steps.policy.done ? 'accepted' : 'not accepted'"></span> <a class="underline ml-2" :href="registration?.steps.policy.url" target="_blank">Read the policy</a> <button class="underline ml-2" x-show="!registration?.steps.policy.done" @click="acceptPolicy()">I accept</button></li>
+            <li><span class="font-medium">Payment</span> — <span x-text="registration?.steps.payment.done ? 'paid' : (registration?.steps.payment.price?.monthlyTzs == null ? 'the price has not been set yet; an administrator must set it first' : MoranBuy.money(registration?.steps.payment.price?.monthlyTzs) + ' for ' + (registration?.steps.payment.price?.periodDays || 30) + ' days')"></span> <button class="underline ml-2" x-show="!registration?.steps.payment.done && registration?.steps.payment.price?.monthlyTzs != null" @click="payService('paid_followup').then(() => loadRegistration())">Pay</button> <span class="text-xs text-gray-500" x-show="registration?.steps.payment.last && !registration?.steps.payment.done" x-text="'Last payment ' + registration?.steps.payment.last?.reference + ': ' + registration?.steps.payment.last?.status"></span></li>
+          </ol>
+          <p class="mt-3" x-text="registration?.active ? 'The follow-up service is active.' : 'The service starts only once all three steps are complete and the payment is verified.'"></p>
+        </div>
         <div class="bg-white rounded-xl border p-5 text-sm">
           <h3 class="font-semibold mb-2">Paid follow-up service</h3>
           <p x-text="followup.question"></p>
@@ -275,18 +288,23 @@
       return {
         me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns', 'Follow-up'],
         templates: [], offers: [], campaigns: [], senderInfo: null, followup: { question: '', decision: null, registrationUrl: null, active: false, settings: { scheduleText: '24, 72', maxAttempts: 2, paused: false }, leads: [], summary: '' }, error: '', notice: '',
-        listings: [], locations: [], orders: [], editing: null, editingLoc: null,
+        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
-        async init() { if (MoranBuy.session.loggedIn()) await this.loadMe(); },
+        async init() { if (this.registrationToken) this.tab = 'Follow-up'; if (MoranBuy.session.loggedIn()) await this.loadMe(); },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
-        async loadMe() { this.me = await MoranBuy.api('/api/merchants/auth/me'); await this.load(); },
+        async loadMe() { this.me = await MoranBuy.api('/api/merchants/auth/me'); this.pricing = (await MoranBuy.api('/api/merchant/services/pricing')).pricing; await this.load(); },
+        // Starts a payment for a service; the service switches on only when the provider confirms the payment.
+        payService(s) { return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/services/${s}/pay`, { method: 'POST', body: {} }); this.lastPayment = d.payment; await this.loadMe(); }, 'Payment started. The service activates once the payment is verified.'); },
+        settleSandbox() { return this.run(async () => { await MoranBuy.api(`/api/sandbox/payments/${this.lastPayment.reference}/settle`, { method: 'POST', body: { status: 'completed' } }); this.lastPayment = null; await this.loadMe(); if (this.registration) await this.loadRegistration(); }, 'Sandbox payment settled.'); },
+        async loadRegistration() { if (!this.registrationToken) return; try { this.registration = await MoranBuy.api(`/api/merchant/followup/register/${this.registrationToken}`); } catch (e) { this.registration = null; this.error = e.message; } },
+        acceptPolicy() { return this.run(async () => { this.registration = await MoranBuy.api(`/api/merchant/followup/register/${this.registrationToken}/accept-policy`, { method: 'POST', body: {} }); }, 'Policy accepted.'); },
         async load() {
           if (!this.me) return;
           if (this.tab === 'Products') this.listings = (await MoranBuy.api('/api/merchant/listings')).listings;
           if (this.tab === 'Locations') this.locations = (await MoranBuy.api('/api/merchant/locations')).locations;
           if (this.tab === 'Orders') this.orders = (await MoranBuy.api('/api/merchant/orders')).orders;
           if (this.tab === 'Campaigns') { this.senderInfo = await MoranBuy.api('/api/merchant/campaigns/sender'); this.templates = (await MoranBuy.api('/api/merchant/campaigns/templates')).templates; this.offers = (await MoranBuy.api('/api/merchant/campaigns/outreach/offers')).offers; this.campaigns = (await MoranBuy.api('/api/merchant/campaigns')).campaigns; }
-          if (this.tab === 'Follow-up') await this.loadFollowup();
+          if (this.tab === 'Follow-up') { await this.loadFollowup(); await this.loadRegistration(); }
         },
         login() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/login', { method: 'POST', body: this.forms.login }); MoranBuy.session.save(d); await this.loadMe(); }); },
         register() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/register', { method: 'POST', body: { ...this.forms.register, phone: this.forms.register.phone || undefined } }); MoranBuy.session.save(d); await this.loadMe(); }); },

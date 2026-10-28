@@ -3,6 +3,8 @@ import { MuseClient } from '@moranbuy/muse-intelligence';
 import { Geocoder, MoranInternalClient, RuntimeResearcher } from '@moranbuy/integrations';
 import { museRuntimeConfig, researchRuntimeConfig } from './runtime-settings.js';
 import { notifyMerchantOfOrder } from './merchant-notify.js';
+import { handOrderToMoran } from './moran-order-sync.js';
+import { logger } from '@moranbuy/observability';
 import { recordMuseRequest } from '@moranbuy/muse-intelligence';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
@@ -32,7 +34,7 @@ export function shoppingDeps() {
       moran: new MoranInternalClient({ cfg: c }),
     };
     shared.researcher = new RuntimeResearcher({ resolve: () => researchRuntimeConfig(), cfg: c, deps: { recorder: (r) => recordMuseRequest(db, r) } });
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db), onOrderConfirmed: (order) => notifyMerchantOfOrder({ moran: shared.moran, order }) });
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });
   }
   return shared;
 }

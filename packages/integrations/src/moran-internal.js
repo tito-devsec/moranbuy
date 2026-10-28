@@ -45,6 +45,10 @@ export class MoranInternalClient {
   // Sends a plain text (inside a customer-service window) from a merchant's own number through Moran's outbound gate.
   sendMerchantText({ tenantId, to, body, idempotencyKey }) { return this.call('/send', { body: { type: 'text', tenantId, to, body, idempotencyKey } }); }
 
+  // Writes a MoranBuy order into a listed business's own Moran orders, and keeps its status in step.
+  createOrder(body) { return this.call('/orders', { body }); }
+  updateOrder({ orderRef, ...body }) { return this.call(`/orders/${encodeURIComponent(orderRef)}`, { method: 'PATCH', body }); }
+
   // Pages through listings of Moran businesses that opted into MoranBuy, newest changes first.
   listings({ since = null, page = 1, pageSize = 200 } = {}) {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize), ...(since ? { since } : {}) });
@@ -60,6 +64,8 @@ export class FakeMoranInternalClient {
   constructor({ listings = [], knowledge = [] } = {}) { this.sent = []; this.listingRows = listings; this.knowledge = knowledge; this.configured = true; }
   async sendText(m) { this.sent.push({ type: 'text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendImage(m) { this.sent.push({ type: 'image', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async createOrder(b) { this.orders = this.orders || []; this.orders.push(b); return { ok: true, status: 'ok', data: { orderId: `moran-order-${this.orders.length}` } }; }
+  async updateOrder(b) { this.orderUpdates = this.orderUpdates || []; this.orderUpdates.push(b); return { ok: true, status: 'ok', data: {} }; }
   async sendButtons(m) { this.sent.push({ type: 'buttons', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMoranBuyTemplate(m) { this.sent.push({ type: 'moranbuy_template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMerchantText(m) { this.sent.push({ type: 'merchant_text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
