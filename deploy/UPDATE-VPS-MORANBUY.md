@@ -34,31 +34,39 @@ Add an A record `buy.moranai.co.tz` → the VPS IP. Wait until `dig +short buy.m
 
 The patch is a zero-context diff made against Moran `main` at `680d6f5`; zero-context hunks are placed by line number, so apply it only on that exact commit.
 
+Run Moran's tests first in a separate worktree, so they never load the production `.env`:
+
 ```bash
 git clone https://github.com/tito-devsec/moranbuy /opt/moranbuy
 cd $MORAN_DIR && git fetch origin main
 test "$(git rev-parse HEAD)" = "$(git rev-parse 680d6f5)" || git checkout 680d6f5   # stop and regenerate the patch if main has moved past it
-git checkout -b moranbuy-integration
+git worktree add /tmp/moran-check 680d6f5 && cd /tmp/moran-check
 # copy the eight files and apply the patch exactly as /opt/moranbuy/integrations/moran-backend/README.md says, then:
 sha256sum -c /opt/moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.sha256
-openssl rand -hex 32          # the shared secret; the same value goes in both .env files
-echo 'MORANBUY_API_URL=https://buy.moranai.co.tz' >> .env
-echo 'MORANBUY_SHARED_SECRET=<that value>' >> .env
-npm ci && npm test            # on the host; the one known failure is sales-camera-ngapi-not-price (marked TODO)
+npm ci && npm test
+cd $MORAN_DIR && git worktree remove --force /tmp/moran-check
 ```
 
-`frontend/config.js` is set to `MORANBUY_URL: 'https://buy.moranai.co.tz'` by the patch. Do not run `npm run migrate` on the host:
-Moran's backend container runs its migrations (including `20260101000103_moranbuy.js`) when it starts.
+Expected from `npm test` without Redis and Postgres: the known `sales-camera-ngapi-not-price` (marked TODO) and three tests that need a live
+database or Redis (`mcp-security`, `whatsapp-flows`, `schema-columns`), the same as on a clean `main`. Anything else: stop.
+
+Then apply to the live checkout and rebuild in one go. `admin-frontend/` and `frontend/` are bind-mounted into nginx, so the Super Admin
+MoranBuy entry is visible from the moment the patch is applied and answers 404 until the new backend is up (the minutes of the build).
 
 ```bash
+openssl rand -hex 32          # the shared secret; the same value goes in both .env files
+cd $MORAN_DIR && echo 'MORANBUY_API_URL=https://buy.moranai.co.tz' >> .env && echo 'MORANBUY_SHARED_SECRET=<that value>' >> .env
+git checkout -b moranbuy-integration
+# copy the eight files and apply the patch as above, then sha256sum -c again: 19 lines OK
 docker tag moran-backend-backend moran-backend-backend:rollback-$(date +%Y%m%d)       # image names as `docker compose images` shows them
 docker tag moran-backend-websocket moran-backend-websocket:rollback-$(date +%Y%m%d)
 docker compose build backend websocket && docker compose up -d backend websocket
-docker compose logs --tail 50 backend          # migrations ran, server listening
+docker compose logs --tail 50 backend          # migrations ran (20260101000103_moranbuy), server listening
 docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload   # the weare CSP now allows Facebook's Embedded Signup window
 ```
 
-The admin front-end is bind-mounted into nginx, so the Super Admin MoranBuy page is live after the reload.
+Do not run `npm run migrate` on the host: Moran's backend container runs its migrations when it starts.
+`MORANBUY_URL` in `frontend/config.js` stays `''` (the owner dashboard's MoranBuy entry stays hidden) until section 4, when buy.moranai.co.tz answers.
 Then in Super Admin (weare.moranai.co.tz) open **MoranBuy** under Operations and follow the four steps: **Register MoranBuy** (a contact email;
 admins run this account, its owner login is refused by design), **Connect MoranBuy to WhatsApp**
 (the Facebook window, signed in to the account that owns the MoranBuy number), **the name MoranBuy
@@ -95,6 +103,7 @@ cp deploy/nginx.full.conf /root/backups/nginx.full.conf.bak
 cat /opt/moranbuy/deploy/nginx.buy.moranai.co.tz.conf >> deploy/nginx.full.conf
 docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
 curl -s https://buy.moranai.co.tz/ready
+sed -i "s|MORANBUY_URL: ''|MORANBUY_URL: 'https://buy.moranai.co.tz'|" frontend/config.js && grep -n MORANBUY_URL frontend/config.js   # owners now see the MoranBuy entry
 ```
 
 The site keeps `client_max_body_size 25m` for uploads and forwarded voice notes. If `nginx -t` fails, restore the backup and reload.
