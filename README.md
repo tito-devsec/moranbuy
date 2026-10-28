@@ -4,10 +4,9 @@ MoranBuy is an AI-powered reverse marketplace. Customers describe the product th
 budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
 matches to the customer, prioritizing budget fit and total cost before location convenience.
 
-> Build status: all 15 phases implemented. The reverse-marketplace engine, budget-first ranking, Muse Spark
-> client, customer web chat and the signed WhatsApp intake from Moran AI are implemented and tested.
-> Merchant platform, campaign engine, follow-up engine, consent management and the admin app are
-> being built phase by phase. `HACKATHON_CHANGES.md` says exactly what works today.
+> Build status: complete and tested for customers (WhatsApp and web, text, photos and voice), standalone and
+> Moran-registered businesses, and administrators in Moran's Super Admin. Live services (WhatsApp, the Meta
+> Model API, Snippe, Azure Speech) run once their keys are entered; `HACKATHON_CHANGES.md` lists what is new.
 
 ## The problem
 
@@ -63,6 +62,27 @@ campaign messages, and summarise follow-up leads. Muse Spark never decides price
 rankings, consent, authorization, payments or order state; deterministic code does. If Muse Spark
 is unavailable, MoranBuy says so and uses only configured fallback behaviour.
 See `docs/muse-integration.md` and `docs/muse-duties.md` (everything Muse does, with the check on each answer).
+
+## Meta AI tooling
+
+| Meta model | What MoranBuy does with it |
+|---|---|
+| Muse Spark 1.3 | Reads shopping requests and photos, writes grounded recommendations, lists products from a business's chat, picks best-fit customers, drafts campaigns and follow-ups, explains demand and admin data |
+| Muse Spark 1.2 (audio) | Hears WhatsApp and browser voice notes in Swahili, English or a mix (`input_audio`, WAV) |
+| Muse Voice Transcribe | Second ear for voice notes when Muse Spark audio is unavailable (`/v1/asr/transcribe`) |
+| Segment Anything 3.1 | Finds every product Muse named in a business's photo; each box is cut out in-process and becomes that listing's photo, so one shelf photo lists several products |
+
+Voice notes are decoded from Ogg Opus to 16 kHz WAV inside the Node process (`ogg-opus-decoder`, WebAssembly); nothing is
+installed on the server. Meta's API has no text to speech, so spoken replies use Azure Speech's Tanzanian Swahili voices,
+returned directly as Ogg Opus voice notes. Every Meta call is recorded with its latency, tokens and cost.
+
+## How it scales
+
+- The API is stateless: run more copies behind Nginx; sessions, offers and orders live in Postgres.
+- Timed work (scheduled campaigns, sending, follow-ups, reminders) runs from a Redis work list with leases; any number of workers can run, each job is claimed once, and Postgres stays the record.
+- Merchants' campaigns send from each merchant's own WhatsApp number, so sending capacity grows with the merchants; the MoranBuy number only answers customers, which WhatsApp does not cap inside 24 hours.
+- Muse cost is priced per request with a monthly budget and an optional hard cap; every Muse duty has a deterministic fallback, so a cap or an outage never stops answers.
+- Next steps at volume: a search index for listings beyond tens of thousands of products, read replicas for statistics, and partitioning the demand-signal table by month.
 
 ## Campaigns, outreach and follow-up
 
@@ -157,5 +177,6 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 - The WhatsApp provider rate for campaign pricing must be configured by an administrator; until then campaigns cannot be paid.
 - Web research (Hermes) is off by default and needs an allow-list of shop domains.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
-- Muse Spark is in US public preview; access needs a Meta Model API key.
+- The Meta Model API needs a key; Muse Voice Transcribe does not list Swahili among its 25 languages, so Swahili voice notes go to Muse Spark 1.2 audio first.
+- Spoken replies need an Azure Speech key (Meta's API has no text to speech).
 - Live campaign and follow-up sending stays in dry-run until every gate is verified in production.

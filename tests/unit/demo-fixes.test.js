@@ -24,3 +24,15 @@ test('the greeting names the agent once, whatever name the admin chose', () => {
   assert.equal(greetingFor({ name: 'Neema' }, 'en'), 'Hello, I am Neema from MoranBuy.');
   assert.equal(greetingFor({ name: 'Neema', greetingSw: 'Karibu MoranBuy!' }, 'sw'), 'Karibu MoranBuy!');
 });
+
+test('a business product price uses the same Swahili amount reader as customer budgets', async () => {
+  const { fallbackExtractProduct } = await import('@moranbuy/muse-intelligence');
+  const p = fallbackExtractProduct('Bidhaa: Kabati la nguo milango 3, bei laki 2 na elfu hamsini, idadi 4');
+  assert.equal(p.price, 250000);
+  assert.equal(p.stock, 4);
+  assert.equal(fallbackExtractProduct('Bidhaa: Meza, bei laki 4 na nusu, idadi 2').price, 450000);
+  assert.equal(fallbackExtractProduct('Product: Samsung A15 phone, price 420,000, used').price, 420000);
+  assert.equal(fallbackExtractProduct('Bidhaa: Sofa ya watu 3, bei 250k').price, 250000);
+  // The seat count is not mistaken for a price.
+  assert.equal(fallbackExtractProduct('Bidhaa: Sofa ya watu 3, idadi 2').price, null);
+});

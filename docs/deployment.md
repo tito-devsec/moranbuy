@@ -60,7 +60,7 @@ pace when Redis is unreachable or `QUEUE_MODE=poll`. Admin → Integration Healt
 Product photos, verification documents and web customer photos are written to `UPLOAD_DIR`
 (`/app/data/uploads` in the containers), a named volume shared by the API and the worker (the
 worker's purge deletes expired files). Back it up with the database. Nginx allows request bodies up
-to 12 MB; the API accepts images up to `UPLOAD_MAX_IMAGE_MB` (5) and PDFs up to
+to 25 MB (voice notes Moran forwards arrive base64 encoded); the API accepts images up to `UPLOAD_MAX_IMAGE_MB` (5) and PDFs up to
 `UPLOAD_MAX_PDF_MB` (10), and decides the type from the file's bytes. Product photos are public at
 `/media/<random name>`; documents and customer photos are never served publicly.
 

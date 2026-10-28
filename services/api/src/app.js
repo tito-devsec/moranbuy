@@ -23,7 +23,9 @@ export function createApp({ routers = [] } = {}) {
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
 
   // Webhooks are signed over the raw body, so they are parsed as bytes before the JSON parser runs.
-  app.use(['/webhooks', '/internal/inbound'], express.raw({ type: '*/*', limit: '2mb' }));
+  // Voice notes and photos arrive inside Moran's signed body, base64 encoded (a 16 MB WhatsApp voice note is about 22 MB of text).
+  app.use('/internal/inbound', express.raw({ type: '*/*', limit: '24mb' }));
+  app.use('/webhooks', express.raw({ type: '*/*', limit: '2mb' }));
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 
   // One shared ceiling per IP; signed webhooks are authenticated by their signature instead.

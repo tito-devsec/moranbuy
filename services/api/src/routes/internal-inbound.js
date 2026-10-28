@@ -12,6 +12,8 @@ import { handleMerchantOrderReply } from '../services/order-actions.js';
 import { termsGate } from '../services/terms.js';
 import { recordDeliveryStatus } from '@moranbuy/campaign-engine';
 import { handleMerchantChat } from '../services/merchant-chat.js';
+import { intakeVoice, intakeImage } from '../services/media-intake.js';
+import { voiceReplyFor } from '../services/voice-reply.js';
 
 export const internalInboundRouter = express.Router();
 
@@ -24,11 +26,16 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   }
   let event;
   try { event = JSON.parse(raw); } catch { throw new ApiError(400, 'BAD_JSON', 'Body is not JSON.'); }
-  const { messageId, from, imageUrl = null, location = null, name = null, buttonId = null } = event;
-  // Moran forwards a voice note as its transcript behind a fixed prefix; the words are what the agent reads.
-  const kind = event.kind === 'audio' || event.kind === 'voice' ? 'voice' : imageUrl ? 'image' : location ? 'location' : buttonId ? 'button' : 'text';
+  const { messageId, from, location = null, name = null, buttonId = null } = event;
+  let imageUrl = event.imageUrl || null;
+  // Moran forwards a voice note or photo as its raw bytes (event.media); MoranBuy hears and sees it itself, with Meta's models.
+  const media = event.media?.base64 ? Buffer.from(String(event.media.base64), 'base64') : null;
+  const kind = event.kind === 'audio' || event.kind === 'voice' ? 'voice' : (event.kind === 'image' || imageUrl) ? 'image' : location ? 'location' : buttonId ? 'button' : 'text';
   let text = String(event.text || '');
-  if (kind === 'voice') { const m = text.match(/transcript:\s*([\s\S]+)$/i); text = m && !/^\[/.test(m[1].trim()) ? m[1].trim() : ''; }
+  // An older Moran forwarded its own transcript behind a fixed prefix; it is still read when no audio came with it.
+  if (kind === 'voice' && !media) { const m = text.match(/transcript:\s*([\s\S]+)$/i); text = m && !/^\[/.test(m[1].trim()) ? m[1].trim() : ''; }
+  if (kind === 'voice' && media) text = '';
+  let imageDataUrl = null; let heard = null;
   if (!messageId || !from) throw new ApiError(400, 'VALIDATION_ERROR', 'messageId and from are required.');
 
   // The same delivery twice is answered once.
@@ -50,15 +57,23 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     // Nobody, customer or business owner, is answered before accepting the terms; the question is repeated until they do.
     out = { replies: gate.replies, session: { id: null, state: gate.accepted ? 'terms_accepted' : gate.rejected ? 'terms_rejected' : 'terms_prompted' } };
   } else {
+    // Only once the terms are accepted is a voice note or photo opened: decoded and heard, or kept and read, privately.
+    if (media && kind === 'voice') {
+      heard = await intakeVoice({ muse: shoppingDeps().muse, buffer: media, customerId: customer.id, requestRef: String(messageId) });
+      if (heard.ok) text = [event.text, heard.text].filter(Boolean).join(' ').trim();
+    } else if (media && kind === 'image') {
+      const pic = await intakeImage({ buffer: media, customerId: customer.id });
+      if (pic.ok) { imageDataUrl = pic.dataUrl; imageUrl = pic.ref; }
+    }
     // "KUBALI MB-XXXX 15000" from a merchant's own number answers an order alert; everything else is a shopping message.
     const merchantReply = await handleMerchantOrderReply({ moran, from, text });
     // A registered business sending a product or asking "RIPOTI" is served as a business, not as a shopper.
-    const merchantChat = merchantReply ? null : await handleMerchantChat({ muse: shoppingDeps().muse, from, text, imageUrl, kind, messageId: String(messageId) });
+    const merchantChat = merchantReply ? null : await handleMerchantChat({ muse: shoppingDeps().muse, from, text, imageUrl: imageDataUrl || imageUrl, imageBuffer: kind === 'image' ? media : null, kind, messageId: String(messageId) });
     if (merchantReply) out = { replies: [{ text: merchantReply.reply }], session: { id: null, state: merchantReply.order ? `order_${merchantReply.order.status}` : 'order_reply_rejected' } };
     else if (merchantChat) out = { replies: [{ text: merchantChat.reply }], session: { id: null, state: `merchant_${merchantChat.kind}` } };
     else {
       await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
-      out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location, kind });
+      out = await engine.handleMessage({ customer, text, imageUrl, imageDataUrl, sharedLocation: location, kind });
     }
   }
   const sent = [];
@@ -72,8 +87,14 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     sent.push({ idempotencyKey, status: result.status });
     if (!result.ok) logger.warn({ status: result.status }, 'Reply to Moran not delivered');
   }
+  // A voice note is answered with a voice note too, when spoken replies are set up; the written reply always goes first.
+  const spoken = await voiceReplyFor({ replies: out.replies, language: customer.language === 'en' ? 'en' : 'sw', inboundKind: kind, state: out.session?.state, customerId: customer.id }).catch(() => null);
+  if (spoken?.ok) {
+    const r = await moran.sendAudio({ to: from, audioBase64: spoken.audio.toString('base64'), mime: spoken.mime, idempotencyKey: `moranbuy:${messageId}:voice` });
+    sent.push({ idempotencyKey: `moranbuy:${messageId}:voice`, status: r.status, voice: true });
+  }
   await db('webhook_events').where({ source: 'moran', event_id: String(messageId) }).update({ status: 'processed', processed_at: db.fn.now() });
-  res.json({ ok: true, sessionId: out.session.id, state: out.session.state, sent });
+  res.json({ ok: true, sessionId: out.session.id, state: out.session.state, sent, heard: heard ? { ok: heard.ok, source: heard.source || null, reason: heard.reason || null } : null });
 }));
 
 // Delivery receipts (sent, delivered, read, failed) for messages MoranBuy sent, forwarded by Moran; each only moves the ledger forward.

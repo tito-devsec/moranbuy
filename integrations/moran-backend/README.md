@@ -6,7 +6,7 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 ## Contents
 
 - `patches/0001-moranbuy-integration.patch`: a `git diff` against `moran-backend` commit `965c247`
-  (27 October 2026) touching 11 existing files. Config block, raw-body mount and router mounts in
+  (27 October 2026) touching 11 existing files. It is a zero-context diff: it carries only the new lines and the three existing lines they replace, so no other Moran code is published here; apply it with `--unidiff-zero`. Config block, raw-body mount and router mounts in
   `server.js`, the webhook forward, the owner-login refusal, the admin router registration, the
   Super Admin register button and the MoranBuy navigation entry, the delivery-receipt forward, the weare CSP for Facebook's
   Embedded Signup window, the dashboard header entry and `MORANBUY_URL`, and the regenerated admin
@@ -36,7 +36,7 @@ cp ../moranbuy/integrations/moran-backend/files/moranbuy.routes.js src/api/route
 cp ../moranbuy/integrations/moran-backend/files/admin-moranbuy.html admin-frontend/moranbuy.html
 cp ../moranbuy/integrations/moran-backend/files/admin-pages-moranbuy.js admin-frontend/assets/js/pages/moranbuy.js
 cp ../moranbuy/integrations/moran-backend/files/docs-moranbuy.md docs/moranbuy.md
-git apply ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.patch
+git apply --unidiff-zero ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.patch
 npm test && npm run migrate
 ```
 

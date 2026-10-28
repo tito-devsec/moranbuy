@@ -36,6 +36,11 @@ const schema = z.object({
   MUSE_API_KEY: opt(),
   MUSE_MODEL_ID: z.string().default('muse-spark-1.3'),
   MUSE_TIMEOUT_MS: int(30000),
+  // Audio goes to the Muse Spark version Meta recommends for audio input (1.3 does not fully support it yet).
+  MUSE_AUDIO_MODEL_ID: z.string().default('muse-spark-1.2'),
+  MUSE_ASR_MODEL_ID: z.string().default('muse-voice-transcribe-1.0'),
+  // Segment Anything 3.1 on the Meta Model API, for finding products in photos.
+  MUSE_SAM_MODEL_ID: z.string().default('sam-3.1'),
   MUSE_REASONING_EFFORT: z.enum(['minimal', 'low', 'medium', 'high', 'xhigh']).default('low'),
 
   HERMES_BASE_URL: opt(),

@@ -19,8 +19,10 @@ export const DEFAULT_RETENTION = Object.freeze({
   orderLocationDays: 730,     // the customer's delivery location on old orders (the order itself is kept)
   customerPhotosDays: 90,     // photos web customers sent to show what they want
   unusedProductImagesDays: 30, // product photos no listing shows
+  voiceNotesDays: 30,          // voice notes customers and businesses sent (the transcript goes with them)
+  voiceRepliesDays: 7,         // spoken replies MoranBuy made
 });
-const FLOORS = { webhookEventsDays: 7 };
+const FLOORS = { webhookEventsDays: 7, voiceRepliesDays: 1, voiceNotesDays: 7 };
 const MIN_DAYS = 30;
 const BATCH = 2000;
 
@@ -57,6 +59,8 @@ function rules(d, r, now) {
     // Uploaded files: the file on disk and its record go together.
     { key: 'customerPhotosDays', table: 'uploads', files: true, where: (q) => q.where({ purpose: 'customer_photo' }).where('created_at', '<', before(r.customerPhotosDays)) },
     { key: 'unusedProductImagesDays', table: 'uploads', label: 'uploads:unused_product_images', files: true, where: (q) => q.where({ purpose: 'product_image' }).where('created_at', '<', before(r.unusedProductImagesDays)).whereNotExists(d('listings').select(d.raw('1')).whereNull('listings.deleted_at').whereRaw("listings.image_url like '%/media/' || uploads.storage_key")) },
+    { key: 'voiceNotesDays', table: 'uploads', label: 'uploads:voice_notes', files: true, where: (q) => q.where({ purpose: 'voice_note' }).where('created_at', '<', before(r.voiceNotesDays)) },
+    { key: 'voiceRepliesDays', table: 'uploads', label: 'uploads:voice_replies', files: true, where: (q) => q.where({ purpose: 'voice_reply' }).where('created_at', '<', before(r.voiceRepliesDays)) },
     // Spent refresh tokens are not personal history; they are cleared after thirty days.
     { key: null, table: 'refresh_tokens', where: (q) => q.where((s) => s.where('expires_at', '<', before(30)).orWhere('revoked_at', '<', before(30))) },
   ];

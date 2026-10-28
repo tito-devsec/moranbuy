@@ -11,7 +11,7 @@ last 15 minutes; refresh tokens rotate.
 - `POST /api/shop/messages` `{ customerToken?, text, imageUrl?, location?, language? }` → replies, session state, run id
 - `GET /api/shop/runs/:id` ranking evidence
 - `GET /api/shop/orders/:ref` order status
-- `POST /api/shop/uploads?customerToken=` a photo of what the customer wants (after accepting the terms); send its `uploadId` as `photoUploadId` with the next message
+- `POST /api/shop/uploads?customerToken=&kind=photo|voice` a photo (JPEG, PNG, WebP) or a voice recording (WAV or Ogg Opus) after accepting the terms; a voice upload returns what Muse heard (`transcript`); send the id as `photoUploadId` or `voiceUploadId` with the next message, whose response carries `voiceReply.dataUrl` when spoken replies are on
 - `GET /media/:name` public product photos
 - `POST /internal/inbound` signed by Moran (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature`): `{ messageId, from, text, imageUrl?, location?, name? }`
 
@@ -48,7 +48,7 @@ last 15 minutes; refresh tokens rotate.
 - A completed settlement of a payment with purpose `entitlement` activates that service for `periodDays` (default 30); nothing else activates a paid service automatically.
 
 ## Moran channel (signed, `MORAN_SHARED_SECRET`)
-- `POST /internal/inbound` customer messages, button replies, locations, photos and voice transcripts (`kind: "audio"`) from the MoranBuy number; a registered business's own number may send a product ("Bidhaa: ...") or ask "RIPOTI"
+- `POST /internal/inbound` customer messages, button replies, locations, and photos or voice notes as raw bytes (`kind: "image" | "audio"`, `media: { base64, mime }`) from the MoranBuy number; a registered business's own number may send a product ("Bidhaa: ...") or ask "RIPOTI"
 - `POST /internal/inbound/status` `{ statuses: [{ id, status, errors? }] }` delivery receipts for messages MoranBuy sent
 
 ## Admin
@@ -66,6 +66,7 @@ MoranBuy admin token for the fallback app.
 - `GET /merchants/:id/uploads`, `GET /uploads/:id` (a private file as base64 for review; audited)
 - `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`
 - `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
+- `PUT /credentials/tts` `{ provider: azure|disabled, region, apiKey, voiceSw, voiceEn, mode: mirror|always|off, reason }` (spoken replies; super admin)
 - `GET|PUT /retention` (keep periods in days, floors, last preview and purge), `POST /retention/run` `{ dryRun, confirm?, reason }` (a real purge: super admin and `confirm: true`)
 - `GET|PUT /notifications/schedule-reminder` `{ enabled?, templateName?, templateLanguage?, textSw?, textEn?, templateParams?, quietFrom?, quietTo?, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)

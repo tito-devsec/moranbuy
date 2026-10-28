@@ -8,7 +8,7 @@ import { db } from '../db/connection.js';
 import { saveUpload, readUpload, publicUpload, deleteUpload } from '../services/uploads.js';
 
 // The raw file is the request body; its declared type only lets it through, its bytes decide what it is.
-export const rawFile = express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/octet-stream'], limit: '11mb' });
+export const rawFile = express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'application/octet-stream'], limit: '17mb' });
 
 export const merchantUploadsRouter = express.Router();
 merchantUploadsRouter.use(requireMerchantAuth(db));

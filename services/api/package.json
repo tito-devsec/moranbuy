@@ -4,5 +4,10 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "main": "src/server.js"
+  "main": "src/server.js",
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "ogg-opus-decoder": "^1.7.5",
+    "pngjs": "^7.0.0"
+  }
 }

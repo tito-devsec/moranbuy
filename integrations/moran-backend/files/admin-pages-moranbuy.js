@@ -231,6 +231,20 @@ function locationsPage(d, reload) {
     ], d.locations, { empty: t('No locations match.') }), pager('Locations', d, reload)) }));
 }
 
+// Spoken replies: Meta's API has no text to speech, so voice replies go through Azure Speech's Tanzanian Swahili voices.
+function ttsCard(c, reload) {
+  const form = h('div', { class: 'row g-2 align-items-end' },
+    h('div', { class: 'col-md-2' }, select({ name: 'provider', label: t('Provider'), value: c.provider, options: [{ value: 'disabled', label: t('Off') }, { value: 'azure', label: 'Azure Speech' }] })),
+    h('div', { class: 'col-md-2' }, input({ name: 'region', label: t('Region'), value: c.region || '', placeholder: 'westeurope' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'apiKey', label: t('Speech key'), type: 'password', placeholder: c.apiKey.configured ? `…${c.apiKey.last4} (${t('blank keeps')})` : '' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'voiceSw', label: t('Swahili voice'), value: c.voiceSw })),
+    h('div', { class: 'col-md-2' }, input({ name: 'voiceEn', label: t('English voice'), value: c.voiceEn })),
+    h('div', { class: 'col-md-2' }, select({ name: 'mode', label: t('Speak'), value: c.mode, options: [{ value: 'mirror', label: t('Answer voice with voice') }, { value: 'always', label: t('Always') }, { value: 'off', label: t('Never') }] })),
+    h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+  const save = button(t('Save spoken replies'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/tts', f); toast(t('Saved.')); reload(); }).catch(toastError) });
+  return card({ cls: 'mt-3', title: t('Spoken replies (text to speech)'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t("Voice notes are heard by Muse Spark. Meta's API has no text to speech, so replies are spoken with Azure Speech; the voice note goes back through the MoranBuy number.") }), form, h('div', { class: 'mt-2' }, save)) });
+}
+
 // What Muse cost and the rate card behind it; Meta's price is not in the API response, so the rates are entered here.
 function museCostCard(c, reload) {
   const p = c.pricing;
@@ -405,7 +419,7 @@ function render(name, d, reload) {
       const sSave = button(t('Save Snippe'), { onClick: () => busy(sSave, async () => { const f = readForm(sForm); if (!f.reason) return toastError(new Error(t('A reason is required.'))); for (const k of ['apiKey', 'webhookSecret']) if (!f[k]) delete f[k]; await mb.put('credentials/snippe', f); toast(t('Snippe saved.')); reload(); }).catch(toastError) });
       const hForm = h('div', { class: 'row g-2 align-items-end' }, h('div', { class: 'col-md-3' }, input({ name: 'baseUrl', label: t('Hermes base URL (blank: plain fetch)'), value: hm.baseUrl || '' })), h('div', { class: 'col-md-3' }, input({ name: 'apiKey', label: t('Hermes API key'), type: 'password', placeholder: hm.apiKey.configured ? t('set (blank keeps)') : '', maxlength: 400 })), h('div', { class: 'col-md-3' }, input({ name: 'allowedDomains', label: t('Allowed shop domains'), value: hm.allowedDomains, maxlength: 2000 })), h('div', { class: 'col-md-3' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const hSave = button(t('Save Hermes and enable research'), { onClick: () => busy(hSave, async () => { const f = readForm(hForm); if (!f.reason) return toastError(new Error(t('A reason is required.'))); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/hermes', { ...f, enabled: !!f.allowedDomains }); toast(t('Hermes saved.')); reload(); }).catch(toastError) });
-      return h('div', {}, card({ title: t('Snippe mobile money (the same account as Moran)'), body: h('div', {}, sForm, h('div', { class: 'mt-2' }, sSave), h('p', { class: 'fs-xs text-muted mt-2', text: t('Register the MoranBuy webhook URL with Snippe: {u}', { u: `${(d.credentials.snippe.baseUrl ? '' : '')}https://buy.moranai.co.tz/webhooks/payments` }) })) }), card({ cls: 'mt-3', title: t('Hermes research agent (optional)'), body: h('div', {}, hForm, h('div', { class: 'mt-2' }, hSave)) }));
+      return h('div', {}, card({ title: t('Snippe mobile money (the same account as Moran)'), body: h('div', {}, sForm, h('div', { class: 'mt-2' }, sSave), h('p', { class: 'fs-xs text-muted mt-2', text: t('Register the MoranBuy webhook URL with Snippe: {u}', { u: `${(d.credentials.snippe.baseUrl ? '' : '')}https://buy.moranai.co.tz/webhooks/payments` }) })) }), card({ cls: 'mt-3', title: t('Hermes research agent (optional)'), body: h('div', {}, hForm, h('div', { class: 'mt-2' }, hSave)) }), ttsCard(d.credentials.tts, reload));
     }
     case 'Retention': {
       // How long each kind of record is kept; a preview counts what would go, a purge deletes it and is audited.

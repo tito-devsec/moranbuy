@@ -5,6 +5,7 @@ export const DEFAULT_MUSE_PRICING = Object.freeze({
   usdToTzs: null,            // for showing costs in shillings; blank shows dollars only
   monthlyBudgetUsd: null,    // alert threshold for the calendar month
   hardCap: false,            // when true, Muse is not called once the month's cost reaches the budget; every duty uses its plain fallback
+  asrPerHourUsd: null,       // Muse Voice Transcribe, US dollars per hour of audio
   updatedAt: null,
 });
 
@@ -27,10 +28,10 @@ export function priceTokens(pricing, inputTokens, outputTokens) {
 }
 
 // Records one real Muse request outcome, with its cost when rates are set; nothing here is ever written without an actual call having been made.
-export async function recordMuseRequest(db, { feature, provider, model, status, latencyMs = null, inputTokens = null, outputTokens = null, errorCode = null, errorRedacted = null, merchantId = null, requestRef = null }) {
+export async function recordMuseRequest(db, { feature, provider, model, status, latencyMs = null, inputTokens = null, outputTokens = null, errorCode = null, errorRedacted = null, merchantId = null, requestRef = null, audioMs = null }) {
   if (!db) return;
   const pricing = await loadMusePricing(db);
-  const cost = priceTokens(pricing, inputTokens ?? null, outputTokens ?? null);
+  const cost = audioMs ? (pricing.asrPerHourUsd === null || pricing.asrPerHourUsd === undefined ? null : (audioMs / 3600000) * Number(pricing.asrPerHourUsd)) : priceTokens(pricing, inputTokens ?? null, outputTokens ?? null);
   await db('muse_requests').insert({
     feature, provider, model, status, latency_ms: latencyMs, input_tokens: inputTokens, output_tokens: outputTokens,
     error_code: errorCode, error_redacted: errorRedacted ? String(errorRedacted).slice(0, 500) : null, merchant_id: merchantId, request_ref: requestRef,

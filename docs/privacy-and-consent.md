@@ -73,6 +73,8 @@ audited with a reason.
 | Delivery location on old orders (the order itself stays) | 730 |
 | Photos web customers uploaded (file and record) | 90 |
 | Product photos no listing shows (file and record) | 30 |
+| Voice notes customers and businesses sent, with their transcripts | 30 |
+| Spoken replies MoranBuy made | 7 |
 
 Never purged here: orders, payments, consent events, contacts, merchants, listings and the audit
 trail. Erasure on request (`DELETE /api/merchant/contacts/:phone`) is separate and immediate.
@@ -80,3 +82,12 @@ trail. Erasure on request (`DELETE /api/merchant/contacts/:phone`) is separate a
 preview at any time and purge by hand with a reason and an explicit confirmation. The last preview
 and the last purge are shown with their counts per table. These periods are a starting point; the
 operator must confirm them against Tanzania's Personal Data Protection Act before production.
+
+## Voice notes and photos
+
+A voice note or photo is opened only after the sender accepted the terms. Moran downloads it from
+WhatsApp and forwards the bytes in its signed request; Moran's own transcription and image tools are
+not used for MoranBuy. MoranBuy keeps it privately (never public), decodes voice notes inside its own
+process, and sends them to the Meta Model API to be heard; the transcript is stored beside the
+recording. Spoken replies are made by Azure Speech from the written reply and sent back as a voice
+note. Both are removed by the retention purge (30 and 7 days).

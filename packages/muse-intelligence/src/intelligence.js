@@ -1,3 +1,5 @@
+import { parseShillings } from '@moranbuy/core';
+
 // Muse's wider duties: reading a business's product from chat, explaining demand statistics, and judging which customers fit an offer; every answer is checked against the facts.
 
 const PRODUCT = `You read a product a Tanzanian business describes in a WhatsApp message (text, and a photo when given) for its MoranBuy catalogue.
@@ -42,14 +44,9 @@ export async function museDraftFollowup(muse, { facts, language = 'sw', merchant
 export function fallbackExtractProduct(text) {
   const t = String(text || '').trim();
   const body = t.replace(/^(bidhaa|product|ongeza|add)\s*[:\-]?\s*/i, '');
-  const mult = { laki: 100000, elfu: 1000, milioni: 1000000, k: 1000, m: 1000000 };
-  const words = { moja: 1, mbili: 2, tatu: 3, nne: 4, tano: 5, sita: 6, saba: 7, nane: 8, tisa: 9, kumi: 10 };
-  // "bei 450000", "bei laki 4 na nusu", "laki tatu", "250k": the number may come before or after the unit word, in digits or Swahili words.
-  let price = null;
-  const after = body.match(/\b(laki|elfu|milioni)\s+([\d.,]+|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)(\s+na\s+nusu)?/i);
-  const before = body.match(/(?:bei|price|tsh|tzs|sh)\s*[:\-]?\s*([\d.,]+)\s*(laki|elfu|milioni|k|m)?\b/i) || body.match(/([\d.,]+)\s*(laki|elfu|milioni|k|m)\b/i);
-  if (after) price = Math.round(((words[after[2].toLowerCase()] ?? parseFloat(after[2].replace(/,/g, ''))) + (after[3] ? 0.5 : 0)) * mult[after[1].toLowerCase()]);
-  else if (before) price = Math.round(parseFloat(before[1].replace(/,/g, '')) * (mult[(before[2] || '').toLowerCase()] || 1));
+  // The price is read after "bei" or "price" when the business wrote one, otherwise from the whole message, with the same reader customers' budgets use.
+  const priceAt = body.search(/\b(bei|price|tsh|tzs)\b/i);
+  const price = parseShillings(priceAt >= 0 ? body.slice(priceAt).split(/\b(idadi|stock|qty|zipo|vipo)\b/i)[0] : body);
   const stockM = body.match(/(?:stock|idadi|zipo|vipo|qty)\s*[:\-]?\s*(\d+)/i);
   const name = body.split(/[,;\n]|\bbei\b|\bprice\b|\bstock\b|\bidadi\b/i)[0].trim().slice(0, 120);
   const attributes = {};
@@ -61,4 +58,16 @@ export function fallbackExtractProduct(text) {
   const typeMap = [['sofa', 'sofa', 'furniture'], ['kochi', 'sofa', 'furniture'], ['kitanda', 'bed', 'furniture'], ['meza', 'table', 'furniture'], ['kiti', 'chair', 'furniture'], ['simu', 'smartphone', 'phones'], ['phone', 'smartphone', 'phones'], ['tv', 'television', 'electronics'], ['friji', 'fridge', 'electronics'], ['laptop', 'laptop', 'electronics'], ['viatu', 'shoes', 'fashion'], ['nguo', 'clothing', 'fashion'], ['gauni', 'dress', 'fashion']];
   const hit = typeMap.find(([w]) => lower.includes(w));
   return { name: name || null, productType: hit?.[1] || null, category: hit?.[2] || 'other', description: body.slice(0, 500) || null, attributes, price: price && price > 0 ? price : null, currency: 'TZS', stock: stockM ? Number(stockM[1]) : null, condition: /\b(used|mtumba|second ?hand)\b/i.test(body) ? 'used' : null, confidence: name ? 0.4 : 0 };
+}
+
+const PHOTO_PRODUCTS = `You read a photo a Tanzanian business sent to list its products on MoranBuy: one product, a shelf, a display, or a handwritten or printed price list.
+List every distinct product for sale that is clearly visible or written. Never invent a price, a stock count or a specification; a price counts only when it is written in the photo or the caption next to that product.
+For each product give: name (short product name), productType (short English noun), concept (one or two English words naming the physical object as it looks in the photo, for an object detector, e.g. "sofa", "office chair", "phone"; null for a product that is only written, not pictured),
+category (one of: furniture, electronics, phones, fashion, home, beauty, food, vehicles, building, other), description (one plain sentence from what is visible), attributes (object), price (integer or null), currency ("TZS" unless stated), stock (integer or null), condition ("new", "used" or null).
+List products left to right, top to bottom. At most 8. Answer with one JSON object: {"products": [ ... ], "kind": "single" | "several" | "price_list"}. Price words: "laki" = 100,000; "elfu" = 1,000; "milioni" = 1,000,000; "k" = 1,000.`;
+
+// Muse reads every product in one business photo, so a shelf or a price list becomes several listings at once.
+export async function museReadProductPhoto(muse, { imageUrl, text = '', merchantId = null }) {
+  const content = [{ type: 'text', text: text ? `Caption from the business: ${text}` : 'No caption.' }, { type: 'image_url', image_url: { url: imageUrl } }];
+  return muse.complete({ feature: 'catalog_photo', system: PHOTO_PRODUCTS, messages: [{ role: 'user', content }], maxTokens: 1500, merchantId });
 }

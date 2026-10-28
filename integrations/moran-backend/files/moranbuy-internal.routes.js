@@ -20,7 +20,9 @@ moranbuyInternalRouter.use((req, res, next) => {
 });
 
 const sendSchema = z.object({
-  type: z.enum(['text', 'image', 'template', 'buttons']).default('text'),
+  type: z.enum(['text', 'image', 'template', 'buttons', 'audio']).default('text'),
+  audioBase64: z.string().max(3_000_000).optional(),
+  mime: z.string().max(60).optional(),
   to: z.string().min(9).max(20),
   body: z.string().max(4096).optional(),
   imageUrl: z.string().url().optional(),
@@ -41,7 +43,7 @@ moranbuyInternalRouter.post('/send', async (req, res) => {
   try {
     const result = m.tenantId
       ? await sendMerchantText({ tenantId: m.tenantId, to: m.to, body: m.body || '', idempotencyKey: m.idempotencyKey || null })
-      : await sendFromMoranBuy({ type: m.type, to: m.to, body: m.body || '', imageUrl: m.imageUrl, caption: m.caption, templateName: m.templateName, language: m.language || 'sw', components: m.components || [], buttons: m.buttons || [], footer: m.footer || null, idempotencyKey: m.idempotencyKey || null });
+      : await sendFromMoranBuy({ type: m.type, to: m.to, body: m.body || '', imageUrl: m.imageUrl, caption: m.caption, templateName: m.templateName, language: m.language || 'sw', components: m.components || [], buttons: m.buttons || [], footer: m.footer || null, idempotencyKey: m.idempotencyKey || null, audioBase64: m.audioBase64 || null, mime: m.mime || null });
     res.json({ sent: true, messageId: result.messageId || null, duplicate: !!result.duplicate });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.code, message: err.message });

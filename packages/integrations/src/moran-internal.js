@@ -31,6 +31,8 @@ export class MoranInternalClient {
   sendText({ to, body, idempotencyKey }) { return this.call('/send', { body: { type: 'text', to, body, idempotencyKey } }); }
 
   // Sends an approved template from the MoranBuy number itself (business-initiated messages to merchants).
+  // A voice note from the MoranBuy number; the Ogg Opus bytes travel in the signed body, so Moran fetches nothing.
+  sendAudio({ to, audioBase64, mime = 'audio/ogg; codecs=opus', idempotencyKey }) { return this.call('/send', { body: { type: 'audio', to, audioBase64, mime, idempotencyKey } }); }
   sendMoranBuyTemplate({ to, templateName, language, components = [], idempotencyKey }) { return this.call('/send', { body: { type: 'template', to, templateName, language, components, idempotencyKey } }); }
 
   // Sends a short question with up to three reply buttons from the MoranBuy number.
@@ -67,6 +69,7 @@ export class FakeMoranInternalClient {
   async createOrder(b) { this.orders = this.orders || []; this.orders.push(b); return { ok: true, status: 'ok', data: { orderId: `moran-order-${this.orders.length}` } }; }
   async updateOrder(b) { this.orderUpdates = this.orderUpdates || []; this.orderUpdates.push(b); return { ok: true, status: 'ok', data: {} }; }
   async sendButtons(m) { this.sent.push({ type: 'buttons', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async sendAudio(m) { this.sent.push({ type: 'audio', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMoranBuyTemplate(m) { this.sent.push({ type: 'moranbuy_template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMerchantText(m) { this.sent.push({ type: 'merchant_text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendTemplate(m) { if (this.failNext) { this.failNext = false; return { ok: false, status: 'http_502', data: { error: 'META_ERROR' } }; } this.sent.push({ type: 'template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }

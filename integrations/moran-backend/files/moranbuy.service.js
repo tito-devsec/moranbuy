@@ -13,7 +13,8 @@ import { db } from '../db/connection.js';
 import { config } from '../config/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import { unusablePasswordHash } from './auth.service.js';
-import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage, sendWhatsAppButtons } from './whatsapp-sender.service.js';
+import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage, sendWhatsAppButtons, sendWhatsAppAudio } from './whatsapp-sender.service.js';
+import { decrypt } from '../utils/crypto.js';
 import { searchKnowledge } from '../core/knowledge-search.js';
 import { audit } from './admin/audit.js';
 
@@ -60,8 +61,29 @@ export async function registerMoranBuyTenant({ businessName = 'MoranBuy', ownerE
 /** True when this inbound message belongs to the MoranBuy business and must be forwarded. */
 export const isMoranBuyTenant = (tenant) => tenant?.workspace_type === MORANBUY_WORKSPACE;
 
+const MEDIA_TYPES = new Set(['audio', 'voice', 'image']);
+const MAX_MEDIA_BYTES = 16 * 1024 * 1024;
+
+/** True for a voice note or photo, which MoranBuy reads itself from the raw bytes. */
+export const isMoranBuyMedia = (message) => MEDIA_TYPES.has(message?.type);
+
+/** Downloads a voice note or photo from WhatsApp with the MoranBuy number's own token; nothing in Moran opens or reads it. */
+export async function downloadMoranBuyMedia(tenant, message) {
+  const media = message[message.type] || {};
+  if (!media.id) return null;
+  const token = tenant.wa_access_token_encrypted ? decrypt(tenant.wa_access_token_encrypted) : config.meta.systemUserToken;
+  const graph = `https://graph.facebook.com/${config.meta.apiVersion || 'v25.0'}`;
+  const info = await fetch(`${graph}/${media.id}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+  if (!info?.url) return null;
+  const res = await fetch(info.url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_MEDIA_BYTES) return null;
+  return { base64: buf.toString('base64'), mime: info.mime_type || media.mime_type || null, caption: media.caption || null };
+}
+
 /** Forwards one customer message to MoranBuy, which answers through /internal/moranbuy/send; a failure is logged. */
-export async function forwardInboundToMoranBuy({ tenant, message, inbound, customerNumber, profileName = null }) {
+export async function forwardInboundToMoranBuy({ tenant, message, inbound, customerNumber, profileName = null, media = null }) {
   const base = config.moranbuy.apiUrl;
   if (!base || !config.moranbuy.sharedSecret) {
     logger.error('MORANBUY_API_URL or MORANBUY_SHARED_SECRET is not set; MoranBuy message dropped');
@@ -69,7 +91,8 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
   }
   const payload = {
     messageId: message.id, from: customerNumber, name: profileName,
-    text: inbound?.text || '', imageUrl: inbound?.imageUrl || null, buttonId: inbound?.replyId || null, kind: inbound?.kind || message.type || 'text',
+    text: media ? (media.caption || '') : (inbound?.text || ''), imageUrl: media ? null : (inbound?.imageUrl || null), buttonId: inbound?.replyId || null, kind: message.type === 'voice' ? 'audio' : (inbound?.kind || message.type || 'text'),
+    media: media ? { base64: media.base64, mime: media.mime } : null,
     location: message.type === 'location' && message.location ? { lat: message.location.latitude, lng: message.location.longitude, label: message.location.name || message.location.address || null } : null,
     tenantId: tenant.id,
   };
@@ -77,7 +100,7 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
   const { timestamp, signature } = signMoranBuy(raw);
   try {
     const res = await fetch(`${String(base).replace(/\/+$/, '')}/internal/inbound`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': timestamp, 'X-MoranBuy-Signature': signature }, body: raw, signal: AbortSignal.timeout(20000),
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': timestamp, 'X-MoranBuy-Signature': signature }, body: raw, signal: AbortSignal.timeout(media ? 60000 : 20000),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) logger.warn({ status: res.status, data }, 'MoranBuy did not accept the forwarded message');
@@ -89,11 +112,13 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
 }
 
 /** A reply from the MoranBuy number (text or image), through the outbound gate like every message. */
-export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], buttons = [], footer = null, idempotencyKey }) {
+export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], buttons = [], footer = null, idempotencyKey, audioBase64 = null, mime = null }) {
   const tenant = await moranBuyTenant();
   if (!tenant?.whatsapp_phone_number_id) throw Object.assign(new Error('MORANBUY_NOT_CONNECTED'), { code: 'MORANBUY_NOT_CONNECTED', status: 409 });
   const common = { phoneNumberId: tenant.whatsapp_phone_number_id, accessTokenEncrypted: tenant.wa_access_token_encrypted, to, kind: 'moranbuy', idempotencyKey, tenantId: tenant.id };
   if (type === 'image') return sendWhatsAppImage({ ...common, imageUrl, caption });
+  // A spoken reply MoranBuy made; the bytes came in the signed body and go to Meta as a voice note.
+  if (type === 'audio') return sendWhatsAppAudio({ ...common, audioBuffer: Buffer.from(String(audioBase64 || ''), 'base64'), mimeType: mime || 'audio/ogg; codecs=opus' });
   // Up to three reply buttons (the terms question, for one).
   if (type === 'buttons') return sendWhatsAppButtons({ ...common, body, buttons, footer });
   if (type === 'template') {

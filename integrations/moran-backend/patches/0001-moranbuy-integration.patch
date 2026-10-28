@@ -2,22 +2,13 @@ diff --git a/admin-frontend/assets/js/core/layout.js b/admin-frontend/assets/js/
 index 721e555..c373640 100644
 --- a/admin-frontend/assets/js/core/layout.js
 +++ b/admin-frontend/assets/js/core/layout.js
-@@ -19,6 +19,7 @@ export const NAV = [
-   ] },
-   { title: 'Operations', items: [
-     { key: 'businesses', href: 'businesses.html', icon: 'buildings-fill', label: 'Businesses', perm: 'businesses.read' },
+@@ -21,0 +22 @@ export const NAV = [
 +    { key: 'moranbuy', href: 'moranbuy.html', icon: 'bag-check-fill', label: 'MoranBuy', perm: 'businesses.read' },
-     { key: 'agents', href: 'agents.html', icon: 'robot', label: 'AI Agents', perm: 'agents.read' },
-     { key: 'conversations', href: 'conversations.html', icon: 'chat-dots-fill', label: 'Conversations', perm: 'conversations.read', badge: 'escalations' },
-     { key: 'leads', href: 'leads.html', icon: 'graph-up-arrow', label: 'Leads & Sales', perm: 'leads.read' },
 diff --git a/admin-frontend/assets/js/pages/businesses.js b/admin-frontend/assets/js/pages/businesses.js
 index 2729c29..bced33e 100644
 --- a/admin-frontend/assets/js/pages/businesses.js
 +++ b/admin-frontend/assets/js/pages/businesses.js
-@@ -50,6 +50,24 @@ bootPage({
-         { key: '_menu', label: '', render: (b) => moreMenu(businessActions(b, () => { table.reload(); stats.reload(); }), t('Actions for {b}', { b: b.businessName })) },
-       ],
-     });
+@@ -53 +53,19 @@ bootPage({
 -    root.append(stats.el, table.el);
 +    // MoranBuy (github.com/tito-devsec/moranbuy): one admin-managed business, registered from here like any other.
 +    const moranbuy = h('div', { class: 'd-flex align-items-center gap-2 mb-3' });
@@ -38,46 +29,23 @@ index 2729c29..bced33e 100644
 +    };
 +    refreshMoranBuy().catch(() => {});
 +    root.append(moranbuy, stats.el, table.el);
-   },
- });
 diff --git a/deploy/nginx.full.conf b/deploy/nginx.full.conf
 index cae1e3f..b1c6bdc 100644
 --- a/deploy/nginx.full.conf
 +++ b/deploy/nginx.full.conf
-@@ -303,7 +303,7 @@ server {
-     add_header Cross-Origin-Opener-Policy   "same-origin" always;
-     add_header Cross-Origin-Resource-Policy "same-origin" always;
-     add_header X-Robots-Tag                 "noindex, nofollow" always;
+@@ -306 +306 @@ server {
 -    add_header Content-Security-Policy      "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz; connect-src 'self' https://api.moranai.co.tz; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
 +    add_header Content-Security-Policy      "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz https://www.facebook.com; connect-src 'self' https://api.moranai.co.tz https://connect.facebook.net https://graph.facebook.com https://www.facebook.com; frame-src https://www.facebook.com https://web.facebook.com https://*.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
- 
-     error_page 404 /404.html;
-     error_page 500 502 503 504 /500.html;
 diff --git a/docs/admin-api-reference.md b/docs/admin-api-reference.md
 index 795e532..0f584d7 100644
 --- a/docs/admin-api-reference.md
 +++ b/docs/admin-api-reference.md
-@@ -7,7 +7,7 @@ the zod schemas of its path parameters, query string and body. Concepts, respons
- metric definitions and error codes are in [admin-api.md](./admin-api.md); example responses are in
- [admin-api.examples.json](./admin-api.examples.json).
- 
+@@ -10 +10 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
 -298 routes.
 +304 routes.
- 
- ## Contents
- 
-@@ -28,6 +28,7 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
- - [feedback](#feedback)
- - [conversations](#conversations)
- - [leads](#leads)
+@@ -30,0 +31 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
 +- [moranbuy](#moranbuy)
- - [customers](#customers)
- - [channels](#channels)
- - [campaigns](#campaigns)
-@@ -1576,6 +1577,59 @@ Query:
- 
- Other parameters are read by the service: `days`, list parameters (`page`, `pageSize`, `sort`, `order`) and the filters in admin-api.md §4.
- 
+@@ -1578,0 +1580,53 @@ Other parameters are read by the service: `days`, list parameters (`page`, `page
 +## moranbuy
 +
 +### `GET /api/admin/moranbuy`
@@ -131,29 +99,18 @@ index 795e532..0f584d7 100644
 +
 +- **Access:** Bearer token with `businesses.read`.
 +
- ## customers
- 
- ### `GET /api/admin/customers`
 diff --git a/frontend/config.js b/frontend/config.js
 index f50c66a..e4040c3 100644
 --- a/frontend/config.js
 +++ b/frontend/config.js
-@@ -1,5 +1,7 @@
- window.MORAN_CONFIG = {
-   API_BASE_URL: 'https://api.moranai.co.tz',
+@@ -2,0 +3,2 @@ window.MORAN_CONFIG = {
 +  // The MoranBuy service (github.com/tito-devsec/moranbuy); blank hides the header entry.
 +  MORANBUY_URL: '',
-   FB_SDK_VERSION: 'v25.0',
-   // Moran's sales and support line on WhatsApp, for owners who want to reach
-   // Moran (cash onboarding).
 diff --git a/frontend/moran-app.js b/frontend/moran-app.js
 index 3c5521a..85fd64a 100644
 --- a/frontend/moran-app.js
 +++ b/frontend/moran-app.js
-@@ -1019,6 +1019,27 @@
-     groups.forEach((g) => g.classList.toggle('hidden', !show));
-   }
- 
+@@ -1021,0 +1022,21 @@
 +  // ---- MoranBuy entry at the right-hand side of the header (github.com/tito-devsec/moranbuy) ----
 +  // One link on every page, before the notification bell, to the MoranBuy business app, where the
 +  // owner lists products on the reverse marketplace, runs campaigns and follow-up. Shown only when
@@ -175,97 +132,52 @@ index 3c5521a..85fd64a 100644
 +  }
 +  document.addEventListener('DOMContentLoaded', () => mountMoranBuyEntry());
 +
-   // ---- the workspace switcher in the header of every dashboard page ----------------------------
-   // "Agent Workspace" shows the whole account at once, each agent narrows the whole dashboard to
-   // that agent (its one catalogue), and "Manage Workspace" opens services.html, where agents are made.
 diff --git a/src/api/routes/admin/index.js b/src/api/routes/admin/index.js
 index 242eb57..2339974 100644
 --- a/src/api/routes/admin/index.js
 +++ b/src/api/routes/admin/index.js
-@@ -23,6 +23,7 @@ import { agentsRouter, feedbackRouter } from './agents.routes.js';
- import { agentCatalogRouter } from './agent-catalog.routes.js';
- import { conversationsRouter } from './conversations.routes.js';
- import { leadsRouter } from './leads.routes.js';
+@@ -25,0 +26 @@ import { leadsRouter } from './leads.routes.js';
 +import { moranbuyAdminRouter } from './moranbuy.routes.js';
- import { customersRouter } from './customers.routes.js';
- import { channelsRouter } from './channels.routes.js';
- import { campaignsRouter } from './campaigns.routes.js';
-@@ -83,6 +84,7 @@ adminApiRouter.use('/agent-catalog', agentCatalogRouter);
- adminApiRouter.use('/feedback', feedbackRouter);
- adminApiRouter.use('/conversations', conversationsRouter);
- adminApiRouter.use('/leads', leadsRouter);
+@@ -85,0 +87 @@ adminApiRouter.use('/leads', leadsRouter);
 +adminApiRouter.use('/moranbuy', moranbuyAdminRouter);
- adminApiRouter.use('/customers', customersRouter);
- adminApiRouter.use('/channels', channelsRouter);
- adminApiRouter.use('/campaigns', campaignsRouter);
 diff --git a/src/api/routes/auth.routes.js b/src/api/routes/auth.routes.js
 index e44d3cf..0553144 100644
 --- a/src/api/routes/auth.routes.js
 +++ b/src/api/routes/auth.routes.js
-@@ -82,6 +82,11 @@ authRouter.post('/login', validateBody(loginSchema), async (req, res) => {
-     const tenant = await db('tenants').whereRaw('LOWER(owner_email) = ?', [identifier.toLowerCase()]).first();
-     if (tenant) {
-       ownerChecked = true;
+@@ -84,0 +85,5 @@ authRouter.post('/login', validateBody(loginSchema), async (req, res) => {
 +      // An admin-managed account (the MoranBuy business) has no owner sign-in; Super Admin runs it.
 +      if (tenant.admin_managed) {
 +        recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_failed', identifier, reason: 'admin_managed' });
 +        return res.status(403).json({ error: 'ADMIN_MANAGED', message: 'This account is managed by Moran AI administrators.' });
 +      }
-       if (await verifyPassword(password, tenant.owner_password_hash)) {
-         recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_success', identifier });
-         return res.json(await issueSession(tenant, {}, null, { via: 'web' }));
 diff --git a/src/api/routes/whatsapp-webhook.routes.js b/src/api/routes/whatsapp-webhook.routes.js
-index e5a7702..752a0cd 100644
+index e5a7702..718b10d 100644
 --- a/src/api/routes/whatsapp-webhook.routes.js
 +++ b/src/api/routes/whatsapp-webhook.routes.js
-@@ -6,6 +6,7 @@ import { resolveTenantByPhoneNumberId, isTenantOperational, invalidateTenantCach
- import { runAgent } from '../../core/agent-runner.js';
- import { handleTableMessage } from '../../services/restaurant/reply.service.js';
- import { handleMediaTrustMessage } from '../../agents/media-trust/mediaTrustAgent.js';
-+import { isMoranBuyTenant, forwardInboundToMoranBuy, forwardStatusesToMoranBuy } from '../../services/moranbuy.service.js';
- import { upsertCustomer, updateCustomerInterest } from '../../services/customer.service.js';
- import { detectIntent, createFollowUp, extractPromisedDate } from '../../services/followup.service.js';
- import { notifyOwnerOfHandover, pingOwnerDashboard } from '../../services/owner-notify.service.js';
-@@ -458,6 +459,8 @@ whatsappWebhookRouter.post('/', async (req, res) => {
-         logger.error({ err: err.message }, 'Campaign status update failed'));
-       // The same receipts for Moran's own replies: when the last bubble was delivered and read.
-       recordReplyStatuses(change.statuses).catch(() => {});
+@@ -8,0 +9 @@ import { handleMediaTrustMessage } from '../../agents/media-trust/mediaTrustAgen
++import { isMoranBuyTenant, forwardInboundToMoranBuy, forwardStatusesToMoranBuy, isMoranBuyMedia, downloadMoranBuyMedia } from '../../services/moranbuy.service.js';
+@@ -460,0 +462,2 @@ whatsappWebhookRouter.post('/', async (req, res) => {
 +      // And for what MoranBuy sent (docs/moranbuy.md): its campaign and order alerts keep their own delivery ledger.
 +      forwardStatusesToMoranBuy(change.statuses).catch(() => {});
-       // And for patient testimonials sent (services/healthcare/testimonials.service.js); none match otherwise.
-       import('../../services/healthcare/testimonials.service.js')
-         .then((m) => m.recordTestimonialStatuses(change.statuses)).catch(() => {});
-@@ -528,7 +531,8 @@ whatsappWebhookRouter.post('/', async (req, res) => {
-      * which messages start it; it only means the entitlement read next sees
-      * the trial this very message is starting.
-      */
--    const paidMedia = PAID_MEDIA_TYPES.has(message.type);
-+    // MoranBuy's own number (docs/moranbuy.md) reads photos and voice notes as part of the service; the media gate is for businesses' agents.
-+    const paidMedia = PAID_MEDIA_TYPES.has(message.type) && !isMoranBuyTenant(tenant);
-     if (paidMedia) await startTrialOnFirstMessage(tenant, customerNumber);
-     const mediaGate = paidMedia ? await mayOpenMedia(tenant, customerNumber) : { allowed: true };
-     if (!mediaGate.allowed) {
-@@ -884,6 +888,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
-       }
-     }
- 
-+    // MoranBuy business (docs/moranbuy.md): the reverse-marketplace service answers, through this backend's outbound gate.
+@@ -524,0 +528,11 @@ whatsappWebhookRouter.post('/', async (req, res) => {
++    /*
++     * MoranBuy's number (docs/moranbuy.md): MoranBuy reads voice notes and photos itself with Meta's models, so Moran only downloads the
++     * raw bytes and forwards them; nothing here transcribes or describes them. Text, taps and locations are resolved as usual.
++     */
 +    if (isMoranBuyTenant(tenant)) {
-+      await forwardInboundToMoranBuy({ tenant, message, inbound, customerNumber, profileName: change?.contacts?.[0]?.profile?.name || null });
++      const media = isMoranBuyMedia(message) ? await downloadMoranBuyMedia(tenant, message).catch((err) => { logger.warn({ err: err.message }, 'MoranBuy media not downloaded'); return null; }) : null;
++      const inbound = media ? null : await resolveInboundMessage(message, tenant);
++      await forwardInboundToMoranBuy({ tenant, message, inbound, media, customerNumber, profileName: change?.contacts?.[0]?.profile?.name || null });
 +      return;
 +    }
 +
-     // MediSure workspace — route to media trust agent instead of business agent
-     if (tenant.workspace_type === 'media') {
-       logger.info({ tenantId: tenant.id }, 'Routing to the MediSure agent instead of the business agent');
+@@ -886,0 +901 @@ whatsappWebhookRouter.post('/', async (req, res) => {
++
 diff --git a/src/config/index.js b/src/config/index.js
 index 8863974..b254b07 100644
 --- a/src/config/index.js
 +++ b/src/config/index.js
-@@ -103,6 +103,13 @@ export const config = {
-     baseUrl: process.env.N8N_BASE_URL || 'http://127.0.0.1:5678',
-   },
- 
+@@ -105,0 +106,7 @@ export const config = {
 +  // MoranBuy (github.com/tito-devsec/moranbuy): where customer messages to the MoranBuy business are
 +  // forwarded, and the secret both sides sign with. Unset, the MoranBuy business answers nothing.
 +  moranbuy: {
@@ -273,37 +185,16 @@ index 8863974..b254b07 100644
 +    sharedSecret: process.env.MORANBUY_SHARED_SECRET,
 +  },
 +
-   // Snippe mobile-money payments (M-Pesa, Airtel, Mixx, Halotel — Tanzania).
-   snippe: {
-     apiKey: process.env.SNIPPE_API_KEY,
 diff --git a/src/server.js b/src/server.js
-index 19d43c7..43b6ceb 100644
+index 19d43c7..75572a6 100644
 --- a/src/server.js
 +++ b/src/server.js
-@@ -56,6 +56,8 @@ import { setupRouter } from './api/routes/setup.routes.js';
- import { adminApiRouter } from './api/routes/admin/index.js';
- import { appConfigRouter } from './api/routes/app-config.routes.js';
- import { webhookEventsRouter } from './api/routes/webhook-events.routes.js';
+@@ -58,0 +59,2 @@ import { webhookEventsRouter } from './api/routes/webhook-events.routes.js';
 +import { moranbuyInternalRouter } from './api/routes/moranbuy-internal.routes.js';
 +import { moranbuyOwnerRouter } from './api/routes/moranbuy-owner.routes.js';
- import { globalErrorHandler, notFoundHandler } from './api/middleware/error.middleware.js';
- import { corsOptions } from './api/allowed-origins.js';
- import { bearsAdminToken } from './api/middleware/admin.middleware.js';
-@@ -88,6 +90,8 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
- app.use('/webhook/whatsapp', express.raw({ type: 'application/json' }));
- // The shop screens' endpoint (docs/whatsapp-shop.md): signed over the raw body, like the webhook.
- app.use('/webhook/flows', express.raw({ type: () => true, limit: '1mb' }));
+@@ -90,0 +93,2 @@ app.use('/webhook/flows', express.raw({ type: () => true, limit: '1mb' }));
 +// MoranBuy's signed internal channel (docs/moranbuy.md): signed over the raw body like the webhooks.
-+app.use('/internal/moranbuy', express.raw({ type: () => true, limit: '1mb' }));
- // MoranAI MCP (docs/mcp.md): a JSON-RPC message is small; a token's share of a minute is counted
- // after parsing, so the body must be small before anything is looked at.
- app.use('/mcp', mcpBodyParser());
-@@ -311,6 +315,8 @@ app.get('/share/:token', async (req, res) => {
-   }
- });
- app.use('/api/tenant', tenantRouter);
++app.use('/internal/moranbuy', express.raw({ type: () => true, limit: '4mb' }));
+@@ -313,0 +318,2 @@ app.use('/api/tenant', tenantRouter);
 +app.use('/api/moranbuy', moranbuyOwnerRouter);
 +app.use('/internal/moranbuy', moranbuyInternalRouter);
- app.use('/api/team', teamRouter);
- app.use('/api/products', productsRouter);
- app.use('/api/catalog', catalogRouter);
