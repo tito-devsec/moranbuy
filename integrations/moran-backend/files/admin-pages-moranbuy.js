@@ -141,9 +141,9 @@ async function load(name) {
     case 'Orders': return mb.get('orders');
     case 'Notifications': return { ...(await mb.get('notifications/order-confirmed')), terms: await mb.get('notifications/terms'), reminder: await mb.get('notifications/schedule-reminder') };
     case 'Billing': return { pricing: await mb.get('pricing'), servicePricing: await mb.get('service-pricing'), payments: (await mb.get('payments')).payments };
-    case 'Muse Spark': return { muse: await mb.get('muse'), credentials: (await mb.get('credentials')).credentials };
+    case 'Muse Spark': return { muse: await mb.get('muse'), cost: await mb.get('muse/cost', { days: 30 }), credentials: (await mb.get('credentials')).credentials };
     case 'Credentials': return mb.get('credentials');
-    case 'Integration Health': return mb.get('integrations');
+    case 'Integration Health': return { ...(await mb.get('integrations')), queues: await mb.get('queues').catch(() => null) };
     case 'Retention': return mb.get('retention');
     case 'Audit': return mb.get('audit');
     default: return {};
@@ -229,6 +229,38 @@ function locationsPage(d, reload) {
       { key: 'issues', label: t('Missing'), render: (l) => l.issues.map((i) => t(i.replace(/_/g, ' '))).join(', ') || '—' },
       { key: '_', label: '', render: (l) => (l.source === 'moran' ? h('span', { class: 'fs-xs text-muted', text: t('fix in Moran AI') }) : button(l.latitude === null ? t('Place') : t('Correct'), { size: 'sm', variant: 'secondary', onClick: () => place(l) })) },
     ], d.locations, { empty: t('No locations match.') }), pager('Locations', d, reload)) }));
+}
+
+// What Muse cost and the rate card behind it; Meta's price is not in the API response, so the rates are entered here.
+function museCostCard(c, reload) {
+  const p = c.pricing;
+  const usd = (v) => (v === null || v === undefined ? '—' : `$${Number(v).toFixed(v < 1 ? 4 : 2)}`);
+  const withTzs = (u, z) => `${usd(u)}${z !== null && z !== undefined ? ` (TSh ${formatInt(z)})` : ''}`;
+  const form = h('div', { class: 'row g-2 align-items-end' },
+    h('div', { class: 'col-md-2' }, input({ name: 'inputPerMillionUsd', label: t('USD per 1M input tokens'), type: 'number', step: 'any', value: p.inputPerMillionUsd ?? '' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'outputPerMillionUsd', label: t('USD per 1M output tokens'), type: 'number', step: 'any', value: p.outputPerMillionUsd ?? '' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'usdToTzs', label: t('TSh per USD'), type: 'number', step: 'any', value: p.usdToTzs ?? '' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'monthlyBudgetUsd', label: t('Monthly budget (USD)'), type: 'number', step: 'any', value: p.monthlyBudgetUsd ?? '' })),
+    h('div', { class: 'col-md-2' }, select({ name: 'hardCap', label: t('At the budget'), value: p.hardCap ? 'true' : 'false', options: [{ value: 'false', label: t('Alert only') }, { value: 'true', label: t('Pause Muse') }] })),
+    h('div', { class: 'col-md-2' }, select({ name: 'applyToPast', label: t('Unpriced past requests'), value: 'false', options: [{ value: 'false', label: t('Leave') }, { value: 'true', label: t('Price with these rates') }] })),
+    h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+  const num = (v) => (v === '' || v === undefined ? null : Number(v));
+  const save = button(t('Save rates and budget'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); const r = await mb.put('muse/pricing', { inputPerMillionUsd: num(f.inputPerMillionUsd), outputPerMillionUsd: num(f.outputPerMillionUsd), usdToTzs: num(f.usdToTzs), monthlyBudgetUsd: num(f.monthlyBudgetUsd), hardCap: f.hardCap === 'true', applyToPast: f.applyToPast === 'true', reason: f.reason }); toast(t('Saved. {n} past requests priced.', { n: r.repriced })); reload(); }).catch(toastError) });
+  const b = c.budget;
+  const status = !c.ratesSet ? t('Rates are not set: tokens are counted, cost is not.') : b.blocked ? t('Budget used up and the hard cap is on: Muse is paused, every duty uses its plain fallback.') : b.alert ? t('Heads up: this month is at or heading past the budget.') : t('Within budget.');
+  return card({ cls: 'mt-3', title: t('Muse cost (last {d} days)', { d: c.days }), body: h('div', {},
+    h('div', { class: `alert ${b.blocked ? 'alert-danger' : b.alert || !c.ratesSet ? 'alert-warning' : 'alert-success'} py-2 fs-sm`, text: status }),
+    h('div', { class: 'row g-3' },
+      h('div', { class: 'col-md-3' }, h('div', { class: 'fs-xs text-muted', text: t('This month so far') }), h('div', { class: 'fw-bold', text: withTzs(c.monthToDate.costUsd, c.monthToDate.costTzs) })),
+      h('div', { class: 'col-md-3' }, h('div', { class: 'fs-xs text-muted', text: t('Projected for the month') }), h('div', { class: 'fw-bold', text: withTzs(c.monthToDate.projectedUsd, c.monthToDate.projectedTzs) })),
+      h('div', { class: 'col-md-3' }, h('div', { class: 'fs-xs text-muted', text: t('Budget') }), h('div', { class: 'fw-bold', text: b.budgetUsd === null ? t('none') : `${usd(b.budgetUsd)} · ${Math.round((b.usedShare || 0) * 100)}%` })),
+      h('div', { class: 'col-md-3' }, h('div', { class: 'fs-xs text-muted', text: t('{d} days: requests, tokens in / out', { d: c.days }) }), h('div', { class: 'fw-bold', text: `${formatInt(c.totals.requests)} · ${formatInt(c.totals.inputTokens)} / ${formatInt(c.totals.outputTokens)}` }))),
+    c.unpricedRequests ? h('p', { class: 'fs-xs text-muted mt-2', text: t('{n} requests in this period have tokens but no price (made before rates were set).', { n: c.unpricedRequests }) }) : null,
+    h('div', { class: 'row g-3 mt-1' },
+      h('div', { class: 'col-lg-4' }, h('h3', { class: 'fs-sm fw-bold', text: t('By feature') }), simpleTable([{ key: 'feature', label: t('Feature') }, { key: 'requests', label: t('Requests'), align: 'end' }, { key: 'costUsd', label: t('Cost'), align: 'end', render: (r) => usd(r.costUsd) }], c.byFeature)),
+      h('div', { class: 'col-lg-4' }, h('h3', { class: 'fs-sm fw-bold', text: t('By business') }), simpleTable([{ key: 'business', label: t('Business') }, { key: 'requests', label: t('Requests'), align: 'end' }, { key: 'costUsd', label: t('Cost'), align: 'end', render: (r) => usd(r.costUsd) }], c.byMerchant)),
+      h('div', { class: 'col-lg-4' }, h('h3', { class: 'fs-sm fw-bold', text: t('By day (Tanzania time)') }), simpleTable([{ key: 'day', label: t('Day') }, { key: 'requests', label: t('Requests'), align: 'end' }, { key: 'costUsd', label: t('Cost'), align: 'end', render: (r) => usd(r.costUsd) }], c.byDay.slice(-14).reverse()))),
+    h('h3', { class: 'fs-sm fw-bold mt-3', text: t('Rates and budget') }), h('p', { class: 'fs-xs text-muted', text: t('Take the rates from your Meta Model API billing page. New rates price new requests; past ones keep their price unless you choose to price the unpriced ones.') }), form, h('div', { class: 'mt-2' }, save)) });
 }
 
 // Which admin section Muse can explain, by the section's tab name.
@@ -363,6 +395,7 @@ function render(name, d, reload) {
         h('div', { class: 'col-md-2' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const save = button(t('Save and test'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/muse', f); const r = await mb.post('muse/test', {}); toast(r.result === 'ok' ? t('Muse Spark answered: working.') : t('Muse Spark test: {r}', { r: r.code || r.result }), r.result === 'ok' ? 'success' : 'warning'); reload(); }).catch(toastError) });
       return h('div', {}, card({ title: t('Muse Spark API key (used within seconds, no restart)'), body: h('div', {}, form, h('div', { class: 'mt-2 d-flex gap-2 align-items-center' }, save, h('span', { class: 'fs-xs text-muted', text: c.apiKey.configured ? t('Key set (…{l}, source: {s})', { l: c.apiKey.last4, s: c.source }) : t('No key set') }))) }),
+        museCostCard(d.cost, reload),
         card({ cls: 'mt-3', title: t('Status and telemetry (from real requests)'), body: pre({ status: d.muse.status, telemetry: d.muse.telemetry }) }),
         card({ cls: 'mt-3', title: t('Recent requests'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (r) => formatDateTime(r.created_at) }, { key: 'feature', label: t('Feature') }, { key: 'model', label: t('Model') }, { key: 'status', label: t('Status') }, { key: 'latency_ms', label: t('ms'), align: 'end' }, { key: 'error_code', label: t('Error') }], d.muse.recent) }));
     }
@@ -386,7 +419,14 @@ function render(name, d, reload) {
     }
     case 'Integration Health': {
       const pull = button(t('Pull opted-in Moran businesses now'), { onClick: () => busy(pull, async () => { const r = await mb.post('sync/moran-listings', {}); toast(r.ok ? t('Pulled: {m} businesses, {c} new, {u} updated', { m: r.merchants, c: r.created, u: r.updated }) : t('Pull failed: {s}', { s: r.status }), r.ok ? 'success' : 'warning'); reload(); }).catch(toastError) });
-      return card({ title: t('Integration health'), right: pull, body: pre(d) });
+      const { queues, ...rest } = d;
+      // The Redis work list: what is waiting, due, in progress, finished and dead per queue; dead jobs can be sent back with a reason.
+      const qCard = !queues ? null : card({ cls: 'mt-3', title: t('Work queues ({m})', { m: queues.mode === 'redis' ? t('Redis, jobs run within a second of being due') : t('Postgres passes only: Redis is not reachable') }), body: simpleTable([
+        { key: 'queue', label: t('Queue') }, { key: 'queued', label: t('Waiting'), align: 'end' }, { key: 'due', label: t('Due now'), align: 'end' }, { key: 'leased', label: t('Running'), align: 'end' }, { key: 'done', label: t('Done'), align: 'end' }, { key: 'dead', label: t('Dead'), align: 'end' },
+        { key: 'nextRunAt', label: t('Next'), render: (q) => (q.nextRunAt ? formatDateTime(q.nextRunAt) : '—') },
+        { key: '_', label: '', render: (q) => (q.dead ? button(t('Retry dead'), { size: 'sm', variant: 'secondary', onClick: () => confirmAction({ title: t('Retry dead jobs in {q}', { q: q.queue }), requireReason: true, action: async (reason) => { const r = await mb.post(`queues/${q.queue}/retry-dead`, { reason }); toast(t('{n} jobs sent back.', { n: r.retried })); reload(); } }) }) : '') },
+      ], queues.queues || [], { empty: t('No queues.') }) });
+      return h('div', {}, card({ title: t('Integration health'), right: pull, body: pre(rest) }), qCard);
     }
     case 'Audit': return card({ title: t('MoranBuy audit log'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (e) => formatDateTime(e.created_at) }, { key: 'actor_type', label: t('Actor') }, { key: 'action', label: t('Action') }, { key: 'target_type', label: t('Target'), render: (e) => `${e.target_type || ''} ${e.target_id || ''}` }, { key: 'reason', label: t('Reason') }], d.events) });
     default: return pre(d);

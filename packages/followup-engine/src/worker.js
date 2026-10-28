@@ -11,8 +11,8 @@ export function followupMessage(lead, merchant, language = 'sw') {
 }
 
 // One pass of the follow-up worker: every due task is claimed, every gate checked at that moment, and the real result recorded.
-export async function processDueFollowups(db, sender, { dryRun = true, now = Date.now, batch = 100, muse = null } = {}) {
-  const due = await db('followup_tasks').where({ status: 'pending' }).where('due_at', '<=', new Date(now())).orderBy('due_at').limit(batch);
+export async function processDueFollowups(db, sender, { dryRun = true, now = Date.now, batch = 100, muse = null, taskId = null } = {}) {
+  const due = await db('followup_tasks').where({ status: 'pending' }).where('due_at', '<=', new Date(now())).modify((q) => { if (taskId) q.where({ id: taskId }); }).orderBy('due_at').limit(batch);
   const summary = { sent: 0, skipped: 0, failed: 0 };
   for (const task of due) {
     const claimed = await db('followup_tasks').where({ id: task.id, status: 'pending' }).update({ status: 'sending', updated_at: new Date(now()) });

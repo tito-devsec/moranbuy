@@ -9,6 +9,7 @@ import { asyncHandler } from '../middleware/async-handler.js';
 import { validate } from '../middleware/validate.js';
 import { db } from '../db/connection.js';
 import { engagementDeps, loadCampaignPricing } from '../services/engagement.js';
+import { enqueueSoft } from '../queue/jobs.js';
 import { merchantDeps } from '../services/merchants.js';
 
 export const campaignsRouter = express.Router();
@@ -67,12 +68,20 @@ campaignsRouter.post('/:id/readiness', needCampaign, validate({ params: idParams
 campaignsRouter.post('/:id/confirm', needCampaign, validate({ params: idParams, body: z.object({ confirm: z.literal(true), sendAt: z.string().datetime({ offset: true }).optional() }) }), asyncHandler(async (req, res) => {
   const pricing = await loadCampaignPricing();
   const row = await confirmDispatch(db, req.merchant, req.params.id, { pricingConfigured: pricing.providerUnitTzs !== null, dryRun: engagementDeps().dryRun, sendAt: req.body.sendAt || null, ...actor(req) });
+  // A scheduled campaign waits on its queue until its time; one sent now starts at once.
+  if (row.status === 'scheduled') await enqueueSoft('campaign-start', row.id, new Date(row.scheduled_at).getTime());
+  else if (row.status === 'dispatching') await enqueueSoft('campaign-dispatch', row.id);
   res.json({ campaign: publicCampaign(row), dryRun: row.dry_run, scheduledAt: row.scheduled_at || null });
 }));
 // A campaign waiting for its send time goes back to ready, with its queued ledger removed.
 campaignsRouter.post('/:id/unschedule', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await unscheduleCampaign(db, req.merchant.id, req.params.id, actor(req))) })));
 campaignsRouter.post('/:id/pause', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await pauseCampaign(db, req.merchant.id, req.params.id, actor(req))) })));
-campaignsRouter.post('/:id/resume', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await pauseCampaign(db, req.merchant.id, req.params.id, { resume: true, ...actor(req) })) })));
+campaignsRouter.post('/:id/resume', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => {
+  const row = await pauseCampaign(db, req.merchant.id, req.params.id, { resume: true, ...actor(req) });
+  if (row.status === 'dispatching') await enqueueSoft('campaign-dispatch', row.id);
+  else if (row.status === 'scheduled') await enqueueSoft('campaign-start', row.id, new Date(row.scheduled_at).getTime());
+  res.json({ campaign: publicCampaign(row) });
+}));
 
 // ---- new-product outreach offers ----
 campaignsRouter.get('/outreach/offers', asyncHandler(async (req, res) => res.json({ offers: (await listOutreachOffers(db, req.merchant.id)).map((r) => publicCampaign(r, { listingName: r.listing_name, listingPrice: r.listing_price, listingCurrency: r.listing_currency })) })));

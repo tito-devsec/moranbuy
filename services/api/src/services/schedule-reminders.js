@@ -53,11 +53,11 @@ async function reminderFacts(dbImpl, schedule, customer, language) {
 }
 
 // One pass: every due reminder is claimed once, every gate checked at that moment, and the real outcome recorded on the schedule.
-export async function processDueReminders({ dbImpl = db, moran, dryRun = true, now = Date.now, batch = 50 } = {}) {
+export async function processDueReminders({ dbImpl = db, moran, dryRun = true, now = Date.now, batch = 50, scheduleId = null } = {}) {
   const settings = await loadReminderSettings(dbImpl);
   const summary = { sent: 0, skipped: 0, failed: 0, deferred: 0 };
   if (!settings.enabled) return { ...summary, disabled: true };
-  const due = await dbImpl('customer_schedules').where({ status: 'scheduled' }).whereNotNull('due_at').where('due_at', '<=', new Date(now())).orderBy('due_at').limit(batch);
+  const due = await dbImpl('customer_schedules').where({ status: 'scheduled' }).whereNotNull('due_at').where('due_at', '<=', new Date(now())).modify((q) => { if (scheduleId) q.where({ id: scheduleId }); }).orderBy('due_at').limit(batch);
   for (const s of due) {
     // Quiet hours move the reminder to the morning; it is not claimed.
     const later = nextSendableAt(now(), settings);

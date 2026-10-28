@@ -51,3 +51,19 @@ No fallback pretends to be Muse; the customer-facing text says what is and is no
 `tests/integration/muse-client.test.js` drives the client with a fake `fetch`: request shape and
 headers, success telemetry with real token counts, 401, bad JSON, timeout, secret redaction,
 disabled provider, telemetry summary, `testConnection`. No test calls the real API.
+
+## Cost and budget
+
+Meta's API response carries token counts, not prices, so cost is computed from rates an admin enters
+in Super Admin → MoranBuy → Muse Spark (US dollars per million input and output tokens, and
+optionally shillings per dollar). Every request recorded after that carries `cost_usd` and the rate
+card that priced it; requests made before any rate stay unpriced unless the admin chooses to price
+them with the current rates. The cost report (`GET /api/admin/muse/cost?days=`) gives totals, cost by
+day in Tanzania time, by feature and by business, month to date with a straight-line projection,
+and how many requests are still unpriced.
+
+A monthly budget alerts once 80% is spent or the projection passes it, in the report and in
+"Explain with Muse". With the hard cap on, once the month's cost reaches the budget the client
+records `budget_exceeded` and makes no call; every caller then uses its deterministic fallback, so
+shoppers and businesses are still answered. The connection test is never blocked. Raising the
+budget or the start of a new month lifts the cap within a minute.

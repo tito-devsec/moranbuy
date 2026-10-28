@@ -60,8 +60,8 @@ export async function unscheduleCampaign(db, merchantId, id, { actorId, ip = nul
 }
 
 // Starts every scheduled campaign whose time has come, each claimed once; a gate that no longer holds (payment, template, entitlement, sender, merchant) fails it with the reason instead of sending.
-export async function startDueCampaigns(db, { pricingConfigured = true, now = Date.now } = {}) {
-  const due = await db('campaigns').where({ status: 'scheduled' }).where('scheduled_at', '<=', new Date(now())).orderBy('scheduled_at').limit(50);
+export async function startDueCampaigns(db, { pricingConfigured = true, now = Date.now, campaignId = null } = {}) {
+  const due = await db('campaigns').where({ status: 'scheduled' }).where('scheduled_at', '<=', new Date(now())).modify((q) => { if (campaignId) q.where({ id: campaignId }); }).orderBy('scheduled_at').limit(50);
   const summary = { started: 0, failed: 0 };
   for (const c of due) {
     const claimed = await db('campaigns').where({ id: c.id, status: 'scheduled' }).update({ status: 'starting', updated_at: new Date(now()) });
@@ -85,8 +85,8 @@ export async function startDueCampaigns(db, { pricingConfigured = true, now = Da
 }
 
 // One pass of the worker: claims queued recipients one at a time with a conditional update, rechecks consent, sends, records the real outcome.
-export async function processCampaignQueue(db, sender, { batch = 50, maxAttempts = 3, now = Date.now } = {}) {
-  const campaigns = await db('campaigns').where({ status: 'dispatching' }).orderBy('dispatched_at').limit(20);
+export async function processCampaignQueue(db, sender, { batch = 50, maxAttempts = 3, now = Date.now, campaignId = null } = {}) {
+  const campaigns = await db('campaigns').where({ status: 'dispatching' }).modify((q) => { if (campaignId) q.where({ id: campaignId }); }).orderBy('dispatched_at').limit(20);
   const summary = { sent: 0, failed: 0, skipped: 0, retried: 0, completed: 0 };
   for (const campaign of campaigns) {
     const merchant = await db('merchants').where({ id: campaign.merchant_id }).first();

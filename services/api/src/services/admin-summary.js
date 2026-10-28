@@ -1,6 +1,6 @@
 import { config } from '@moranbuy/core';
 import { redact } from '@moranbuy/observability';
-import { museTelemetry, museAdminSummary, numbersAreGrounded } from '@moranbuy/muse-intelligence';
+import { museTelemetry, museAdminSummary, numbersAreGrounded, museCostReport } from '@moranbuy/muse-intelligence';
 import { db } from '../db/connection.js';
 import { demandStats } from './insights.js';
 
@@ -50,7 +50,12 @@ export async function sectionData(section, { dbImpl = db, now = Date.now() } = {
       completedAmount30d: n((await dbImpl('payments').where({ status: 'completed' }).where('created_at', '>=', since(30)).sum('amount as s').first()).s),
       provider: config().PAYMENT_PROVIDER,
     };
-    case 'muse': { const t = await museTelemetry(dbImpl, { sinceHours: 24 }); return { last24h: { requests: t.requests, ok: t.ok, failed: t.failed, avgLatencyMs: t.avgLatencyMs, inputTokens: t.inputTokens, outputTokens: t.outputTokens, byFeature: t.byFeature, lastFailureCode: t.lastFailure?.error_code || null }, provider: config().MUSE_PROVIDER }; }
+    case 'muse': {
+      const t = await museTelemetry(dbImpl, { sinceHours: 24 });
+      const c = await museCostReport(dbImpl, { days: 30, now });
+      return { last24h: { requests: t.requests, ok: t.ok, failed: t.failed, avgLatencyMs: t.avgLatencyMs, inputTokens: t.inputTokens, outputTokens: t.outputTokens, byFeature: t.byFeature, lastFailureCode: t.lastFailure?.error_code || null }, provider: config().MUSE_PROVIDER,
+        cost: { ratesSet: c.ratesSet, monthToDateUsd: c.monthToDate.costUsd, projectedMonthUsd: c.monthToDate.projectedUsd, budgetUsd: c.budget.budgetUsd, hardCap: c.budget.hardCap, blocked: c.budget.blocked, unpricedRequests30d: c.unpricedRequests, topFeature: c.byFeature[0]?.feature || null } };
+    }
     case 'demand': { const s = await demandStats({ dbImpl, days: 30, now }); return { customers: s.customers, topProducts: s.topProducts.slice(0, 5), byRegion: s.byRegion.slice(0, 5), unmetDemand: s.unmetDemand, purchaseTiming: s.purchaseTiming, outcomes: s.outcomes, orders: s.orders, openSchedules: s.openSchedules }; }
     case 'retention': {
       const run = (await dbImpl('platform_settings').where({ key: 'retention_last_run' }).first())?.value || null;
@@ -90,6 +95,10 @@ export function ruleChecks(section, d) {
   if (section === 'payments' && d.pendingOver1h) c.push(`${d.pendingOver1h} payments have been pending over an hour; check the provider webhook.`);
   if (section === 'muse') {
     if (d.provider === 'disabled') c.push('Muse Spark is off; every Muse duty is using its plain fallback.');
+    if (d.cost && !d.cost.ratesSet && d.last24h.requests) c.push('Muse token rates are not set, so cost is not being counted; enter them under Muse Spark.');
+    if (d.cost?.blocked) c.push(`The monthly Muse budget of $${d.cost.budgetUsd} is used up and the hard cap is on: Muse is paused until next month or a higher budget.`);
+    else if (d.cost?.budgetUsd && d.cost.projectedMonthUsd >= d.cost.budgetUsd) c.push(`This month's Muse cost is heading for $${d.cost.projectedMonthUsd} against a budget of $${d.cost.budgetUsd}.`);
+    if (d.provider === 'disabled') { /* reported above */ }
     else if (d.last24h.requests && d.last24h.failed / d.last24h.requests > 0.2) c.push(`${d.last24h.failed} of ${d.last24h.requests} Muse requests failed in 24 hours (last error ${d.last24h.lastFailureCode || 'unknown'}).`);
   }
   if (section === 'demand' && d.unmetDemand?.length) c.push(`Customers asked for ${d.unmetDemand.map((u) => u.productType).join(', ')} and found nothing; these are products to recruit businesses for.`);

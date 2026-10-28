@@ -41,6 +41,20 @@ dispatch, follow-up delivery (30 s), customer schedule reminders (60 s), Moran l
 (10 min) and the retention purge (6 h). Run one instance per environment or several: every row is
 claimed with a conditional update, so duplicates cannot happen across instances.
 
+## Work queue
+
+With `QUEUE_MODE=redis` (the default) the worker runs a Redis work list for the timed jobs:
+`campaign-start`, `campaign-dispatch`, `followup` and `reminder`. Each queue is a sorted set
+scored by run time (`moranbuy:queue:<name>:jobs`), with a lease set, an attempts hash and a dead
+list. A feeder loads everything due in the next two minutes from Postgres every 15 seconds, one
+consumer per queue runs due jobs within a quarter second, a reaper returns jobs whose lease ran out,
+and a failing job is retried after 5 s, 10 s, 20 s and 40 s before it goes to the dead list. The API
+also queues a campaign the moment it is confirmed or resumed. Postgres stays the record: every
+handler re-reads the row and acts only if it is still due, so a lost, repeated or stale job is
+harmless. The old Postgres passes still run every five minutes as a safety net, and at their full
+pace when Redis is unreachable or `QUEUE_MODE=poll`. Admin → Integration Health shows each queue
+(waiting, due, running, done, dead) and sends dead jobs back with a reason.
+
 ## Uploaded files
 
 Product photos, verification documents and web customer photos are written to `UPLOAD_DIR`

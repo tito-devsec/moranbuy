@@ -5,7 +5,7 @@ import { ApiError, notFound, config } from '@moranbuy/core';
 import { requireAdminAuth, signAccessToken, issueRefreshToken, rotateRefreshToken, verifyPassword, activateEntitlement, pauseEntitlement, listEntitlements, SERVICES } from '@moranbuy/authorization';
 import { publicMerchant } from '@moranbuy/merchant-management';
 import { listListings, listLocations, pullMoranListings } from '@moranbuy/product-catalog';
-import { museTelemetry } from '@moranbuy/muse-intelligence';
+import { museTelemetry, museCostReport, loadMusePricing, priceUnpricedRequests, clearMusePricingCache } from '@moranbuy/muse-intelligence';
 import { consentHistory, consentState, toMsisdn } from '@moranbuy/consent-management';
 import { publicCampaign, publicTemplate } from '@moranbuy/campaign-engine';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
@@ -26,6 +26,7 @@ import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 import { demandOverview } from '../services/insights.js';
 import { readUpload, publicUpload } from '../services/uploads.js';
 import { adminSummary, SUMMARY_SECTIONS } from '../services/admin-summary.js';
+import { queueStats, queue, QUEUE_NAMES } from '../queue/jobs.js';
 import { adminListings, adminLocations, setListingVisibility, correctLocation, listingsCsv, LISTING_FLAGS } from '../services/admin-catalog.js';
 import { loadReminderSettings, renderReminder, DEFAULT_SCHEDULE_REMINDER } from '../services/schedule-reminders.js';
 import { loadRetention, purgeExpired, retentionFloor, DEFAULT_RETENTION, NEVER_PURGED } from '../services/retention.js';
@@ -101,6 +102,17 @@ adminRouter.get('/locations', validate({ query: z.object({ search: z.string().ma
 adminRouter.post('/locations/:id/position', manage, validate({ params: idParams, body: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180), region: z.string().max(80).optional(), district: z.string().max(80).optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
   const row = await correctLocation({ id: req.params.id, ...req.body, admin: req.admin });
   res.json({ location: { id: row.id, latitude: Number(row.latitude), longitude: Number(row.longitude), region: row.region, district: row.district, positionSource: row.location_source } });
+}));
+
+// ---- work queues ----
+adminRouter.get('/queues', asyncHandler(async (_req, res) => {
+  const s = await queueStats();
+  res.json({ ...s, dead: s.mode === 'redis' ? Object.fromEntries(await Promise.all(QUEUE_NAMES.map(async (n) => [n, await queue(n).deadJobs(20)]))) : {} });
+}));
+adminRouter.post('/queues/:name/retry-dead', manage, validate({ params: z.object({ name: z.enum(QUEUE_NAMES) }), body: z.object({ reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const n = await queue(req.params.name).retryDead();
+  await act(req, { action: 'queue.dead_retried', targetType: 'queue', targetId: null, after: { queue: req.params.name, jobs: n }, reason: req.body.reason });
+  res.json({ retried: n });
 }));
 
 // ---- Muse explains a section ----
@@ -292,6 +304,19 @@ adminRouter.put('/pricing', manage, validate({ body: z.object({ providerUnitTzs:
 adminRouter.get('/muse', asyncHandler(async (req, res) => {
   const { muse } = shoppingDeps();
   res.json({ status: muse.status(), telemetry: await museTelemetry(db, { sinceHours: Number(req.query.hours) || 24 }), recent: await db('muse_requests').orderBy('id', 'desc').limit(50) });
+}));
+// What Muse cost, by day, feature and business, against the month's budget; priced with the rates entered below.
+adminRouter.get('/muse/cost', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(366).default(30) }).passthrough() }), asyncHandler(async (req, res) => res.json(await museCostReport(db, { days: req.query.days }))));
+const rate = z.number().nonnegative().max(10000).nullable();
+adminRouter.put('/muse/pricing', manage, validate({ body: z.object({ inputPerMillionUsd: rate.optional(), outputPerMillionUsd: rate.optional(), usdToTzs: z.number().positive().max(100000).nullable().optional(), monthlyBudgetUsd: z.number().nonnegative().max(1000000).nullable().optional(), hardCap: z.boolean().optional(), applyToPast: z.boolean().default(false), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, applyToPast, ...patch } = req.body;
+  const before = await loadMusePricing(db, { fresh: true });
+  const next = { ...before, ...patch, updatedAt: new Date().toISOString() };
+  await db('platform_settings').insert({ key: 'muse_pricing', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  clearMusePricingCache();
+  const repriced = applyToPast ? await priceUnpricedRequests(db) : 0;
+  await act(req, { action: 'muse.pricing_changed', targetType: 'settings', targetId: 'muse_pricing', before, after: { ...next, repriced }, reason: why });
+  res.json({ pricing: next, repriced });
 }));
 adminRouter.post('/muse/test', manage, asyncHandler(async (req, res) => {
   const out = await shoppingDeps().muse.testConnection();

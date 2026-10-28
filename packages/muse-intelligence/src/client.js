@@ -1,6 +1,6 @@
 import { config } from '@moranbuy/core';
 import { redact } from '@moranbuy/observability';
-import { recordMuseRequest } from './telemetry.js';
+import { recordMuseRequest, museBudgetState } from './telemetry.js';
 
 // Muse Spark on the Meta Model API, called through its OpenAI-compatible chat completions endpoint.
 export class MuseClient {
@@ -39,6 +39,11 @@ export class MuseClient {
     if (!this.enabled) {
       await recordMuseRequest(this.db, { feature, provider: this.provider, model: this.model, status: 'disabled', merchantId, requestRef });
       return { ok: false, status: 'disabled' };
+    }
+    // With a hard cap on, a month that reached its budget makes no more Muse calls; every caller falls back to its plain path.
+    if (feature !== 'test_connection' && (await museBudgetState(this.db).catch(() => ({ blocked: false }))).blocked) {
+      await recordMuseRequest(this.db, { feature, provider: this.provider, model: this.model, status: 'budget_exceeded', merchantId, requestRef });
+      return { ok: false, status: 'budget_exceeded' };
     }
     const body = {
       model: this.model,
