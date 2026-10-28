@@ -110,7 +110,7 @@ export class ShoppingEngine {
     const [run] = await this.db('matching_runs').insert({
       session_id: session.id, request_json: request, policy_json: result.policy, candidates: offers.length, ranked: result.ranked.length,
       over_budget: result.overBudget.length, excluded: result.excluded.length, none_within_budget: result.noneWithinBudget,
-      excluded_json: JSON.stringify(result.excluded), muse_status: researchStatus ? `${museStatus};research:${researchStatus}` : museStatus, duration_ms: this.now() - started,
+      excluded_json: JSON.stringify(result.excluded), muse_status: String(researchStatus ? `${museStatus};research:${researchStatus}` : museStatus).slice(0, 80), duration_ms: this.now() - started,
     }).returning('*');
     const rows = [];
     for (const group of ['ranked', 'overBudget']) {
@@ -203,7 +203,7 @@ export class ShoppingEngine {
     if (session.isNew && this.profileLoader && replies[0]?.text) {
       const p = await this.profileLoader().catch(() => null);
       const lang = session.request_json?.language === 'en' ? 'en' : 'sw';
-      const greeting = p ? (lang === 'en' ? (p.greetingEn || `Hello, I am ${p.name} from MoranBuy.`) : (p.greetingSw || `Habari, mimi ni ${p.name} wa MoranBuy.`)) : null;
+      const greeting = p ? greetingFor(p, lang) : null;
       if (greeting) replies[0] = { ...replies[0], text: `${greeting} ${replies[0].text}` };
       session.isNew = false;
     }
@@ -233,4 +233,14 @@ function readIntent(text, extracted, context) {
   if (num && context.presented?.length) return { kind: 'select', option: Number(num[1]), language };
   if (extracted.intent === 'select' && Number.isInteger(extracted.selection) && context.presented?.length) return { kind: 'select', option: extracted.selection, language };
   return { kind: 'shop', language };
+}
+
+// The agent introduces itself once by the name chosen in Super Admin; "of MoranBuy" is added only when the name does not already say it.
+export function greetingFor(profile, lang = 'sw') {
+  if (lang === 'en' && profile.greetingEn) return profile.greetingEn;
+  if (lang !== 'en' && profile.greetingSw) return profile.greetingSw;
+  const name = String(profile.name || 'MoranBuy').trim();
+  const saysMoranBuy = /moran\s*buy/i.test(name);
+  if (lang === 'en') return saysMoranBuy ? `Hello, I am ${name}.` : `Hello, I am ${name} from MoranBuy.`;
+  return saysMoranBuy ? `Habari, mimi ni ${name}.` : `Habari, mimi ni ${name} wa MoranBuy.`;
 }
