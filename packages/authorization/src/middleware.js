@@ -32,6 +32,11 @@ export function requireMerchantAuth(db) {
 export function requireAdminAuth(db, ...roles) {
   return async (req, _res, next) => {
     try {
+      // An admin Super Admin's proxy already identified (proxiedAdmin) only needs the role check.
+      if (req.admin?.proxied) {
+        if (roles.length && !roles.includes(req.admin.role)) throw new ApiError(403, 'INSUFFICIENT_ROLE', 'Your role does not allow this.');
+        return next();
+      }
       const token = bearer(req);
       if (!token) throw new ApiError(401, 'MISSING_TOKEN', 'Sign in to continue.');
       let payload;

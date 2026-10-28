@@ -6,10 +6,12 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 ## Contents
 
 - `patches/0001-moranbuy-integration.patch`: a `git diff` against `moran-backend` commit `965c247`
-  (27 October 2026) touching 8 existing files, 69 lines added. Config block, raw-body mount and
-  router mounts in `server.js`, the webhook forward, the owner-login refusal, the admin router
-  registration, the Super Admin register button, the dashboard header entry and `MORANBUY_URL`.
-- `files/`: four new source files and one doc to copy in:
+  (27 October 2026) touching 11 existing files. Config block, raw-body mount and router mounts in
+  `server.js`, the webhook forward, the owner-login refusal, the admin router registration, the
+  Super Admin register button and the MoranBuy navigation entry, the weare CSP for Facebook's
+  Embedded Signup window, the dashboard header entry and `MORANBUY_URL`, and the regenerated admin
+  API reference.
+- `files/`: the new source files, the Super Admin MoranBuy page and one doc to copy in:
 
 | Copy to | File |
 |---|---|
@@ -18,6 +20,8 @@ and apply it. Nothing here is pushed to `moran-backend` by MoranBuy.
 | `src/api/routes/moranbuy-internal.routes.js` | `files/moranbuy-internal.routes.js` |
 | `src/api/routes/moranbuy-owner.routes.js` | `files/moranbuy-owner.routes.js` |
 | `src/api/routes/admin/moranbuy.routes.js` | `files/moranbuy.routes.js` |
+| `admin-frontend/moranbuy.html` | `files/admin-moranbuy.html` |
+| `admin-frontend/assets/js/pages/moranbuy.js` | `files/admin-pages-moranbuy.js` |
 | `docs/moranbuy.md` | `files/docs-moranbuy.md` |
 
 ## Apply
@@ -29,14 +33,18 @@ cp ../moranbuy/integrations/moran-backend/files/moranbuy.service.js src/services
 cp ../moranbuy/integrations/moran-backend/files/moranbuy-internal.routes.js src/api/routes/
 cp ../moranbuy/integrations/moran-backend/files/moranbuy-owner.routes.js src/api/routes/
 cp ../moranbuy/integrations/moran-backend/files/moranbuy.routes.js src/api/routes/admin/
+cp ../moranbuy/integrations/moran-backend/files/admin-moranbuy.html admin-frontend/moranbuy.html
+cp ../moranbuy/integrations/moran-backend/files/admin-pages-moranbuy.js admin-frontend/assets/js/pages/moranbuy.js
 cp ../moranbuy/integrations/moran-backend/files/docs-moranbuy.md docs/moranbuy.md
 git apply ../moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.patch
 npm test && npm run migrate
 ```
 
 Set `MORANBUY_API_URL` and `MORANBUY_SHARED_SECRET` in Moran's `.env`, and `MORANBUY_URL` in
-`frontend/config.js`. Then Super Admin → Businesses → Register MoranBuy, connect its number, write
-its knowledge.
+`frontend/config.js`. Redeploy the admin front-end (`admin-frontend/deploy.sh`) and reload Nginx
+for the CSP change. Then Super Admin → MoranBuy: Register, Connect MoranBuy to WhatsApp, choose
+the name, Open MoranBuy dashboard. Super Admins manage MoranBuy from there with their existing
+login; every action is audited in MoranBuy under the admin's email.
 
 ## Verification done here
 

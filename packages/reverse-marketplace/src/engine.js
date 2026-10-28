@@ -14,8 +14,8 @@ const SESSION_TTL_MS = 6 * 3600000;
 
 // The customer-facing shopping engine: one call per inbound message, returns the replies to send and the new session state.
 export class ShoppingEngine {
-  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, now = Date.now }) {
-    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.now = now;
+  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, profileLoader = null, now = Date.now }) {
+    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.profileLoader = profileLoader; this.now = now;
   }
 
   // Finds the customer's open session or starts one.
@@ -23,6 +23,7 @@ export class ShoppingEngine {
     const open = await this.db('shopping_sessions').where({ customer_id: customerId }).whereNotIn('state', ['closed', 'confirmed']).orderBy('created_at', 'desc').first();
     if (open && (!open.expires_at || new Date(open.expires_at).getTime() > this.now())) return open;
     const [row] = await this.db('shopping_sessions').insert({ customer_id: customerId, expires_at: new Date(this.now() + SESSION_TTL_MS) }).returning('*');
+    row.isNew = true;
     return row;
   }
 
@@ -162,6 +163,14 @@ export class ShoppingEngine {
   }
 
   async reply(session, replies, extra = {}) {
+    // On a customer's first message of a new session the agent introduces itself with the name chosen in Super Admin.
+    if (session.isNew && this.profileLoader && replies[0]?.text) {
+      const p = await this.profileLoader().catch(() => null);
+      const lang = session.request_json?.language === 'en' ? 'en' : 'sw';
+      const greeting = p ? (lang === 'en' ? (p.greetingEn || `Hello, I am ${p.name} from MoranBuy.`) : (p.greetingSw || `Habari, mimi ni ${p.name} wa MoranBuy.`)) : null;
+      if (greeting) replies[0] = { ...replies[0], text: `${greeting} ${replies[0].text}` };
+      session.isNew = false;
+    }
     for (const r of replies) await this.db('session_messages').insert({ session_id: session.id, direction: 'out', content: r.text || r.caption || '', content_type: r.imageUrl ? 'image' : 'text' });
     return { replies, session, ...extra };
   }

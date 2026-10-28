@@ -15,6 +15,12 @@ export async function loadRankingPolicy(dbImpl = db) {
   return { ...DEFAULT_POLICY, ...(row?.value || {}) };
 }
 
+// The name and greeting MoranBuy uses, chosen in Super Admin; a sensible default until then.
+export async function loadAgentProfile(dbImpl = db) {
+  const row = await dbImpl('platform_settings').where({ key: 'agent_profile' }).first();
+  return { name: 'MoranBuy', greetingSw: null, greetingEn: null, ...(row?.value || {}) };
+}
+
 // The engine and clients the routes use; tests build their own with fakes.
 export function shoppingDeps() {
   if (!shared) {
@@ -25,7 +31,7 @@ export function shoppingDeps() {
       moran: new MoranInternalClient({ cfg: c }),
     };
     shared.researcher = new RuntimeResearcher({ resolve: () => researchRuntimeConfig(), cfg: c, deps: { recorder: (r) => recordMuseRequest(db, r) } });
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher });
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db) });
   }
   return shared;
 }

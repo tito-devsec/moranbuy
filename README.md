@@ -49,8 +49,10 @@ within budget. No price, product, distance, stock level or delivery fee is ever 
 - **Businesses**: standalone merchants register, list products and locations, and receive enquiries;
   registered Moran AI businesses link their account and their existing products appear in MoranBuy
   without re-uploading.
-- **MoranBuy Admin**: merchants, verification, ranking evidence, consent, campaigns, follow-up,
-  billing, Muse Spark telemetry, integration health and audit logs.
+- **MoranBuy Admin, inside Moran AI's Super Admin** (`weare.moranai.co.tz` → MoranBuy): register
+  the MoranBuy business, connect its WhatsApp number, choose its name, then merchants,
+  verification, ranking evidence, consent, campaigns, follow-up, billing, Muse Spark key and
+  telemetry, Snippe keys, integration health and audit logs, all with the existing Super Admin login.
 
 ## Muse Spark
 
@@ -80,8 +82,10 @@ MoranBuy keeps its own database and never reads Moran AI's. It talks to Moran AI
   forwarded from Moran, outbound replies through Moran's outbound gate, listings of businesses
   that opted in, admin-provided knowledge, merchant campaign sends from the merchant's own number).
 
-MoranBuy itself is registered in Moran AI's Super Admin like any business, with its own WhatsApp
-number, managed only by administrators. Its sales agent is limited to shopping, reads only the
+MoranBuy itself is registered from Moran AI's Super Admin like any business, its WhatsApp number is
+connected there with Meta's Embedded Signup, and it is managed only by administrators: Super Admin
+calls MoranBuy's admin API through a signed proxy that carries the admin's identity, so there is
+one login and one audit trail. Its sales agent is limited to shopping, reads only the
 products of businesses that opted in, answers policy questions only from admin-written knowledge,
 and can look up public shop sites through an optional Hermes research agent whose results are
 always shown as "found online, not confirmed".

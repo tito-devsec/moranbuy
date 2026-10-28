@@ -24,7 +24,7 @@ export function createApp({ routers = [] } = {}) {
 
   // Webhooks are signed over the raw body, so they are parsed as bytes before the JSON parser runs.
   app.use(['/webhooks', '/internal/inbound'], express.raw({ type: '*/*', limit: '2mb' }));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 
   // One shared ceiling per IP; signed webhooks are authenticated by their signature instead.
   app.use('/api', rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));

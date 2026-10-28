@@ -16,6 +16,9 @@ second. Inside Moran it is **one admin-managed business** plus a signed channel.
 | Webhook: a message to the MoranBuy tenant is forwarded instead of answered by an agent | `src/api/routes/whatsapp-webhook.routes.js` |
 | Owner login refused for admin-managed accounts | `src/api/routes/auth.routes.js` |
 | Super Admin: "Register MoranBuy" on Businesses | `admin-frontend/assets/js/pages/businesses.js` |
+| Super Admin → **MoranBuy** page (Operations): register, **Connect MoranBuy to WhatsApp** (Meta Embedded Signup, as an owner does), choose the name MoranBuy appears under, open the MoranBuy dashboard (merchants, ranking evidence, campaigns, follow-up, billing, Muse Spark key, Snippe keys, audit) | `admin-frontend/moranbuy.html`, `admin-frontend/assets/js/pages/moranbuy.js`, `assets/js/core/layout.js` |
+| `/api/admin/moranbuy/signup-config`, `POST /whatsapp/connect`, `POST /profile`, and the signed proxy `ALL /api/admin/moranbuy/api/*` → MoranBuy's admin API carrying this admin's identity | `src/api/routes/admin/moranbuy.routes.js` |
+| weare CSP allows Facebook's SDK and window for the connect step | `deploy/nginx.full.conf` |
 | Owner dashboard: MoranBuy entry at the right of the header | `frontend/moran-app.js`, `frontend/config.js` (`MORANBUY_URL`) |
 
 ## Environment
@@ -28,8 +31,7 @@ MORANBUY_SHARED_SECRET=<long random, the same value in MoranBuy's MORAN_SHARED_S
 ## Running it
 
 1. `npm run migrate`.
-2. Super Admin → Businesses → **Register MoranBuy** (contact email; the owner login is refused by design).
-3. Open the business page and connect its WhatsApp number as for any business; write its knowledge on the Knowledge tab.
+2. Super Admin → **MoranBuy** (Operations): step 1 Register MoranBuy (contact email; the owner login is refused by design), step 2 **Connect MoranBuy to WhatsApp** (Facebook window, same Embedded Signup as every business), step 3 the name MoranBuy appears under, step 4 **Open MoranBuy dashboard**. Its knowledge is written on the business page's Knowledge tab like any business.
 4. In `frontend/config.js` set `MORANBUY_URL`; the MoranBuy entry appears in every owner's header.
 5. A business owner switches on **List my products on MoranBuy** (`POST /api/moranbuy/listing`); only then do its products reach MoranBuy.
 

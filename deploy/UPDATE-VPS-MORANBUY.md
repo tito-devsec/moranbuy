@@ -22,11 +22,14 @@ npm test && npm run migrate
 docker compose up -d --build backend websocket     # or pm2 reload, as Moran is run today
 ```
 
-Then in Super Admin (weare.moranai.co.tz): **Businesses → Register MoranBuy** (a contact email;
-admins run this account, its owner login is refused by design), open the business page, **connect
-the MoranBuy WhatsApp number** with the usual connect dialog, and write its knowledge on the
-Knowledge tab. Owners who want their products on MoranBuy switch on **List my products on
-MoranBuy** in their dashboard (the MoranBuy entry sits at the right of the header).
+Redeploy the admin front-end (`admin-frontend/deploy.sh`) and reload Nginx (the weare CSP now
+allows Facebook's Embedded Signup window). Then in Super Admin (weare.moranai.co.tz) open
+**MoranBuy** under Operations and follow the four steps: **Register MoranBuy** (a contact email;
+admins run this account, its owner login is refused by design), **Connect MoranBuy to WhatsApp**
+(the Facebook window, signed in to the account that owns the MoranBuy number), **the name MoranBuy
+appears under**, then **Open MoranBuy dashboard**. Its knowledge is written on the business page's
+Knowledge tab like any business. Owners who want their products on MoranBuy switch on **List my
+products on MoranBuy** in their dashboard (the MoranBuy entry sits at the right of the header).
 
 ## 3. MoranBuy stack
 
@@ -49,18 +52,19 @@ sudo certbot --nginx -d buy.moranai.co.tz
 curl -s https://buy.moranai.co.tz/ready
 ```
 
-## 5. Credentials in MoranBuy Admin
+## 5. Credentials, from Super Admin → MoranBuy → Open MoranBuy dashboard
 
-Open `https://buy.moranai.co.tz/admin/` and sign in with `ADMIN_BOOTSTRAP_EMAIL`.
+- **Muse Spark** tab: paste the Meta Model API key (dev.meta.ai), model `muse-spark-1.3`, Save and
+  test. A real test request runs and the result is shown; the key is stored encrypted in MoranBuy
+  and used within seconds. No restart.
+- **Credentials** tab: paste the Snippe API key and webhook secret from `/opt/moran-backend/.env`
+  (the same Snippe account). Register `https://buy.moranai.co.tz/webhooks/payments` as a webhook
+  URL in Snippe. Optional: Hermes base URL, key and the allowed shop domains.
+- **Billing** tab: set the WhatsApp provider rate per message to Meta's current marketing rate.
 
-- **Muse Spark Intelligence**: paste the Meta Model API key (dev.meta.ai), model `muse-spark-1.3`,
-  Save. The page runs a real test request and shows the result; the key is stored encrypted and
-  used within seconds. No restart.
-- **Security and Settings → Snippe**: paste the Snippe API key and webhook secret from
-  `/opt/moran-backend/.env` (the same Snippe account). Register
-  `https://buy.moranai.co.tz/webhooks/payments` as a webhook URL in Snippe.
-- **Billing and Refunds → pricing**: set `providerUnitTzs` to Meta's current marketing message rate.
-- Optional: **Hermes** base URL, key and the allowed shop domains.
+Only a Super Admin (`super_admin`) may change credentials; other roles read. Every change is
+audited in MoranBuy under the admin's email. `https://buy.moranai.co.tz/admin/` remains as a
+fallback with its own `ADMIN_BOOTSTRAP_EMAIL` login for when weare is unavailable.
 
 ## 6. Smoke test
 

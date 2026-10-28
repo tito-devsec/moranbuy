@@ -35,5 +35,6 @@ The patch in `integrations/moran-backend/` was applied to a local clone of `mora
 the patched tree: 1,523 passed; the 2 failures are Moran's own cases marked `TODO known fault`
 in its source (healthcare and sales evaluation cases), unrelated to the patch. The admin API
 reference check, which failed when the new admin route was added, passes after regenerating the
-reference, which is part of the patch. Not run: Moran's database-backed suites and anything
-against a live Meta number.
+reference, which is part of the patch. Not run: Moran's database-backed suites, anything
+against a live Meta number, and the Super Admin MoranBuy page in a browser (checked by `node --check`
+and by reading the helpers it uses).

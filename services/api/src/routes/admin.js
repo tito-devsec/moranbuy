@@ -20,6 +20,7 @@ import { shoppingDeps } from '../services/shopping.js';
 import { engagementDeps } from '../services/engagement.js';
 import { merchantDeps } from '../services/merchants.js';
 import { describeCredentials, saveCredentials, CREDENTIAL_FIELDS } from '../services/runtime-settings.js';
+import { proxiedAdmin } from '../middleware/proxied-admin.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -42,7 +43,7 @@ adminRouter.post('/auth/refresh', validate({ body: z.object({ refreshToken: z.st
   res.json({ accessToken: signAccessToken({ type: 'admin', sub: admin.id, role: admin.role, email: admin.email }), refreshToken: rotated.refreshToken });
 }));
 
-adminRouter.use(requireAdminAuth(db));
+adminRouter.use(proxiedAdmin(db), requireAdminAuth(db));
 const manage = requireAdminAuth(db, 'super_admin', 'admin');
 const act = (req, extra) => audit(db, { actorType: 'admin', actorId: req.admin.id, ip: req.ip, ...extra });
 
@@ -245,6 +246,16 @@ adminRouter.put('/credentials/:group', requireAdminAuth(db, 'super_admin'), vali
   await saveCredentials(req.params.group, patch, { updatedBy: req.admin.email });
   await act(req, { action: `credentials.${req.params.group}_updated`, targetType: 'settings', targetId: 'credentials', after: { fields: Object.keys(patch) }, reason: why });
   res.json({ credentials: await describeCredentials({ fresh: true }) });
+}));
+
+// ---- the name MoranBuy appears under in conversations, chosen in Super Admin after the number is connected ----
+adminRouter.get('/agent-profile', asyncHandler(async (_req, res) => { const row = await db('platform_settings').where({ key: 'agent_profile' }).first(); res.json({ profile: { name: 'MoranBuy', greetingSw: null, greetingEn: null, ...(row?.value || {}) } }); }));
+adminRouter.put('/agent-profile', manage, validate({ body: z.object({ name: z.string().trim().min(2).max(60), greetingSw: z.string().max(300).nullable().optional(), greetingEn: z.string().max(300).nullable().optional(), reason: z.string().min(3).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...profile } = req.body;
+  const before = (await db('platform_settings').where({ key: 'agent_profile' }).first())?.value || {};
+  await db('platform_settings').insert({ key: 'agent_profile', value: JSON.stringify(profile), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'agent_profile.changed', targetType: 'settings', targetId: 'agent_profile', before, after: profile, reason: why });
+  res.json({ profile });
 }));
 
 adminRouter.get('/settings', asyncHandler(async (_req, res) => res.json({ settings: await db('platform_settings').orderBy('key'), admins: await db('admin_users').select('id', 'email', 'name', 'role', 'is_active', 'last_login_at') })));

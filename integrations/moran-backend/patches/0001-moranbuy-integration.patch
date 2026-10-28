@@ -1,3 +1,15 @@
+diff --git a/admin-frontend/assets/js/core/layout.js b/admin-frontend/assets/js/core/layout.js
+index 721e555..c373640 100644
+--- a/admin-frontend/assets/js/core/layout.js
++++ b/admin-frontend/assets/js/core/layout.js
+@@ -19,6 +19,7 @@ export const NAV = [
+   ] },
+   { title: 'Operations', items: [
+     { key: 'businesses', href: 'businesses.html', icon: 'buildings-fill', label: 'Businesses', perm: 'businesses.read' },
++    { key: 'moranbuy', href: 'moranbuy.html', icon: 'bag-check-fill', label: 'MoranBuy', perm: 'businesses.read' },
+     { key: 'agents', href: 'agents.html', icon: 'robot', label: 'AI Agents', perm: 'agents.read' },
+     { key: 'conversations', href: 'conversations.html', icon: 'chat-dots-fill', label: 'Conversations', perm: 'conversations.read', badge: 'escalations' },
+     { key: 'leads', href: 'leads.html', icon: 'graph-up-arrow', label: 'Leads & Sales', perm: 'leads.read' },
 diff --git a/admin-frontend/assets/js/pages/businesses.js b/admin-frontend/assets/js/pages/businesses.js
 index 2729c29..bced33e 100644
 --- a/admin-frontend/assets/js/pages/businesses.js
@@ -28,8 +40,21 @@ index 2729c29..bced33e 100644
 +    root.append(moranbuy, stats.el, table.el);
    },
  });
+diff --git a/deploy/nginx.full.conf b/deploy/nginx.full.conf
+index cae1e3f..b1c6bdc 100644
+--- a/deploy/nginx.full.conf
++++ b/deploy/nginx.full.conf
+@@ -303,7 +303,7 @@ server {
+     add_header Cross-Origin-Opener-Policy   "same-origin" always;
+     add_header Cross-Origin-Resource-Policy "same-origin" always;
+     add_header X-Robots-Tag                 "noindex, nofollow" always;
+-    add_header Content-Security-Policy      "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz; connect-src 'self' https://api.moranai.co.tz; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
++    add_header Content-Security-Policy      "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz https://www.facebook.com; connect-src 'self' https://api.moranai.co.tz https://connect.facebook.net https://graph.facebook.com https://www.facebook.com; frame-src https://www.facebook.com https://web.facebook.com https://*.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
+ 
+     error_page 404 /404.html;
+     error_page 500 502 503 504 /500.html;
 diff --git a/docs/admin-api-reference.md b/docs/admin-api-reference.md
-index 795e532..851a563 100644
+index 795e532..0f584d7 100644
 --- a/docs/admin-api-reference.md
 +++ b/docs/admin-api-reference.md
 @@ -7,7 +7,7 @@ the zod schemas of its path parameters, query string and body. Concepts, respons
@@ -37,7 +62,7 @@ index 795e532..851a563 100644
  [admin-api.examples.json](./admin-api.examples.json).
  
 -298 routes.
-+300 routes.
++304 routes.
  
  ## Contents
  
@@ -49,7 +74,7 @@ index 795e532..851a563 100644
  - [customers](#customers)
  - [channels](#channels)
  - [campaigns](#campaigns)
-@@ -1576,6 +1577,24 @@ Query:
+@@ -1576,6 +1577,59 @@ Query:
  
  Other parameters are read by the service: `days`, list parameters (`page`, `pageSize`, `sort`, `order`) and the filters in admin-api.md §4.
  
@@ -70,6 +95,41 @@ index 795e532..851a563 100644
 +| `businessName` | string, min 2, max 160 | optional, default `"MoranBuy"` |
 +| `ownerEmail` | email, max 255 | required |
 +| `reason` | string, max 500 | optional |
++
++### `GET /api/admin/moranbuy/signup-config`
++
++- **Access:** Bearer token with `businesses.read`.
++
++### `POST /api/admin/moranbuy/whatsapp/connect`
++
++- **Access:** Bearer token with `businesses.read` and `channels.manage`.
++
++Body:
++
++| Field | Type | |
++|---|---|---|
++| `code` | string, min 1 | required |
++| `wabaId` | string, min 1 | optional |
++| `phoneNumberId` | string, min 1 | optional |
++| `displayNumber` | string, min 5 | optional |
++| `businessId` | string, min 1, max 64 | optional |
++| `coexistence` | boolean | optional |
++| `reason` | string, max 500 | optional |
++
++### `POST /api/admin/moranbuy/profile`
++
++- **Access:** Bearer token with `businesses.read` and `businesses.manage`.
++
++Body:
++
++| Field | Type | |
++|---|---|---|
++| `name` | string, min 2, max 60 | required |
++| `reason` | string, max 500 | optional |
++
++### `_ALL /api/admin/moranbuy/api/*`
++
++- **Access:** Bearer token with `businesses.read`.
 +
  ## customers
  

@@ -40,6 +40,13 @@ last 15 minutes; refresh tokens rotate.
 - `POST /api/sandbox/payments/:reference/settle` (not in production)
 
 ## Admin
+
+Reached from Moran AI's Super Admin through `ALL /api/admin/moranbuy/api/*` on the Moran backend,
+which signs each request (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature` over timestamp, method,
+path and body) and carries `X-MoranBuy-Admin-Email`, `-Name`, `-Role`. The same routes accept a
+MoranBuy admin token for the fallback app.
+
+- `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`
 - `POST /api/admin/auth/login`, `/auth/refresh`, `GET /me`, `GET /overview`
 - `GET /merchants?type=&status=&verification=&search=`, `GET /merchants/:id`, `POST /merchants/:id/verification`, `POST /merchants/:id/status`, `POST /merchants/:id/entitlements/:service`
 - `GET /ranking/runs`, `GET /ranking/runs/:id`, `GET|PUT /ranking/policy` (reason required, audited)
