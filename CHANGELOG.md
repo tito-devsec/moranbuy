@@ -2,9 +2,9 @@
 
 All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
-## Unreleased
+## 1.0.0 (2026-10-28)
 
-### 2026-10-28
+- Deployment: the Moran patch rebased on Moran `680d6f5` with a checksum list, its migration renumbered to `...103` with a receipt index, MoranBuy behind Moran's Docker nginx on Moran's Docker network, Compose project `moranbuy`, host check port `MORANBUY_HOST_PORT` (4100), memory limits, Redis `noeviction`, and the night-time queue test fixed.
 - Voice and vision with Meta's models: WhatsApp voice notes are forwarded by Moran as raw bytes (Moran's own transcription is no longer used for MoranBuy), decoded from Ogg Opus to 16 kHz WAV inside Node, and heard by Muse Spark 1.2 audio (Swahili, English, mixed) with Muse Voice Transcribe as the second ear; the web chat records WAV in the browser. A voice note is answered with a voice note (Azure Speech, Tanzanian Swahili voice, Ogg Opus) when spoken replies are set up in Super Admin. Businesses can photograph a shelf or a price list: Muse lists every product, Segment Anything 3.1 finds each pictured one, and each cut-out becomes that listing's photo. Voice notes are kept 30 days and spoken replies 7 days.
 - Repository: the Moran patch is now zero-context (only the new lines and the three lines they replace); README status, Meta tooling and scaling sections updated.
 - Demo fixes found in a live walkthrough: a search with web research set up (every real server) failed because its status text did not fit the column (widened, and the value is now length-guarded); the plain reader now understands "laki tatu na nusu" (350,000), "laki mbili na elfu hamsini" (250,000) and "elfu ishirini na tano" (25,000); the agent no longer greets as "MoranBuy wa MoranBuy" when its name already says MoranBuy.

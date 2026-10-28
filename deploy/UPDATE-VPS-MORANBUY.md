@@ -62,7 +62,7 @@ docker tag moran-backend-backend moran-backend-backend:rollback-$(date +%Y%m%d) 
 docker tag moran-backend-websocket moran-backend-websocket:rollback-$(date +%Y%m%d)
 docker compose build backend websocket && docker compose up -d backend websocket
 docker compose logs --tail 50 backend          # migrations ran (20260101000103_moranbuy), server listening
-docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload   # the weare CSP now allows Facebook's Embedded Signup window
+docker compose exec nginx nginx -t && docker compose restart nginx   # restart, not reload: the single-file mount keeps the old file after git apply; the weare CSP now allows Embedded Signup
 ```
 
 Do not run `npm run migrate` on the host: Moran's backend container runs its migrations when it starts.
@@ -82,7 +82,7 @@ cp deploy/env.production.example .env && chmod 600 .env && nano .env   # every C
 docker network ls | grep moran-backend          # Moran's network; set MORAN_DOCKER_NETWORK in .env if it is not moran-backend_default
 docker compose -f deploy/docker-compose.vps.yml --env-file .env up -d --build
 docker compose -f deploy/docker-compose.vps.yml logs -f moranbuy-api   # until "MoranBuy API listening"
-curl -s http://127.0.0.1:4000/ready
+curl -s http://127.0.0.1:4100/ready
 docker compose -f deploy/docker-compose.vps.yml exec moranbuy-api npx knex migrate:list --knexfile services/api/src/db/knexfile.js | tail -3
 cd $MORAN_DIR && docker compose exec nginx wget -qO- http://moranbuy-api:4000/health   # Moran's nginx reaches MoranBuy
 ```
@@ -160,7 +160,7 @@ Only after step 6 and a one-recipient campaign read in the ledger: set `CAMPAIGN
 
 ```bash
 cd /opt/moranbuy && docker compose -f deploy/docker-compose.vps.yml down        # never -v: MoranBuy's own data stays
-cd $MORAN_DIR && cp /root/backups/nginx.full.conf.bak deploy/nginx.full.conf && docker compose exec nginx nginx -s reload
+cd $MORAN_DIR && cp /root/backups/nginx.full.conf.bak deploy/nginx.full.conf && docker compose restart nginx
 git checkout main && cp /root/backups/moran-env-<stamp>.bak .env
 docker tag moran-backend-backend:rollback-<date> moran-backend-backend && docker tag moran-backend-websocket:rollback-<date> moran-backend-websocket
 docker compose up -d --no-build backend websocket
