@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetDatabase, closeDatabase, db } from '../helpers/db.js';
-import { makeMerchant, makeListing } from '../helpers/fixtures.js';
+import { makeMerchant, makeListing, acceptedCustomer } from '../helpers/fixtures.js';
 import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setShoppingDepsForTests } from '../../services/api/src/services/shopping.js';
@@ -27,13 +27,14 @@ before(async () => {
   moran = new FakeMoranInternalClient();
   const engine = new ShoppingEngine({ db, muse: new MuseClient({ cfg, db }), geocoder: new FakeGeocoder({ sinza: SINZA }) });
   setShoppingDepsForTests({ engine, moran, muse: null, geocoder: null });
+  await acceptedCustomer('255712345678');
   server = createApp({ routers }).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
 after(async () => { server.close(); await closeDatabase(); });
 
-const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(path === '/api/shop/messages' && !body.customerToken ? { acceptTerms: true, ...body } : body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
 
 test('a Swahili request with product, budget and place is matched budget-first and location-second', async () => {
   const r = await post('/api/shop/messages', { text: 'Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana.' });

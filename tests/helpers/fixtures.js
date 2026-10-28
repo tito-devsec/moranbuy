@@ -13,3 +13,9 @@ export async function makeListing(merchantId, { name, productType = 'sofa', cate
   const [l] = await db('listings').insert({ merchant_id: merchantId, name, product_type: productType, category, price, attributes: JSON.stringify(attributes), stock, status, source, source_merchant_ref: sourceRef, source_product_id: sourceProductId, image_url: imageUrl, ...(updatedAt ? { updated_at: updatedAt, source_updated_at: updatedAt } : {}) }).returning('*');
   return l;
 }
+
+// A WhatsApp sender who already accepted the current terms, so a test can go straight to shopping.
+export async function acceptedCustomer(phone, { language = 'sw' } = {}) {
+  const [c] = await db('customers').insert({ channel: 'whatsapp', channel_ref: phone, language, terms_status: 'accepted', terms_version: '2026-10-28', terms_accepted_at: db.fn.now() }).onConflict(['channel', 'channel_ref']).merge({ terms_status: 'accepted', terms_version: '2026-10-28' }).returning('*');
+  return c;
+}

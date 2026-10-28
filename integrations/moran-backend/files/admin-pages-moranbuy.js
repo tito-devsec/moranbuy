@@ -136,7 +136,7 @@ async function load(name) {
     case 'Templates': return mb.get('templates');
     case 'Follow-up': return mb.get('followup');
     case 'Orders': return mb.get('orders');
-    case 'Notifications': return mb.get('notifications/order-confirmed');
+    case 'Notifications': return { ...(await mb.get('notifications/order-confirmed')), terms: await mb.get('notifications/terms') };
     case 'Billing': return { pricing: await mb.get('pricing'), payments: (await mb.get('payments')).payments };
     case 'Muse Spark': return { muse: await mb.get('muse'), credentials: (await mb.get('credentials')).credentials };
     case 'Credentials': return mb.get('credentials');
@@ -159,6 +159,20 @@ function merchantDrawer(id) {
       h('h3', { class: 'fs-sm fw-bold mt-3', text: t('Orders, campaigns, payments') }), pre({ orders: d.orders.length, campaigns: d.campaigns.length, payments: d.payments.length, followup: d.followup.settings }),
     ) });
   }).catch(toastError);
+}
+
+// The terms question put to every new sender, with Accept and Reject buttons, before the agent answers.
+function termsCard(terms, reload) {
+  const st = terms.settings;
+  const form = h('div', { class: 'row g-2' },
+    h('div', { class: 'col-md-6' }, textarea({ name: 'textSw', label: t('Terms question (Swahili), keep {terms_url} and {privacy_url}'), value: st.textSw, rows: 3, maxlength: 1024 })),
+    h('div', { class: 'col-md-6' }, textarea({ name: 'textEn', label: t('Terms question (English)'), value: st.textEn, rows: 3, maxlength: 1024 })),
+    h('div', { class: 'col-md-2' }, input({ name: 'version', label: t('Version (a change asks everyone again)'), value: st.version, maxlength: 20 })),
+    h('div', { class: 'col-md-2' }, input({ name: 'acceptSw', label: t('Accept button (sw)'), value: st.acceptSw, maxlength: 20 })),
+    h('div', { class: 'col-md-2' }, input({ name: 'rejectSw', label: t('Reject button (sw)'), value: st.rejectSw, maxlength: 20 })),
+    h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+  const save = button(t('Save terms question'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('notifications/terms', f); toast(t('Saved.')); reload(); }).catch(toastError) });
+  return card({ cls: 'mt-3', title: t('Terms and privacy question (asked before anyone is answered)'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Accepted / pending / rejected: {c}. Pages: {u} and {p}', { c: JSON.stringify(terms.counts), u: st.termsUrl, p: st.privacyUrl }) }), form, h('div', { class: 'mt-2' }, save), h('p', { class: 'fs-sm text-muted mt-2', text: terms.preview.sw.body })) });
 }
 
 function render(name, d, reload) {
@@ -195,7 +209,8 @@ function render(name, d, reload) {
         h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const save = button(t('Save notification'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('notifications/order-confirmed', f); toast(t('Saved.')); reload(); }).catch(toastError) });
       return h('div', {}, card({ title: t('When a customer confirms an order, the business owner gets this on WhatsApp'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Placeholders: {p}', { p: d.placeholders.map((x) => `{${x}}`).join(' ') }) }), form, h('div', { class: 'mt-2' }, save), h('div', { class: 'mt-3 fs-sm' }, h('div', { class: 'fw-bold', text: t('Preview') }), h('div', { class: 'text-muted', text: d.preview.sw }), h('div', { class: 'text-muted', text: d.preview.en }))) }),
-        card({ cls: 'mt-3', title: t('Recent alerts sent'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (n) => formatDateTime(n.created_at) }, { key: 'business_name', label: t('Business') }, { key: 'kind', label: t('Kind') }, { key: 'status', label: t('Status'), render: (n) => badge(n.status) }, { key: 'skip_reason', label: t('Reason'), render: (n) => n.skip_reason || n.error || '' }], d.recent) }));
+        card({ cls: 'mt-3', title: t('Recent alerts sent'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (n) => formatDateTime(n.created_at) }, { key: 'business_name', label: t('Business') }, { key: 'kind', label: t('Kind') }, { key: 'status', label: t('Status'), render: (n) => badge(n.status) }, { key: 'skip_reason', label: t('Reason'), render: (n) => n.skip_reason || n.error || '' }], d.recent) }),
+        termsCard(d.terms, reload));
     }
     case 'Billing': {
       const form = h('div', { class: 'row g-2 align-items-end' }, h('div', { class: 'col-md-3' }, input({ name: 'providerUnitTzs', label: t('WhatsApp provider rate per message (TZS)'), type: 'number', value: d.pricing.effective.providerUnitTzs ?? '' })), h('div', { class: 'col-md-3' }, input({ name: 'serviceFeeUnitTzs', label: t('MoranBuy fee per message'), type: 'number', value: d.pricing.effective.serviceFeeUnitTzs })), h('div', { class: 'col-md-2' }, input({ name: 'taxPct', label: t('Tax %'), type: 'number', value: d.pricing.effective.taxPct })), h('div', { class: 'col-md-4' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));

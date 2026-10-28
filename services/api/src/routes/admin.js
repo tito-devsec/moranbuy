@@ -22,6 +22,7 @@ import { merchantDeps } from '../services/merchants.js';
 import { describeCredentials, saveCredentials, CREDENTIAL_FIELDS } from '../services/runtime-settings.js';
 import { proxiedAdmin } from '../middleware/proxied-admin.js';
 import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '../services/merchant-notify.js';
+import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -279,6 +280,23 @@ adminRouter.put('/notifications/order-confirmed', manage, validate({ body: z.obj
   await db('platform_settings').insert({ key: 'notification_order_confirmed', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
   await act(req, { action: 'notifications.order_confirmed_changed', targetType: 'settings', targetId: 'notification_order_confirmed', before, after: next, reason: why });
   res.json({ settings: next });
+}));
+
+// ---- the terms question every new sender gets; changing the version asks everyone again ----
+adminRouter.get('/notifications/terms', asyncHandler(async (_req, res) => {
+  const t = await loadTerms();
+  const counts = Object.fromEntries((await db('customers').select('terms_status').count('id as n').groupBy('terms_status')).map((r) => [r.terms_status, Number(r.n)]));
+  res.json({ settings: t, defaults: DEFAULT_TERMS, preview: { sw: termsPrompt(t, 'sw'), en: termsPrompt(t, 'en') }, counts });
+}));
+adminRouter.put('/notifications/terms', manage, validate({ body: z.object({ version: z.string().min(3).max(20).optional(), textSw: z.string().min(20).max(1024).optional(), textEn: z.string().min(20).max(1024).optional(), acceptSw: z.string().min(1).max(20).optional(), rejectSw: z.string().min(1).max(20).optional(), acceptEn: z.string().min(1).max(20).optional(), rejectEn: z.string().min(1).max(20).optional(), rejectedSw: z.string().max(500).optional(), rejectedEn: z.string().max(500).optional(), acceptedSw: z.string().max(500).optional(), acceptedEn: z.string().max(500).optional(), reason: z.string().min(3).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...patch } = req.body;
+  for (const k of ['textSw', 'textEn']) if (patch[k] && !/\{terms_url\}/.test(patch[k])) throw new ApiError(400, 'VALIDATION_ERROR', `${k} must contain {terms_url}.`);
+  const before = await loadTerms();
+  const next = { ...before, ...patch };
+  delete next.termsUrl; delete next.privacyUrl;
+  await db('platform_settings').insert({ key: 'terms', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'terms.changed', targetType: 'settings', targetId: 'terms', before: { version: before.version }, after: { version: next.version }, reason: why });
+  res.json({ settings: await loadTerms() });
 }));
 
 adminRouter.get('/settings', asyncHandler(async (_req, res) => res.json({ settings: await db('platform_settings').orderBy('key'), admins: await db('admin_users').select('id', 'email', 'name', 'role', 'is_active', 'last_login_at') })));

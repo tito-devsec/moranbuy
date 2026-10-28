@@ -15,6 +15,13 @@ merchant-level `all` revocation wins; otherwise the latest event for the purpose
 - Consent is per merchant. Nothing is shared between merchants; a merchant's audience is its own
   contacts, and a pasted phone list is filtered to numbers the merchant already has a relationship with.
 
+## Terms acceptance
+
+No one is answered before accepting the Terms of Service and Privacy Policy (`/terms`, `/privacy`,
+bilingual). The question carries two WhatsApp reply buttons; acceptance is stored on the
+customer row with the version and as a `service` consent event with `terms:<version>` as
+evidence. Super Admin → MoranBuy → Notifications edits the wording and version.
+
 ## Audiences
 
 `resolveAudience` excludes invalid numbers, duplicates, numbers that are not the merchant's

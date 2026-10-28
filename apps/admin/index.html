@@ -92,6 +92,13 @@
           <div class="mt-2 flex gap-2 items-center"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="saveNotif()">Save</button><span class="text-xs text-gray-500">Preview: <span x-text="data.notif?.preview.sw"></span></span></div>
         </div>
         <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Recent alerts</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.notif?.recent, null, 1)"></pre></div>
+        <div class="bg-white rounded-xl border p-4 text-sm">
+          <div class="font-semibold mb-1">Terms question asked before the agent answers anyone</div>
+          <p class="text-xs text-gray-500 mb-2" x-text="'Accepted / pending / rejected: ' + JSON.stringify(data.terms?.counts || {}) + '. Changing the version asks everyone again. Keep {terms_url} and {privacy_url} in the text.'"></p>
+          <div class="grid md:grid-cols-2 gap-2"><textarea class="border rounded p-2" rows="3" x-model="terms.textSw"></textarea><textarea class="border rounded p-2" rows="3" x-model="terms.textEn"></textarea></div>
+          <div class="flex gap-2 mt-2 items-center"><input class="border rounded p-1 w-32" placeholder="Version" x-model="terms.version"><input class="border rounded p-1 w-64" placeholder="Reason (audited)" x-model="terms.reason"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="saveTerms()">Save terms question</button></div>
+          <p class="text-xs text-gray-500 mt-2" x-text="data.terms?.preview.sw.body"></p>
+        </div>
       </div></template>
       <template x-if="section === 'Billing and Refunds'"><div class="space-y-4">
         <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Campaign pricing</div><pre class="text-xs" x-text="JSON.stringify(data.pricing, null, 1)"></pre><div class="flex gap-2 mt-2 text-sm"><input class="border rounded p-1 w-64" placeholder='{"providerUnitTzs": 60}' x-model="pricingJson"><input class="border rounded p-1 w-64" placeholder="Reason (required, audited)" x-model="pricingReason"><button class="underline" @click="savePricing()">Save</button></div></div>
@@ -147,7 +154,7 @@
         return d;
       };
       return {
-        me: null, section: 'Overview', data: {}, error: '', notice: '', notif: { textSw: '', textEn: '', templateName: '', templateLanguage: 'sw', reason: '' }, cred: { muse: { provider: 'meta', baseUrl: 'https://api.meta.ai/v1', model: 'muse-spark-1.3', apiKey: '', reasoningEffort: 'low', reason: '' }, snippe: { apiKey: '', webhookSecret: '', baseUrl: 'https://api.snippe.sh', reason: '' }, hermes: { baseUrl: '', apiKey: '', allowedDomains: '', enabled: false, reason: '' } }, form: { email: '', password: '' }, newService: '', policyJson: '', policyReason: '', pricingJson: '', pricingReason: '', consentPhone: '',
+        me: null, section: 'Overview', data: {}, error: '', notice: '', notif: { textSw: '', textEn: '', templateName: '', templateLanguage: 'sw', reason: '' }, terms: { version: '', textSw: '', textEn: '', reason: '' }, cred: { muse: { provider: 'meta', baseUrl: 'https://api.meta.ai/v1', model: 'muse-spark-1.3', apiKey: '', reasoningEffort: 'low', reason: '' }, snippe: { apiKey: '', webhookSecret: '', baseUrl: 'https://api.snippe.sh', reason: '' }, hermes: { baseUrl: '', apiKey: '', allowedDomains: '', enabled: false, reason: '' } }, form: { email: '', password: '' }, newService: '', policyJson: '', policyReason: '', pricingJson: '', pricingReason: '', consentPhone: '',
         sections: ['Overview', 'Standalone Businesses', 'Registered Businesses', 'Verification', 'Products and Catalogues', 'Product Matching and Ranking', 'Locations', 'Customer Consent', 'Campaign Engine', 'New-Product Outreach', 'Templates and Media', 'Follow-up Operations', 'Orders and Enquiries', 'Owner Notifications', 'Billing and Refunds', 'Muse Spark Intelligence', 'Integration Health', 'Audit Logs', 'Security and Settings'],
         async init() { if (get('moranbuy_admin_access')) { try { this.me = await api('/me'); await this.go('Overview'); } catch { set('moranbuy_admin_access', null); } } },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.message; if (e.status === 401) { this.me = null; set('moranbuy_admin_access', null); } } },
@@ -163,7 +170,7 @@
           if (s === 'Templates and Media') this.data.templates = (await api('/templates')).templates;
           if (s === 'Follow-up Operations') this.data.followup = await api('/followup');
           if (s === 'Orders and Enquiries') this.data.orders = await api('/orders');
-          if (s === 'Owner Notifications') { this.data.notif = await api('/notifications/order-confirmed'); this.notif = { ...this.data.notif.settings, reason: '' }; }
+          if (s === 'Owner Notifications') { this.data.notif = await api('/notifications/order-confirmed'); this.notif = { ...this.data.notif.settings, reason: '' }; this.data.terms = await api('/notifications/terms'); this.terms = { version: this.data.terms.settings.version, textSw: this.data.terms.settings.textSw, textEn: this.data.terms.settings.textEn, reason: '' }; }
           if (s === 'Billing and Refunds') { this.data.pricing = await api('/pricing'); this.data.payments = (await api('/payments')).payments; }
           if (s === 'Muse Spark Intelligence') { this.data.muse = await api('/muse'); await this.loadCred(); }
           if (s === 'Integration Health') this.data.integrations = await api('/integrations');
@@ -171,6 +178,7 @@
           if (s === 'Security and Settings') { this.data.settings = await api('/settings'); await this.loadCred(); }
         }); },
         async loadCred() { const d = (await api('/credentials')).credentials; this.data.credentials = d; this.cred.muse = { ...this.cred.muse, provider: d.muse.provider === 'disabled' && !d.muse.apiKey.configured ? 'meta' : d.muse.provider, baseUrl: d.muse.baseUrl, model: d.muse.model, reasoningEffort: d.muse.reasoningEffort, apiKey: '' }; this.cred.snippe = { ...this.cred.snippe, baseUrl: d.snippe.baseUrl, apiKey: '', webhookSecret: '' }; this.cred.hermes = { ...this.cred.hermes, baseUrl: d.hermes.baseUrl || '', allowedDomains: d.hermes.allowedDomains, enabled: !!d.hermes.enabled, apiKey: '' }; },
+        saveTerms() { return this.run(async () => { await api('/notifications/terms', { method: 'PUT', body: this.terms }); await this.go('Owner Notifications'); }, 'Terms question saved.'); },
         saveNotif() { return this.run(async () => { await api('/notifications/order-confirmed', { method: 'PUT', body: this.notif }); await this.go('Owner Notifications'); }, 'Notification saved.'); },
         saveCred(group) { return this.run(async () => { const body = { ...this.cred[group] }; for (const k of ['apiKey', 'webhookSecret']) if (body[k] === '') delete body[k]; await api(`/credentials/${group}`, { method: 'PUT', body }); await this.loadCred(); if (group === 'muse') { this.data.museTest = await api('/muse/test', { method: 'POST' }); this.data.muse = await api('/muse'); } }, `${group} credentials saved and in use.`); },
         openMerchant(id) { this.section = 'Merchant'; return this.run(async () => { this.data.merchant = await api(`/merchants/${id}`); }); },

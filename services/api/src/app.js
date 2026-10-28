@@ -37,6 +37,8 @@ export function createApp({ routers = [] } = {}) {
   app.use('/business', express.static(path.join(appsDir, 'business')));
   app.use('/admin', express.static(path.join(appsDir, 'admin')));
   app.get('/', (_req, res) => res.redirect('/customer/'));
+  app.get('/terms', (_req, res) => res.sendFile(path.join(appsDir, 'customer', 'terms.html')));
+  app.get('/privacy', (_req, res) => res.sendFile(path.join(appsDir, 'customer', 'privacy.html')));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

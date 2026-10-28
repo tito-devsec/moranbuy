@@ -13,7 +13,7 @@ import { db } from '../db/connection.js';
 import { config } from '../config/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import { unusablePasswordHash } from './auth.service.js';
-import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage } from './whatsapp-sender.service.js';
+import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage, sendWhatsAppButtons } from './whatsapp-sender.service.js';
 import { searchKnowledge } from '../core/knowledge-search.js';
 import { audit } from './admin/audit.js';
 
@@ -69,7 +69,7 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
   }
   const payload = {
     messageId: message.id, from: customerNumber, name: profileName,
-    text: inbound?.text || '', imageUrl: inbound?.imageUrl || null,
+    text: inbound?.text || '', imageUrl: inbound?.imageUrl || null, buttonId: inbound?.replyId || null,
     location: message.type === 'location' && message.location ? { lat: message.location.latitude, lng: message.location.longitude, label: message.location.name || message.location.address || null } : null,
     tenantId: tenant.id,
   };
@@ -89,11 +89,13 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
 }
 
 /** A reply from the MoranBuy number (text or image), through the outbound gate like every message. */
-export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], idempotencyKey }) {
+export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], buttons = [], footer = null, idempotencyKey }) {
   const tenant = await moranBuyTenant();
   if (!tenant?.whatsapp_phone_number_id) throw Object.assign(new Error('MORANBUY_NOT_CONNECTED'), { code: 'MORANBUY_NOT_CONNECTED', status: 409 });
   const common = { phoneNumberId: tenant.whatsapp_phone_number_id, accessTokenEncrypted: tenant.wa_access_token_encrypted, to, kind: 'moranbuy', idempotencyKey, tenantId: tenant.id };
   if (type === 'image') return sendWhatsAppImage({ ...common, imageUrl, caption });
+  // Up to three reply buttons (the terms question, for one).
+  if (type === 'buttons') return sendWhatsAppButtons({ ...common, body, buttons, footer });
   if (type === 'template') {
     // A business-initiated message (an order alert to a merchant) must be a template Meta approved on the MoranBuy number.
     const template = await db('whatsapp_templates').where({ tenant_id: tenant.id, name: templateName, language }).first('status');

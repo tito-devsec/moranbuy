@@ -5,6 +5,11 @@ yes, an order. One call per inbound message: `ShoppingEngine.handleMessage`.
 
 ## Flow
 
+0. **Terms gate.** Every new sender, customer or business owner, first gets the terms and privacy
+   question with Accept and Reject buttons (`services/api/src/services/terms.js`), linking to
+   `/terms` and `/privacy`. Reject silences the agent; any later text repeats the question until
+   they accept. Acceptance is recorded with the terms version; a new version asks again. On the
+   web the first message returns `terms_required` and the page shows the same two buttons.
 1. **Intake.** The message (text, photo, shared location) is stored on the customer's open session.
 2. **Reading.** Muse Spark extracts the structured fields (`museExtractRequest`). When Muse is
    disabled or fails, the deterministic parser (`parse.js`) reads the budget (TSh 350,000, 350k,

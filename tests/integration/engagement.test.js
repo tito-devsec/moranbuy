@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetDatabase, closeDatabase, db } from '../helpers/db.js';
-import { makeMerchant, makeListing } from '../helpers/fixtures.js';
+import { makeMerchant, makeListing, acceptedCustomer } from '../helpers/fixtures.js';
 import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setEngagementDepsForTests } from '../../services/api/src/services/engagement.js';
@@ -35,6 +35,7 @@ before(async () => {
   setEngagementDepsForTests({ muse: new MuseClient({ cfg, db }), payments: new SandboxPaymentProvider(), moran: moranInternal, sender, dryRun: false, followupDryRun: false });
   setMerchantDepsForTests({ moran: new MoranOwnerClient({ cfg: loadConfig({ ...process.env, MORAN_BACKEND_BASE_URL: '' }) }), geocoder: new FakeGeocoder() });
   setShoppingDepsForTests({ engine: new ShoppingEngine({ db, muse: new MuseClient({ cfg, db }), geocoder: new FakeGeocoder({ sinza: { lat: -6.776, lng: 39.23 } }) }), moran: moranInternal });
+  for (const p of ["255711000004", "255711000005", "255711000008"]) await acceptedCustomer(p);
   server = createApp({ routers }).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
   moranM = (await makeMerchant({ name: 'Samaki Furniture', lat: -6.72, lng: 39.17, deliveryAvailable: true, deliveryFee: 5000, radiusKm: 30, registrationType: 'moran', moranTenantId: 'tenant-1' })).merchant;

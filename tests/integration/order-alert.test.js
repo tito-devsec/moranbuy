@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetDatabase, closeDatabase, db } from '../helpers/db.js';
-import { makeMerchant, makeListing } from '../helpers/fixtures.js';
+import { makeMerchant, makeListing, acceptedCustomer } from '../helpers/fixtures.js';
 import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setShoppingDepsForTests } from '../../services/api/src/services/shopping.js';
@@ -22,6 +22,7 @@ before(async () => {
   const cfg = loadConfig({ ...process.env, MUSE_PROVIDER: 'disabled' });
   const engine = new ShoppingEngine({ db, muse: new MuseClient({ cfg, db }), geocoder: new FakeGeocoder({ sinza: { lat: -6.776, lng: 39.23, label: 'Sinza, Dar es Salaam' } }), onOrderConfirmed: (order) => notifyMerchantOfOrder({ moran, order }) });
   setShoppingDepsForTests({ engine, moran });
+  for (const p of ["255700000001", "255700000002", "255700000003", "255700000004"]) await acceptedCustomer(p);
   server = createApp({ routers }).listen(0); base = `http://127.0.0.1:${server.address().port}`;
   merchant = (await makeMerchant({ name: 'Duka la Asha', lat: -6.78, lng: 39.235, deliveryAvailable: true, deliveryFee: 10000, radiusKm: 30 })).merchant;
   await db('merchants').where({ id: merchant.id }).update({ contact_phone: '0712 000 111' });

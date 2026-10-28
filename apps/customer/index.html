@@ -55,15 +55,28 @@
       el.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
-    async function send(text) {
-      add('me', text || '📍 location');
-      const body = { customerToken: token || undefined, text, location: pendingLocation || undefined };
+    // The terms question comes from the server and is shown with two buttons; nothing is answered until Accept.
+    function showTerms(terms) {
+      const el = document.createElement('div'); el.className = 'msg bot';
+      el.appendChild(document.createTextNode(terms.text));
+      const row = document.createElement('div'); row.style.marginTop = '8px'; row.style.display = 'flex'; row.style.gap = '8px';
+      const yes = document.createElement('button'); yes.textContent = terms.accept; yes.onclick = () => { row.remove(); send('', { acceptTerms: true }); };
+      const no = document.createElement('button'); no.className = 'ghost'; no.textContent = terms.reject; no.onclick = () => { row.remove(); send('', { rejectTerms: true }); };
+      row.append(yes, no); el.appendChild(row);
+      const links = document.createElement('div'); links.className = 'meta'; links.innerHTML = `<a href="${terms.termsUrl}" target="_blank" rel="noopener">Masharti / Terms</a> · <a href="${terms.privacyUrl}" target="_blank" rel="noopener">Faragha / Privacy</a>`;
+      el.appendChild(links); chat.appendChild(el); el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    async function send(text, extra = {}) {
+      if (text || pendingLocation) add('me', text || '📍 location');
+      const body = { customerToken: token || undefined, text, location: pendingLocation || undefined, ...extra };
       pendingLocation = null;
       const res = await fetch('/api/shop/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) { add('bot', data.message || 'Samahani, kuna hitilafu.'); return; }
       token = data.customerToken;
       try { localStorage.setItem('moranbuy_customer', token); } catch {}
+      if (data.state === 'terms_required') { showTerms(data.terms); return; }
       for (const r of data.replies) add('bot', r.text || r.caption, r.imageUrl, r.imageUrl ? '' : `state: ${data.state}${data.museStatus ? ` · muse: ${data.museStatus}` : ''}`);
     }
 
