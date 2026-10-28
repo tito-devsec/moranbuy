@@ -13,7 +13,7 @@ export async function handOrderToMoran({ dbImpl = db, moran, order }) {
   const r = await moran.createOrder({
     tenantId: merchant.moran_tenant_id, orderRef: order.order_ref,
     customerPhone: customer?.channel === 'whatsapp' ? `+${customer.channel_ref}` : null, customerName: customer?.name || null,
-    items: [{ name: listing?.name || 'MoranBuy order', sku: listing?.source_sku || null, productId: listing?.source_product_id || null, quantity: order.quantity, unitPrice: order.unit_price, lineTotal: order.unit_price * order.quantity }],
+    items: [{ name: `${listing?.name || 'MoranBuy order'}${order.variant ? ` (${order.variant})` : ''}`, sku: listing?.source_sku || null, productId: listing?.source_product_id || null, quantity: order.quantity, unitPrice: order.unit_price, lineTotal: order.unit_price * order.quantity }],
     deliveryFee: order.total_confirmed ? order.delivery_fee : null, totalAmount: order.known_total, totalConfirmed: order.total_confirmed, currency: order.currency, fulfilment: order.fulfilment,
     customerLocation: order.customer_location_json?.label || null, notes: `MoranBuy order ${order.order_ref} (${order.fulfilment}${order.total_confirmed ? '' : ', delivery fee not yet confirmed'})`,
   });

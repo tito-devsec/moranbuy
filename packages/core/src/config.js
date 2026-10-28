@@ -51,6 +51,7 @@ const schema = z.object({
 
   CAMPAIGN_DRY_RUN: flag(true),
   FOLLOWUP_DRY_RUN: flag(true),
+  REMINDER_DRY_RUN: flag(true),
   CAMPAIGN_SEND_INTERVAL_MS: int(150),
 
   GEOCODER_BASE_URL: z.string().url().default('https://nominatim.openstreetmap.org'),

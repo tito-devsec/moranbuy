@@ -3,6 +3,7 @@ import { audit } from '@moranbuy/observability';
 import { toMsisdn } from '@moranbuy/consent-management';
 import { db } from '../db/connection.js';
 import { syncOrderStatusToMoran } from './moran-order-sync.js';
+import { convertLeadsForOrder, releaseLeadsForOrder } from '@moranbuy/followup-engine';
 
 const NEXT = { accepted: ['pending_merchant'], rejected: ['pending_merchant', 'accepted'], fulfilled: ['accepted', 'paid'], cancelled: ['pending_merchant', 'accepted'] };
 
@@ -14,8 +15,15 @@ export async function applyOrderStatus({ dbImpl = db, moran, order, status, deli
   const [row] = await dbImpl('orders').where({ id: order.id }).update(patch).returning('*');
   await audit(dbImpl, { actorType: actor.type, actorId: actor.id || null, merchantId: order.merchant_id, action: 'order.status_changed', targetType: 'order', targetId: order.id, before: { status: order.status }, after: { status, deliveryFee: patch.delivery_fee ?? null, via: actor.via } });
   const customerAlert = await notifyCustomerOfOrderStatus({ dbImpl, moran, order: row });
+  // Follow-up leads follow the order: a sale converts them, a failed order releases them.
+  const customer = await dbImpl('customers').where({ id: row.customer_id }).first();
+  let leads = null;
+  if (customer?.channel === 'whatsapp') {
+    if (['accepted', 'paid', 'fulfilled'].includes(status)) leads = { converted: await convertLeadsForOrder(dbImpl, { order: row, phone: customer.channel_ref }) };
+    else if (['rejected', 'cancelled'].includes(status)) leads = { released: await releaseLeadsForOrder(dbImpl, { order: row, phone: customer.channel_ref }) };
+  }
   const moranSync = await syncOrderStatusToMoran({ dbImpl, moran, order: row }).catch((err) => ({ ok: false, error: err.message }));
-  return { order: row, customerAlert, moranSync };
+  return { order: row, customerAlert, moranSync, leads };
 }
 
 // Tells a WhatsApp customer what the merchant decided, from the MoranBuy number; web customers read the status page.

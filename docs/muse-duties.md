@@ -46,3 +46,15 @@ contact number to the MoranBuy number. The product is read, listed as `source = 
 searchable at once, offered for new-product outreach when that service is selected, and every
 upload is kept in `catalog_uploads` with what was read. Sending the same name again updates it.
 "RIPOTI" (or "REPORT", optionally with a number of days) returns the business's demand overview.
+
+## Reminders customers asked for
+
+A schedule ("nitanunua wiki ijayo", "nipigie kesho") with a due date is reminded by the
+`schedule-reminders` worker from the MoranBuy number: outside quiet hours (21:00 to 08:00 East
+Africa Time, moved to the morning otherwise), as plain text inside 24 hours of the customer's last
+message and only as the approved template after that (without one it is marked `expired`), never
+after a STOP or once the customer ordered, retried up to three times. The message uses only what
+was recorded (name, product, the customer's own words for when, the shop). The customer's request
+is waiting in an open session, so replying YES shows offers again. Schedules whose time could not
+be read ("nikipata pesa") have no due date and are not reminded. `REMINDER_DRY_RUN=true` records
+the reminder without sending it.

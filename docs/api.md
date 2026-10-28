@@ -56,6 +56,7 @@ MoranBuy admin token for the fallback app.
 
 - `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`
 - `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
+- `GET|PUT /notifications/schedule-reminder` `{ enabled?, templateName?, templateLanguage?, textSw?, textEn?, templateParams?, quietFrom?, quietTo?, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
 - `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`
 - `POST /api/admin/auth/login`, `/auth/refresh`, `GET /me`, `GET /overview`

@@ -1,6 +1,7 @@
 import { computeCost, budgetFit } from './cost.js';
 import { assessSuitability } from './suitability.js';
 import { assessLocation } from '@moranbuy/location-ranking';
+import { applyVariant, urgencyLevel } from './variants.js';
 
 // Ranking policy values; changing them is an audited admin configuration change, never a silent edit.
 export const DEFAULT_POLICY = Object.freeze({
@@ -44,13 +45,19 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
   const p = { ...DEFAULT_POLICY, ...policy };
   const quantity = request.quantity || 1;
   const fulfilment = request.fulfilment || 'any';
+  // A customer who said no alternatives sees only exact matches; one in a hurry sees offers that can be had now first.
+  const exactOnly = request.alternativesOk === false;
+  const urgency = urgencyLevel(request.urgency);
   const excluded = [];
   const duplicates = offers.length - dedupe(offers).length;
   const assessed = [];
 
-  for (const offer of dedupe(offers)) {
+  for (const base of dedupe(offers)) {
+    // The variant the customer asked for (a size, colour or capacity) sets the price and stock the offer is judged on.
+    const offer = applyVariant({ request, offer: base });
     const suitability = assessSuitability({ request, offer });
-    const reason = exclusionReason({ request, offer, suitability, now });
+    let reason = exclusionReason({ request, offer, suitability, now });
+    if (!reason && exactOnly && suitability.unknownEssentials.length) reason = `essential_unconfirmed:${suitability.unknownEssentials.join(',')}`;
     if (reason) { excluded.push({ offerId: offer.id, merchantId: offer.merchantId, name: offer.name, reason }); continue; }
     const cost = computeCost({ offer, quantity, fulfilment });
     const budget = budgetFit(cost, request.maxBudget);
@@ -76,6 +83,11 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
     if (a.trust.stale) a.reasons.push('listing_stale');
     if (a.trust.suspiciousPrice) a.reasons.push('price_needs_confirmation');
     if (a.offer.unverified) a.reasons.push('found_online_unverified');
+    if (a.offer.variant) a.reasons.push(`variant:${a.offer.variant.name}`);
+    // Ready now: stock is known to cover the quantity and the listing is fresh.
+    a.ready = a.trust.stockKnown && Number(a.offer.stock) >= quantity && !a.trust.stale;
+    if (urgency && a.ready) a.reasons.push('available_now');
+    if (urgency && !a.trust.stockKnown) a.reasons.push('stock_unconfirmed_for_urgent');
     if (!a.cost.totalConfirmed) a.reasons.push(`unknown_cost:${a.cost.unknownParts.join(',')}`);
   }
 
@@ -93,6 +105,7 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
       || (y.trust.suspiciousPrice ? 0 : 1) - (x.trust.suspiciousPrice ? 0 : 1)
       || y.suitability.bucket - x.suitability.bucket
       || band(x, min) - band(y, min)
+      || (urgency ? (y.ready ? 1 : 0) - (x.ready ? 1 : 0) : 0)
       || y.location.score - x.location.score
       || y.trust.score - x.trust.score
       || x.cost.knownTotal - y.cost.knownTotal
@@ -103,6 +116,9 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
   let shownOver = budgetValue ? overBudget.filter((a) => a.cost.knownTotal <= budgetValue * (1 + p.overBudgetShowPct / 100)) : overBudget;
   // With nothing inside the budget the two cheapest alternatives are still shown so the customer sees the real gap.
   if (!inBudget.length && !shownOver.length) shownOver = overBudget.slice(0, 2);
+  // No alternatives wanted: nothing over budget is offered; the count stays for the reply to say so.
+  const hiddenOver = exactOnly ? shownOver.length : 0;
+  if (exactOnly) shownOver = [];
 
   // Each ranked offer carries a plain explanation of why it stands where it does.
   const explain = (a, i, group) => {
@@ -127,6 +143,9 @@ export function rankOffers({ request, offers, policy = DEFAULT_POLICY, now = Dat
     excluded,
     duplicatesRemoved: duplicates,
     noneWithinBudget: inBudget.length === 0,
+    exactOnly,
+    urgency,
+    alternativesHidden: hiddenOver,
     cheapestOverBudget: overBudget[0] ? { offerId: overBudget[0].offer.id, knownTotal: overBudget[0].cost.knownTotal, shortfall: overBudget[0].budget.shortfall } : null,
   };
 }

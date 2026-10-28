@@ -27,6 +27,15 @@ When Muse is on, each follow-up is drafted from the lead's facts (business, prod
 the customer said, attempt number); a draft with a number not in the facts or without the STOP
 line is replaced by the fixed message. The source is recorded on the task.
 
+## Conversion
+
+An order converts a lead only when it becomes real: when the merchant accepts it, is paid for it or
+delivers it, every earlier lead that merchant has for the customer's phone (open, held for the
+order, or stopped by the customer's reply, created within 30 days before the order) becomes
+`converted`, with `converted_order_id` and `converted_at`. A lead the order itself created is not
+counted. A rejected or cancelled order converts nothing, and leads held for it are marked
+`order_not_completed`. Each conversion is audited once.
+
 ## Leads
 
 `createLead` records only what the service needs: merchant, phone, customer reference, product,

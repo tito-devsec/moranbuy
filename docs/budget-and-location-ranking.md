@@ -78,3 +78,9 @@ A: TSh 290,000, 12 km away. B: TSh 340,000, 0.7 km. C: TSh 360,000, 0.7 km.
 Result: A first (lowest known total), B second, C in the over-budget list with a shortfall of TSh 10,000.
 With delivery fees A TSh 60,000 and B TSh 10,000 (Case B) the totals become 350,000 and 330,000
 and B ranks first.
+
+## Variants, alternatives and urgency
+
+- **Variants.** When a listing has variants (`[{ name, price, stock }]`), the variant whose name holds what the customer asked for (essentials count double, preferred once) and has stock for the quantity sets the price, stock and matched attributes the offer is judged on. The variant shows in the option name, is rechecked at selection, and is stored on the order (`orders.variant`). Nothing named: the listing is judged as listed.
+- **No alternatives** (`alternativesOk: false`, "bila mbadala"). Offers whose essential attributes are unknown are excluded (`essential_unconfirmed`), nothing over budget is offered, and the reply says how many close offers were hidden. "mbadala sawa" turns alternatives back on.
+- **Urgency** ("leo", "haraka", "today" = now; "kesho", "wiki hii" = soon). Inside the same price band, offers with known stock covering the quantity and a fresh listing come before the rest (`available_now`); an offer with unknown stock carries `stock_unconfirmed_for_urgent`. Urgency never lifts an offer above a cheaper band, so budget stays first.

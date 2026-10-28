@@ -1,5 +1,5 @@
 import { resolvePlace } from '@moranbuy/location-ranking';
-import { normalizeProductType } from './vocabulary.js';
+import { normalizeProductType } from '@moranbuy/budget-matching';
 
 // Words that say the customer is not buying today; the schedule records them so a follow-up can land at the right time.
 const LATER = /\b(baadaye|kesho|keshokutwa|wiki ijayo|mwezi ujao|mwishoni mwa mwezi|nikipata pesa|nikilipwa|later|tomorrow|next week|next month|end of month|when i get paid|nitakupigia|nitarudi|call me|nipigie)\b/i;

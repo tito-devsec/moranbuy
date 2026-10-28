@@ -41,6 +41,7 @@ export function rowToOffer(r) {
     category: r.category,
     productType: r.product_type,
     attributes: r.attributes || {},
+    variants: Array.isArray(r.variants) ? r.variants : [],
     price: Number(r.price),
     currency: r.currency,
     priceVerified: r.price_status === 'verified',

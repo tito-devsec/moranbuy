@@ -2,13 +2,13 @@ import { rankOffers, DEFAULT_POLICY } from '@moranbuy/budget-matching';
 import { museExtractRequest, museDraftRecommendation, numbersAreGrounded } from '@moranbuy/muse-intelligence';
 import { formatMoney, shortRef } from '@moranbuy/core';
 import { shoppingRequestSchema, mergeRequest } from './request.js';
-import { fallbackExtract } from './parse.js';
+import { fallbackExtract, parseAlternatives, parseUrgency } from './parse.js';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
 import { researchResultsToOffers } from '@moranbuy/integrations';
 import { buildFacts, renderReply } from './present.js';
 import { upsertContact, recordConsent } from '@moranbuy/consent-management';
-import { createLead, followupSettings } from '@moranbuy/followup-engine';
+import { createLead, followupSettings, holdLeadsForOrder } from '@moranbuy/followup-engine';
 import { recordDemandSignal, recordSchedule, fallbackTiming } from './signals.js';
 
 const SESSION_TTL_MS = 6 * 3600000;
@@ -48,6 +48,8 @@ export class ShoppingEngine {
     if (museResult.ok && museResult.json) { extracted = sanitizeExtraction(museResult.json); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
+    // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
+    if (text) { Object.assign(extracted, parseAlternatives(text)); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
     if (sharedLocation) extracted.location = { lat: Number(sharedLocation.lat), lng: Number(sharedLocation.lng), label: sharedLocation.label || null, source: 'customer_shared' };
     // What Muse read about timing, a schedule and the name is kept beside the request; the deterministic reading fills in when Muse did not answer.
     const guess = fallbackTiming(text);
@@ -61,6 +63,14 @@ export class ShoppingEngine {
       const picked = context.presented.find((p) => p.option === intent.option);
       await signal(previous, 'select', 'selected', { merchantId: picked?.merchantId || null, listingId: picked?.listingId && !String(picked.listingId).startsWith('web:') ? picked.listingId : null });
       return this.select(session, customer, intent.option, previous || {});
+    }
+    // "NDIO" to a reminder reruns the search the customer made before, with nothing new mixed in.
+    if (intent.kind === 'confirm' && session.state !== 'selected' && context.fromScheduleId && previous?.productType) {
+      const { fromScheduleId, ...rest } = context;
+      await this.db('customer_schedules').where({ id: fromScheduleId }).update({ status: 'done', updated_at: new Date(this.now()) }).catch(() => null);
+      const out = await this.match(session, customer, previous, { museStatus, context: { ...rest, resumedFromScheduleId: fromScheduleId } });
+      await signal(previous, 'shop', out.result && (out.result.ranked.length || out.result.overBudget.length) ? 'presented' : 'no_match');
+      return out;
     }
     if (intent.kind === 'confirm' && session.state === 'selected') { await signal(previous, 'confirm', 'ordered', { merchantId: session.context_json?.selected?.merchantId || null, listingId: session.context_json?.selected?.listingId || null }); return this.confirm(session, customer, previous || {}); }
 
@@ -115,7 +125,7 @@ export class ShoppingEngine {
       const draft = await museDraftRecommendation(this.muse, { facts, language: request.language, requestRef: session.id });
       if (draft.ok && draft.json?.reply && numbersAreGrounded(draft.json.reply, facts)) textOut = String(draft.json.reply).slice(0, 1500);
     }
-    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
+    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, variant: o.variant || null, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
     await this.save(session, { state: 'presented', request_json: request, current_run_id: run.id, context_json: { ...context, presented } });
     const replies = [{ text: textOut }];
     const first = presented.find((p) => p.imageUrl);
@@ -130,17 +140,20 @@ export class ShoppingEngine {
     if (!presented) return this.reply(session, [{ text: lang === 'en' ? 'Please reply with one of the option numbers shown.' : 'Tafadhali jibu kwa namba ya chaguo lililoonyeshwa.' }]);
     if (String(presented.listingId || '').startsWith('web:')) return this.reply(session, [{ text: lang === 'en' ? 'That one was found online and is not a MoranBuy merchant, so I cannot order it for you. Pick another option or ask me to search again.' : 'Hilo limepatikana mtandaoni na si muuzaji wa MoranBuy, kwa hiyo siwezi kuliagiza. Chagua namba nyingine au niambie nitafute tena.' }]);
     const listing = await this.db('listings as l').join('merchants as m', 'm.id', 'l.merchant_id').where('l.id', presented.listingId).whereNull('l.deleted_at').first('l.*', 'm.business_name', 'm.status as merchant_status');
-    if (!listing || listing.status !== 'active' || listing.merchant_status !== 'active' || (listing.stock !== null && listing.stock < (request.quantity || 1))) {
+    const variant = presented.variant ? (Array.isArray(listing?.variants) ? listing.variants : []).find((v) => v && v.name === presented.variant) : null;
+    const stockNow = variant && variant.stock !== null && variant.stock !== undefined ? Number(variant.stock) : listing?.stock;
+    const priceNow = variant && Number(variant.price) > 0 ? Number(variant.price) : listing?.price;
+    if (!listing || listing.status !== 'active' || listing.merchant_status !== 'active' || (presented.variant && !variant) || (stockNow !== null && stockNow !== undefined && stockNow < (request.quantity || 1))) {
       await this.save(session, { state: 'presented' });
       return this.reply(session, [{ text: lang === 'en' ? 'That offer is no longer available. Reply with another option number or tell me to search again.' : 'Chaguo hilo halipo tena. Jibu namba nyingine au niambie nitafute tena.' }]);
     }
     const cur = request.currency || listing.currency;
     const totalLine = presented.totalConfirmed
       ? (lang === 'en' ? `Known total: ${formatMoney(presented.knownTotal, cur)}.` : `Jumla inayojulikana: ${formatMoney(presented.knownTotal, cur)}.`)
-      : (lang === 'en' ? `Price ${formatMoney(listing.price, cur)}; the delivery fee is not yet confirmed and will be agreed with ${listing.business_name}.` : `Bei ${formatMoney(listing.price, cur)}; gharama ya delivery haijathibitishwa, itakubaliwa na ${listing.business_name}.`);
+      : (lang === 'en' ? `Price ${formatMoney(priceNow, cur)}; the delivery fee is not yet confirmed and will be agreed with ${listing.business_name}.` : `Bei ${formatMoney(priceNow, cur)}; gharama ya delivery haijathibitishwa, itakubaliwa na ${listing.business_name}.`);
     const askConfirm = lang === 'en' ? 'Reply YES to place this order with the merchant, or NO to go back.' : 'Jibu NDIO kuweka oda hii kwa muuzaji, au HAPANA kurudi.';
-    await this.save(session, { state: 'selected', selected_offer_id: presented.listingId, context_json: { ...session.context_json, selected: { listingId: presented.listingId, option, knownTotal: presented.knownTotal, totalConfirmed: presented.totalConfirmed, price: listing.price, merchantId: listing.merchant_id, merchantName: listing.business_name } } });
-    return this.reply(session, [{ text: `${option}. ${listing.name} - ${listing.business_name}. ${totalLine} ${askConfirm}` }]);
+    await this.save(session, { state: 'selected', selected_offer_id: presented.listingId, context_json: { ...session.context_json, selected: { listingId: presented.listingId, option, knownTotal: presented.knownTotal, totalConfirmed: presented.totalConfirmed, price: priceNow, variant: presented.variant || null, merchantId: listing.merchant_id, merchantName: listing.business_name } } });
+    return this.reply(session, [{ text: `${option}. ${listing.name}${presented.variant ? ` (${presented.variant})` : ''} - ${listing.business_name}. ${totalLine} ${askConfirm}` }]);
   }
 
   // Only an explicit YES creates an order; it is recorded as pending with the merchant and the customer gets its reference.
@@ -151,7 +164,7 @@ export class ShoppingEngine {
     const ref = shortRef('MB');
     const fulfilment = request.fulfilment === 'pickup' ? 'pickup' : request.fulfilment === 'delivery' ? 'delivery' : 'pickup';
     const [order] = await this.db('orders').insert({
-      order_ref: ref, customer_id: customer.id, session_id: session.id, merchant_id: sel.merchantId, listing_id: sel.listingId, quantity: request.quantity || 1,
+      order_ref: ref, customer_id: customer.id, session_id: session.id, merchant_id: sel.merchantId, listing_id: sel.listingId, variant: sel.variant || null, quantity: request.quantity || 1,
       unit_price: sel.price, delivery_fee: sel.totalConfirmed ? sel.knownTotal - sel.price * (request.quantity || 1) : null, known_total: sel.knownTotal, total_confirmed: sel.totalConfirmed,
       currency: request.currency || 'TZS', fulfilment, customer_location_json: request.location ? JSON.stringify(request.location) : null, status: 'pending_merchant', confirmed_at: new Date(this.now()),
     }).returning('*');
@@ -162,6 +175,8 @@ export class ShoppingEngine {
     if (customer.channel === 'whatsapp') {
       await upsertContact(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, name: customer.name || null, source: 'order' });
       await recordConsent(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, purpose: 'service', status: 'granted', source: 'order_confirmation', evidenceRef: ref });
+      // Earlier leads stop nudging now; they count as converted only when the merchant accepts or delivers.
+      await holdLeadsForOrder(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, orderRef: ref });
       const merchant = await this.db('merchants').where({ id: sel.merchantId }).first();
       if (followupSettings(merchant).decision === 'accepted') await createLead(this.db, { merchantId: sel.merchantId, phone: customer.channel_ref, listingId: sel.listingId, source: 'order', statedIntention: 'placed an order', customerRef: customer.id, now: this.now() });
     }

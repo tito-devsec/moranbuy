@@ -9,8 +9,8 @@ export async function makeMerchant({ name, lat = null, lng = null, deliveryAvail
 }
 
 // Inserts one listing for a merchant.
-export async function makeListing(merchantId, { name, productType = 'sofa', category = 'furniture', price, attributes = {}, stock = 5, status = 'active', source = 'moranbuy', sourceRef = null, sourceProductId = null, imageUrl = null, updatedAt = null } = {}) {
-  const [l] = await db('listings').insert({ merchant_id: merchantId, name, product_type: productType, category, price, attributes: JSON.stringify(attributes), stock, status, source, source_merchant_ref: sourceRef, source_product_id: sourceProductId, image_url: imageUrl, ...(updatedAt ? { updated_at: updatedAt, source_updated_at: updatedAt } : {}) }).returning('*');
+export async function makeListing(merchantId, { name, productType = 'sofa', category = 'furniture', price, attributes = {}, stock = 5, status = 'active', source = 'moranbuy', sourceRef = null, sourceProductId = null, imageUrl = null, updatedAt = null, variants = null } = {}) {
+  const [l] = await db('listings').insert({ merchant_id: merchantId, name, product_type: productType, category, price, attributes: JSON.stringify(attributes), ...(variants ? { variants: JSON.stringify(variants) } : {}), stock, status, source, source_merchant_ref: sourceRef, source_product_id: sourceProductId, image_url: imageUrl, ...(updatedAt ? { updated_at: updatedAt, source_updated_at: updatedAt } : {}) }).returning('*');
   return l;
 }
 

@@ -6,7 +6,8 @@ export function buildFacts(result, request, { max = 5 } = {}) {
     option: i + 1,
     listingId: r.offer.id,
     merchantId: r.offer.merchantId || null,
-    name: r.offer.name,
+    name: r.offer.variant ? `${r.offer.name} (${r.offer.variant.name})` : r.offer.name,
+    variant: r.offer.variant?.name || null,
     merchant: r.offer.merchantName,
     price: r.cost.unitPrice,
     quantity: r.cost.quantity,
@@ -30,7 +31,7 @@ export function buildFacts(result, request, { max = 5 } = {}) {
   });
   const ranked = result.ranked.slice(0, max).map(line);
   const over = result.overBudget.slice(0, Math.max(0, max - ranked.length) || 1).map((r, i) => line(r, ranked.length + i));
-  return { currency: request.currency, maxBudget: request.maxBudget, fulfilment: request.fulfilment, ranked, overBudget: over, noneWithinBudget: result.noneWithinBudget };
+  return { currency: request.currency, maxBudget: request.maxBudget, fulfilment: request.fulfilment, ranked, overBudget: over, noneWithinBudget: result.noneWithinBudget, exactOnly: !!result.exactOnly, alternativesHidden: result.alternativesHidden || 0, urgency: result.urgency || null };
 }
 
 const T = {
@@ -50,6 +51,9 @@ const T = {
     web: 'imepatikana mtandaoni, haijathibitishwa',
     ask: 'Jibu namba ya chaguo (mfano 1) kupata maelezo zaidi au kuagiza, au uliza swali.',
     askNone: 'Ungependa: (a) mbadala wa bei nafuu, (b) kubadilisha maelezo, au (c) kuongeza bajeti?',
+    hidden: (n) => `Kuna ${n} zinazokaribia lakini zinazidi bajeti au hazilingani kabisa; umesema hutaki mbadala. Jibu "mbadala sawa" kuziona.`,
+    ready: 'ipo sasa',
+    urgentNote: 'Umesema unahitaji haraka, kwa hiyo zilizopo dukani sasa zimewekwa mbele ndani ya bei ileile.',
   },
   en: {
     intro: (n) => `I found ${n} offers close to what you need, ordered by price and your budget first, then by how close the shop is and delivery.`,
@@ -67,6 +71,9 @@ const T = {
     web: 'found online, not confirmed',
     ask: 'Reply with an option number (e.g. 1) for details or to order, or ask a question.',
     askNone: 'Would you like: (a) cheaper alternatives, (b) a different specification, or (c) a higher budget?',
+    hidden: (n) => `${n} close offers are over budget or not an exact match; you said no alternatives. Reply "alternatives ok" to see them.`,
+    ready: 'in stock now',
+    urgentNote: 'You said you need it soon, so offers in stock now come first within the same price.',
   },
 };
 
@@ -76,9 +83,10 @@ export function renderReply(facts, language = 'sw') {
   const cur = facts.currency;
   const lines = [];
   const all = [...facts.ranked, ...facts.overBudget];
-  if (!all.length) return `${t.nothing}`;
+  if (!all.length) return facts.alternativesHidden ? `${t.nothing}\n${t.hidden(facts.alternativesHidden)}` : `${t.nothing}`;
   if (facts.noneWithinBudget) lines.push(t.none(formatMoney(facts.maxBudget, cur)));
   else lines.push(t.intro(facts.ranked.length));
+  if (facts.urgency) lines.push(t.urgentNote);
   for (const o of all) {
     const bits = [];
     bits.push(`${formatMoney(o.price, cur)}${o.quantity > 1 ? ` x${o.quantity}` : ''}`);
@@ -89,9 +97,11 @@ export function renderReply(facts, language = 'sw') {
     if (o.distanceKm !== null) bits.push(t.km(o.distanceKm));
     else if (o.locationLabel) bits.push(o.locationLabel);
     if (o.merchantVerified) bits.push(t.verified);
+    if (facts.urgency && (o.reasons || []).includes('available_now')) bits.push(t.ready);
     if (o.source === 'web') bits.push(t.web);
     lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}`);
   }
-  lines.push(facts.noneWithinBudget ? t.askNone : t.ask);
+  if (facts.alternativesHidden) lines.push(t.hidden(facts.alternativesHidden));
+  lines.push(facts.noneWithinBudget && !facts.exactOnly ? t.askNone : t.ask);
   return lines.join('\n');
 }

@@ -24,6 +24,7 @@ import { proxiedAdmin } from '../middleware/proxied-admin.js';
 import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '../services/merchant-notify.js';
 import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 import { demandOverview } from '../services/insights.js';
+import { loadReminderSettings, renderReminder, DEFAULT_SCHEDULE_REMINDER } from '../services/schedule-reminders.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -288,6 +289,21 @@ adminRouter.get('/notifications/order-confirmed', asyncHandler(async (_req, res)
   const settings = await loadOrderAlertSettings();
   const sample = { order_ref: 'MB-7K2P9Q', product: 'Sofa ya watu watatu', quantity: 1, total: 'TSh 305,000', fulfilment: 'delivery', customer_phone: '+2557…78', customer_location: ', Sinza, Dar es Salaam', merchant: 'Duka la Mfano', reply_hint: 'Jibu KUBALI MB-7K2P9Q au KATAA MB-7K2P9Q.' };
   res.json({ settings, defaults: DEFAULT_ORDER_ALERT, preview: { sw: renderOrderAlert(settings.textSw, sample), en: renderOrderAlert(settings.textEn, sample) }, placeholders: Object.keys(sample), recent: await db('merchant_notifications as n').join('merchants as m', 'm.id', 'n.merchant_id').orderBy('n.created_at', 'desc').limit(50).select('n.*', 'm.business_name') });
+}));
+// The reminder a customer asked for, with a preview and the latest outcomes.
+adminRouter.get('/notifications/schedule-reminder', asyncHandler(async (_req, res) => {
+  const settings = await loadReminderSettings();
+  const sample = { name: ' Neema', product: 'sofa', when: 'wiki ijayo', merchant: '' };
+  const counts = Object.fromEntries((await db('customer_schedules').select('status').count('id as n').groupBy('status')).map((r) => [r.status, Number(r.n)]));
+  res.json({ settings, defaults: DEFAULT_SCHEDULE_REMINDER, preview: { sw: renderReminder(settings.textSw, sample), en: renderReminder(settings.textEn, sample) }, counts, dryRun: config().REMINDER_DRY_RUN, recent: await db('customer_schedules').whereNotNull('reminder_status').orderBy('updated_at', 'desc').limit(50).select('id', 'kind', 'when_text', 'due_at', 'status', 'reminder_status', 'reminder_kind', 'skip_reason', 'reminded_at') });
+}));
+adminRouter.put('/notifications/schedule-reminder', manage, validate({ body: z.object({ enabled: z.boolean().optional(), templateName: z.string().max(120).regex(/^[a-z0-9_]*$/).optional(), templateLanguage: z.string().max(8).optional(), textSw: z.string().min(10).max(1000).optional(), textEn: z.string().min(10).max(1000).optional(), templateParams: z.array(z.string().max(30)).max(10).optional(), quietFrom: z.number().int().min(0).max(23).optional(), quietTo: z.number().int().min(0).max(23).optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...patch } = req.body;
+  const before = await loadReminderSettings();
+  const next = { ...before, ...patch };
+  await db('platform_settings').insert({ key: 'notification_schedule_reminder', value: JSON.stringify(next), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'notifications.schedule_reminder_changed', targetType: 'settings', targetId: 'notification_schedule_reminder', before, after: next, reason: why });
+  res.json({ settings: next });
 }));
 adminRouter.put('/notifications/order-confirmed', manage, validate({ body: z.object({ enabled: z.boolean().optional(), templateName: z.string().max(120).regex(/^[a-z0-9_]*$/).optional(), templateLanguage: z.string().max(8).optional(), textSw: z.string().min(10).max(1000).optional(), textEn: z.string().min(10).max(1000).optional(), templateParams: z.array(z.string().max(30)).max(10).optional(), reason: z.string().min(3).max(500) }) }), asyncHandler(async (req, res) => {
   const { reason: why, ...patch } = req.body;

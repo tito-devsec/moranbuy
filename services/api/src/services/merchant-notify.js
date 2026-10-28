@@ -33,7 +33,7 @@ export function orderAlertFacts({ order, listing, merchant, customer, language =
   const total = order.total_confirmed ? formatMoney(order.known_total, order.currency) : `${formatMoney(order.known_total, order.currency)} (${sw ? 'delivery haijathibitishwa' : 'delivery not confirmed'})`;
   const loc = order.customer_location_json?.label ? `, ${order.customer_location_json.label}` : '';
   return {
-    order_ref: order.order_ref, product: listing?.name || (sw ? 'bidhaa' : 'product'), quantity: order.quantity, total,
+    order_ref: order.order_ref, product: listing?.name ? `${listing.name}${order.variant ? ` (${order.variant})` : ''}` : (sw ? 'bidhaa' : 'product'), quantity: order.quantity, total,
     fulfilment: order.fulfilment === 'delivery' ? 'delivery' : (sw ? 'pickup (mteja atachukua)' : 'pickup'),
     customer_phone: customer?.channel === 'whatsapp' ? `+${customer.channel_ref}` : (sw ? 'mteja wa tovuti' : 'web customer'),
     customer_location: loc, merchant: merchant.business_name, reply_hint: replyHint,

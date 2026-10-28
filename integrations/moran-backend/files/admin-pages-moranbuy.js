@@ -137,7 +137,7 @@ async function load(name) {
     case 'Templates': return mb.get('templates');
     case 'Follow-up': return mb.get('followup');
     case 'Orders': return mb.get('orders');
-    case 'Notifications': return { ...(await mb.get('notifications/order-confirmed')), terms: await mb.get('notifications/terms') };
+    case 'Notifications': return { ...(await mb.get('notifications/order-confirmed')), terms: await mb.get('notifications/terms'), reminder: await mb.get('notifications/schedule-reminder') };
     case 'Billing': return { pricing: await mb.get('pricing'), servicePricing: await mb.get('service-pricing'), payments: (await mb.get('payments')).payments };
     case 'Muse Spark': return { muse: await mb.get('muse'), credentials: (await mb.get('credentials')).credentials };
     case 'Credentials': return mb.get('credentials');
@@ -163,6 +163,20 @@ function merchantDrawer(id) {
 }
 
 // The terms question put to every new sender, with Accept and Reject buttons, before the agent answers.
+// The reminder a customer asked for ("nitanunua wiki ijayo"), sent from the MoranBuy number when it falls due.
+function reminderCard(rem, reload) {
+  const st = rem.settings;
+  const form = h('div', { class: 'row g-2' },
+    h('div', { class: 'col-md-6' }, textarea({ name: 'textSw', label: t('Reminder (Swahili), placeholders {name} {product} {when} {merchant}'), value: st.textSw, rows: 3, maxlength: 1000 })),
+    h('div', { class: 'col-md-6' }, textarea({ name: 'textEn', label: t('Reminder (English)'), value: st.textEn, rows: 3, maxlength: 1000 })),
+    h('div', { class: 'col-md-4' }, input({ name: 'templateName', label: t('Approved template (needed after 24 hours of silence)'), value: st.templateName, placeholder: 'moranbuy_reminder' })),
+    h('div', { class: 'col-md-2' }, input({ name: 'templateLanguage', label: t('Template language'), value: st.templateLanguage })),
+    h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+  const save = button(t('Save reminder'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('notifications/schedule-reminder', f); toast(t('Saved.')); reload(); }).catch(toastError) });
+  return card({ cls: 'mt-3', title: t('Customer schedule reminders'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('{d}Schedules by status: {c}. Preview: {p}', { d: rem.dryRun ? 'Dry run is on (REMINDER_DRY_RUN): reminders are recorded, not sent. ' : '', c: JSON.stringify(rem.counts), p: rem.preview.sw }) }), form, h('div', { class: 'mt-2' }, save),
+    simpleTable([{ key: 'kind', label: t('Kind') }, { key: 'when_text', label: t('When') }, { key: 'status', label: t('Status'), render: (r) => badge(r.status) }, { key: 'reminder_kind', label: t('Sent as') }, { key: 'skip_reason', label: t('Reason') }], rem.recent)) });
+}
+
 function termsCard(terms, reload) {
   const st = terms.settings;
   const form = h('div', { class: 'row g-2' },
@@ -225,6 +239,7 @@ function render(name, d, reload) {
       const save = button(t('Save notification'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); await mb.put('notifications/order-confirmed', f); toast(t('Saved.')); reload(); }).catch(toastError) });
       return h('div', {}, card({ title: t('When a customer confirms an order, the business owner gets this on WhatsApp'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Placeholders: {p}', { p: d.placeholders.map((x) => `{${x}}`).join(' ') }) }), form, h('div', { class: 'mt-2' }, save), h('div', { class: 'mt-3 fs-sm' }, h('div', { class: 'fw-bold', text: t('Preview') }), h('div', { class: 'text-muted', text: d.preview.sw }), h('div', { class: 'text-muted', text: d.preview.en }))) }),
         card({ cls: 'mt-3', title: t('Recent alerts sent'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (n) => formatDateTime(n.created_at) }, { key: 'business_name', label: t('Business') }, { key: 'kind', label: t('Kind') }, { key: 'status', label: t('Status'), render: (n) => badge(n.status) }, { key: 'skip_reason', label: t('Reason'), render: (n) => n.skip_reason || n.error || '' }], d.recent) }),
+        reminderCard(d.reminder, reload),
         termsCard(d.terms, reload));
     }
     case 'Billing': {

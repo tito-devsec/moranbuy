@@ -1,3 +1,5 @@
+import { normalizeProductType } from './vocabulary.js';
+
 const norm = (v) => String(v ?? '').trim().toLowerCase();
 
 // Checks one requested attribute against an offer's attributes; numbers accept ranges, text accepts equal or contained values.
@@ -32,7 +34,10 @@ export function assessSuitability({ request, offer }) {
   // The product type must appear in the offer's type, category or name when it is known.
   const typeWanted = norm(request.productType);
   const typeKnown = [offer.productType, offer.category, offer.name].map(norm);
-  const typeOk = !typeWanted || typeKnown.some((t) => t && (t.includes(typeWanted) || typeWanted.includes(t)));
+  // "simu" and "smartphone", "kochi" and "sofa" are the same product: known words are compared by their canonical type.
+  const canonWanted = normalizeProductType(typeWanted).productType;
+  const canonOffer = typeKnown.map((t) => normalizeProductType(t).productType).filter(Boolean);
+  const typeOk = !typeWanted || typeKnown.some((t) => t && (t.includes(typeWanted) || typeWanted.includes(t))) || (canonWanted && (canonOffer.includes(canonWanted) || typeKnown.some((t) => t && t.includes(canonWanted))));
   if (!typeOk) failed.push('productType');
   let matched = 0;
   const preferredKeys = Object.keys(preferred);
