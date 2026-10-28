@@ -9,6 +9,7 @@ import { researchResultsToOffers } from '@moranbuy/integrations';
 import { buildFacts, renderReply } from './present.js';
 import { upsertContact, recordConsent } from '@moranbuy/consent-management';
 import { createLead, followupSettings } from '@moranbuy/followup-engine';
+import { recordDemandSignal, recordSchedule, fallbackTiming } from './signals.js';
 
 const SESSION_TTL_MS = 6 * 3600000;
 
@@ -28,9 +29,15 @@ export class ShoppingEngine {
   }
 
   // Handles one inbound message end to end and returns { replies: [{text, imageUrl?}], session, run }.
-  async handleMessage({ customer, text = '', imageUrl = null, sharedLocation = null }) {
+  async handleMessage({ customer, text = '', imageUrl = null, sharedLocation = null, kind = null }) {
     let session = await this.openSession(customer.id);
-    await this.db('session_messages').insert({ session_id: session.id, direction: 'in', content: text || (imageUrl ? `[image] ${imageUrl}` : '[location]'), content_type: imageUrl ? 'image' : sharedLocation ? 'location' : 'text' });
+    const sourceKind = kind || (imageUrl ? 'image' : sharedLocation ? 'location' : 'text');
+    await this.db('session_messages').insert({ session_id: session.id, direction: 'in', content: text || (imageUrl ? `[image] ${imageUrl}` : '[location]'), content_type: imageUrl ? 'image' : sharedLocation ? 'location' : 'text', kind: sourceKind });
+    // A voice note Moran could not transcribe cannot be shopped from; the customer is asked to type or send a photo.
+    if (sourceKind === 'voice' && (!text || /^\[/.test(text.trim()))) {
+      const lang = customer.language === 'en' ? 'en' : 'sw';
+      return this.reply(session, [{ text: lang === 'en' ? 'I could not hear that voice note. Please type what you are looking for, your budget and where you are, or send a photo.' : 'Sikuweza kusikia sauti hiyo. Tafadhali andika unachotafuta, bajeti yako na ulipo, au tuma picha.' }]);
+    }
     const previous = session.request_json && Object.keys(session.request_json).length ? session.request_json : null;
     const context = session.context_json || {};
 
@@ -42,12 +49,20 @@ export class ShoppingEngine {
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
     if (sharedLocation) extracted.location = { lat: Number(sharedLocation.lat), lng: Number(sharedLocation.lng), label: sharedLocation.label || null, source: 'customer_shared' };
+    // What Muse read about timing, a schedule and the name is kept beside the request; the deterministic reading fills in when Muse did not answer.
+    const guess = fallbackTiming(text);
+    const intel = { purchaseTiming: ['now', 'later', 'browsing'].includes(museResult.json?.purchaseTiming) ? museResult.json.purchaseTiming : guess.purchaseTiming, schedule: museResult.json?.schedule?.when ? { when: String(museResult.json.schedule.when).slice(0, 160), note: museResult.json.schedule.note ? String(museResult.json.schedule.note).slice(0, 500) : null } : guess.schedule, customerName: typeof museResult.json?.customerName === 'string' ? museResult.json.customerName : null };
+    const signal = (request, intent, outcome, extra = {}) => recordDemandSignal(this.db, { customer, session, request, kind: sourceKind, intent, outcome, purchaseTiming: intel.purchaseTiming, customerName: intel.customerName, now: this.now(), ...extra }).catch(() => null);
 
     // Option selection and confirmation are decided by deterministic rules on the stored options, never by the model alone.
     const intent = readIntent(text, extracted, context);
-    if (intent.kind === 'cancel') return this.close(session, customer, intent.language, 'cancelled');
-    if (intent.kind === 'select' && context.presented?.length) return this.select(session, customer, intent.option, previous || {});
-    if (intent.kind === 'confirm' && session.state === 'selected') return this.confirm(session, customer, previous || {});
+    if (intent.kind === 'cancel') { await signal(previous, 'cancel', 'cancelled'); return this.close(session, customer, intent.language, 'cancelled'); }
+    if (intent.kind === 'select' && context.presented?.length) {
+      const picked = context.presented.find((p) => p.option === intent.option);
+      await signal(previous, 'select', 'selected', { merchantId: picked?.merchantId || null, listingId: picked?.listingId && !String(picked.listingId).startsWith('web:') ? picked.listingId : null });
+      return this.select(session, customer, intent.option, previous || {});
+    }
+    if (intent.kind === 'confirm' && session.state === 'selected') { await signal(previous, 'confirm', 'ordered', { merchantId: session.context_json?.selected?.merchantId || null, listingId: session.context_json?.selected?.listingId || null }); return this.confirm(session, customer, previous || {}); }
 
     let request;
     try { request = mergeRequest(previous, extracted); } catch { request = shoppingRequestSchema.parse(previous || {}); }
@@ -56,12 +71,16 @@ export class ShoppingEngine {
       if (found) request.location = { lat: found.lat, lng: found.lng, label: found.label || request.locationText, source: 'customer_text_geocoded' };
     }
 
+    if (intel.schedule) await recordSchedule(this.db, { customer, session, schedule: intel.schedule, now: this.now() }).catch(() => null);
     const ask = clarificationQuestion(request);
     if (ask) {
       await this.save(session, { state: 'clarifying', request_json: request, context_json: { ...context, asked: [...(context.asked || []), ask.field] } });
+      await signal(request, 'clarify', 'asked');
       return this.reply(session, [{ text: ask.question }], { museStatus });
     }
-    return this.match(session, customer, request, { museStatus, context });
+    const out = await this.match(session, customer, request, { museStatus, context });
+    await signal(request, 'shop', out.result && (out.result.ranked.length || out.result.overBudget.length) ? 'presented' : 'no_match');
+    return out;
   }
 
   // Runs discovery and ranking, stores the evidence, and presents the top offers.
@@ -96,7 +115,7 @@ export class ShoppingEngine {
       const draft = await museDraftRecommendation(this.muse, { facts, language: request.language, requestRef: session.id });
       if (draft.ok && draft.json?.reply && numbersAreGrounded(draft.json.reply, facts)) textOut = String(draft.json.reply).slice(0, 1500);
     }
-    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, name: o.name, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
+    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
     await this.save(session, { state: 'presented', request_json: request, current_run_id: run.id, context_json: { ...context, presented } });
     const replies = [{ text: textOut }];
     const first = presented.find((p) => p.imageUrl);

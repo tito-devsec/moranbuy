@@ -62,7 +62,7 @@ extract attributes and constraints, draft recommendations from matched data, dra
 campaign messages, and summarise follow-up leads. Muse Spark never decides prices, budgets,
 rankings, consent, authorization, payments or order state; deterministic code does. If Muse Spark
 is unavailable, MoranBuy says so and uses only configured fallback behaviour.
-See `docs/muse-integration.md`.
+See `docs/muse-integration.md` and `docs/muse-duties.md` (everything Muse does, with the check on each answer).
 
 ## Campaigns, outreach and follow-up
 

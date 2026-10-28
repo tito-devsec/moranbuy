@@ -66,6 +66,17 @@
       <p class="text-green-700 text-sm mb-3" x-text="notice"></p>
 
       <div x-show="tab === 'Overview'" class="grid md:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl border p-5 md:col-span-2 text-sm" x-show="insights">
+          <div class="flex justify-between items-center mb-2"><h3 class="font-semibold">What customers are asking for (last <span x-text="insights?.stats.days"></span> days)</h3><span class="text-xs text-gray-500" x-text="insights?.source === 'muse' ? 'Read by Muse Spark' : 'From the numbers'"></span></div>
+          <p class="whitespace-pre-line" x-text="insights?.summary"></p>
+          <ul class="list-disc ml-5 mt-1" x-show="insights?.actions?.length"><template x-for="a in insights?.actions || []"><li x-text="a"></li></template></ul>
+          <div class="grid md:grid-cols-3 gap-4 mt-3">
+            <div><div class="font-medium mb-1">Most asked</div><template x-for="p in insights?.stats.topProducts || []" :key="p.productType"><div class="flex justify-between"><span x-text="p.productType"></span><span class="font-mono" x-text="p.asks + (p.avgBudget ? ' · ' + MoranBuy.money(p.avgBudget) : '')"></span></div></template><div class="text-gray-500" x-show="!(insights?.stats.topProducts || []).length">Nothing yet.</div></div>
+            <div><div class="font-medium mb-1">Where they are</div><template x-for="r in insights?.stats.byDistrict?.length ? insights.stats.byDistrict : (insights?.stats.byRegion || [])" :key="(r.region || '') + (r.district || '')"><div class="flex justify-between"><span x-text="(r.district ? r.district + ', ' : '') + r.region"></span><span class="font-mono" x-text="r.asks"></span></div></template></div>
+            <div><div class="font-medium mb-1">Best sellers</div><template x-for="b in insights?.stats.bestSellers || []" :key="b.name"><div class="flex justify-between"><span x-text="b.name"></span><span class="font-mono" x-text="b.orders + ' · ' + MoranBuy.money(b.revenue)"></span></div></template><div class="text-gray-500" x-show="!(insights?.stats.bestSellers || []).length">No orders yet.</div></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-3">Tip: send a product to the MoranBuy WhatsApp number from your business phone as "Bidhaa: name, price, stock" (with a photo if you like) and it is listed here; send "RIPOTI" for this overview by chat.</p>
+        </div>
         <div class="bg-white rounded-xl border p-5">
           <h3 class="font-semibold mb-2">Business</h3>
           <dl class="text-sm grid grid-cols-2 gap-y-1">
@@ -288,7 +299,7 @@
       return {
         me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns', 'Follow-up'],
         templates: [], offers: [], campaigns: [], senderInfo: null, followup: { question: '', decision: null, registrationUrl: null, active: false, settings: { scheduleText: '24, 72', maxAttempts: 2, paused: false }, leads: [], summary: '' }, error: '', notice: '',
-        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
+        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, insights: null, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
         async init() { if (this.registrationToken) this.tab = 'Follow-up'; if (MoranBuy.session.loggedIn()) await this.loadMe(); },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
@@ -305,6 +316,7 @@
           if (this.tab === 'Orders') this.orders = (await MoranBuy.api('/api/merchant/orders')).orders;
           if (this.tab === 'Campaigns') { this.senderInfo = await MoranBuy.api('/api/merchant/campaigns/sender'); this.templates = (await MoranBuy.api('/api/merchant/campaigns/templates')).templates; this.offers = (await MoranBuy.api('/api/merchant/campaigns/outreach/offers')).offers; this.campaigns = (await MoranBuy.api('/api/merchant/campaigns')).campaigns; }
           if (this.tab === 'Follow-up') { await this.loadFollowup(); await this.loadRegistration(); }
+          if (this.tab === 'Overview') { try { this.insights = await MoranBuy.api('/api/merchant/insights?days=30'); } catch { this.insights = null; } }
         },
         login() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/login', { method: 'POST', body: this.forms.login }); MoranBuy.session.save(d); await this.loadMe(); }); },
         register() { return this.run(async () => { const d = await MoranBuy.api('/api/merchants/auth/register', { method: 'POST', body: { ...this.forms.register, phone: this.forms.register.phone || undefined } }); MoranBuy.session.save(d); await this.loadMe(); }); },
@@ -345,7 +357,7 @@
         submitTemplate(t) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/templates/${t.id}/submit`, { method: 'POST' }); await this.load(); }, 'Submitted through Moran AI for Meta review.'); },
         refreshTemplate(t) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/templates/${t.id}/refresh`, { method: 'POST' }); await this.load(); }); },
         answerOffer(o, accept) { return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/outreach/offers/${o.id}/answer`, { method: 'POST', body: { accept } }); await this.load(); }, accept ? 'Offer accepted: a draft campaign was created. Nothing has been sent.' : 'Offer declined.'); },
-        newCampaign() { const name = prompt('Campaign name:'); if (!name) return; const objective = prompt('What should this campaign achieve?') || null; const listingId = prompt('Product id to feature (optional):') || null; const templateId = prompt('Approved template id (required to send):') || null; return this.run(async () => { await MoranBuy.api('/api/merchant/campaigns', { method: 'POST', body: { name, objective, listingId, templateId } }); await this.load(); }, 'Campaign created as a draft.'); },
+        newCampaign() { const name = prompt('Campaign name:'); if (!name) return; const objective = prompt('What should this campaign achieve?') || null; const listingId = prompt('Product id to feature (optional):') || null; const templateId = prompt('Approved template id (required to send):') || null; const bestFit = confirm('Send only to contacts whose recent MoranBuy requests match this product (best fit, chosen by Muse)? Cancel sends to all consented contacts.'); return this.run(async () => { await MoranBuy.api('/api/merchant/campaigns', { method: 'POST', body: { name, objective, listingId, templateId, audience: bestFit ? { segment: 'best_fit', limit: 200 } : { segment: 'consented_contacts' } } }); await this.load(); }, 'Campaign created as a draft.'); },
         act(c, action, body) { return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/${action}`, { method: 'POST', body: body || {} }); await this.load(); if (action === 'draft') this.notice = `Draft source: ${d.draftSource}. ${(d.notes || []).join(' ')}`; if (action === 'readiness') this.notice = d.ready ? 'Every gate passed. You can confirm and send.' : 'Some gates failed; see the details under the campaign.'; }); },
         revise(c) { const revision = prompt('How should the draft change?'); if (!revision) return; return this.act(c, 'draft', { revision }); },
         editBody(c) { const draftBody = prompt('Message text:', c.draftBody || ''); if (draftBody === null) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/${c.id}`, { method: 'PATCH', body: { draftBody } }); await this.load(); }); },

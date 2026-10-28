@@ -21,6 +21,12 @@ provider's settlement is verified; a short settlement never activates it.
 
 A follow-up-only merchant never receives the conversation agent; that is a separate entitlement.
 
+## The message
+
+When Muse is on, each follow-up is drafted from the lead's facts (business, product, price, what
+the customer said, attempt number); a draft with a number not in the facts or without the STOP
+line is replaced by the fixed message. The source is recorded on the task.
+
 ## Leads
 
 `createLead` records only what the service needs: merchant, phone, customer reference, product,

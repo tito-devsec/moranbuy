@@ -69,7 +69,7 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
   }
   const payload = {
     messageId: message.id, from: customerNumber, name: profileName,
-    text: inbound?.text || '', imageUrl: inbound?.imageUrl || null, buttonId: inbound?.replyId || null,
+    text: inbound?.text || '', imageUrl: inbound?.imageUrl || null, buttonId: inbound?.replyId || null, kind: inbound?.kind || message.type || 'text',
     location: message.type === 'location' && message.location ? { lat: message.location.latitude, lng: message.location.longitude, label: message.location.name || message.location.address || null } : null,
     tenantId: tenant.id,
   };

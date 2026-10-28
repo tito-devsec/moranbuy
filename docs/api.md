@@ -23,6 +23,7 @@ last 15 minutes; refresh tokens rotate.
 - `GET|POST /api/merchant/listings`, `GET|PATCH|DELETE /listings/:id`, `PATCH /listings/:id/moran` (Moran-owned fields), `POST /sync/moran`
 - `GET|POST /api/merchant/locations`, `PATCH|DELETE /locations/:id`
 - `GET /api/merchant/orders`, `POST /orders/:id/status` (also mirrored to the Moran order for linked businesses, `moranSync` in the response), `GET /enquiries`
+- `GET /insights?days=&language=` (demand overview for this business), `GET /schedules` (customer schedules tied to this business)
 - `GET /services/pricing`, `POST /services/:service/pay` `{ phone? }` (starts a payment; a pending one under 15 minutes old is returned again; `409 SERVICE_NOT_PRICED` until an admin sets a price), `GET /payments`
 - `GET|POST /api/merchant/contacts`, `GET /contacts/:phone/consent`, `DELETE /contacts/:phone`
 
@@ -43,7 +44,7 @@ last 15 minutes; refresh tokens rotate.
 - A completed settlement of a payment with purpose `entitlement` activates that service for `periodDays` (default 30); nothing else activates a paid service automatically.
 
 ## Moran channel (signed, `MORAN_SHARED_SECRET`)
-- `POST /internal/inbound` customer messages, button replies and locations from the MoranBuy number
+- `POST /internal/inbound` customer messages, button replies, locations, photos and voice transcripts (`kind: "audio"`) from the MoranBuy number; a registered business's own number may send a product ("Bidhaa: ...") or ask "RIPOTI"
 - `POST /internal/inbound/status` `{ statuses: [{ id, status, errors? }] }` delivery receipts for messages MoranBuy sent
 
 ## Admin
@@ -53,6 +54,7 @@ which signs each request (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature` over ti
 path and body) and carries `X-MoranBuy-Admin-Email`, `-Name`, `-Role`. The same routes accept a
 MoranBuy admin token for the fallback app.
 
+- `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`
 - `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
 - `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`

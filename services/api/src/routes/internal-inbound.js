@@ -11,6 +11,7 @@ import { stopLeadsForPhone } from '@moranbuy/followup-engine';
 import { handleMerchantOrderReply } from '../services/order-actions.js';
 import { termsGate } from '../services/terms.js';
 import { recordDeliveryStatus } from '@moranbuy/campaign-engine';
+import { handleMerchantChat } from '../services/merchant-chat.js';
 
 export const internalInboundRouter = express.Router();
 
@@ -23,7 +24,11 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   }
   let event;
   try { event = JSON.parse(raw); } catch { throw new ApiError(400, 'BAD_JSON', 'Body is not JSON.'); }
-  const { messageId, from, text = '', imageUrl = null, location = null, name = null, buttonId = null } = event;
+  const { messageId, from, imageUrl = null, location = null, name = null, buttonId = null } = event;
+  // Moran forwards a voice note as its transcript behind a fixed prefix; the words are what the agent reads.
+  const kind = event.kind === 'audio' || event.kind === 'voice' ? 'voice' : imageUrl ? 'image' : location ? 'location' : buttonId ? 'button' : 'text';
+  let text = String(event.text || '');
+  if (kind === 'voice') { const m = text.match(/transcript:\s*([\s\S]+)$/i); text = m && !/^\[/.test(m[1].trim()) ? m[1].trim() : ''; }
   if (!messageId || !from) throw new ApiError(400, 'VALIDATION_ERROR', 'messageId and from are required.');
 
   // The same delivery twice is answered once.
@@ -47,10 +52,13 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   } else {
     // "KUBALI MB-XXXX 15000" from a merchant's own number answers an order alert; everything else is a shopping message.
     const merchantReply = await handleMerchantOrderReply({ moran, from, text });
+    // A registered business sending a product or asking "RIPOTI" is served as a business, not as a shopper.
+    const merchantChat = merchantReply ? null : await handleMerchantChat({ muse: shoppingDeps().muse, from, text, imageUrl, kind, messageId: String(messageId) });
     if (merchantReply) out = { replies: [{ text: merchantReply.reply }], session: { id: null, state: merchantReply.order ? `order_${merchantReply.order.status}` : 'order_reply_rejected' } };
+    else if (merchantChat) out = { replies: [{ text: merchantChat.reply }], session: { id: null, state: `merchant_${merchantChat.kind}` } };
     else {
       await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
-      out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location });
+      out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location, kind });
     }
   }
   const sent = [];

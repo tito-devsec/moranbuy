@@ -38,6 +38,7 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 ## Still open for the owner
 
+- Speech-to-text on the Moran backend (its configured transcription client) so voice notes to the MoranBuy number arrive as text.
 - Service prices: set them in Super Admin → MoranBuy → Billing before a business can pay for a service.
 
 - A Meta Model API key (`MUSE_API_KEY`) so Muse Spark runs live; every Muse path is tested with fakes and the admin page shows the real status.

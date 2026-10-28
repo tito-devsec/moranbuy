@@ -23,6 +23,15 @@ Moran supplies only the template lifecycle with Meta and the merchant's own send
 
 No campaign dispatches because a draft exists or because a payment arrived.
 
+## Best-fit audience
+
+`audience: { segment: "best_fit", listingId?, limit? }` keeps only consented contacts whose recent
+MoranBuy requests (90 days) match the offer: the same product type scores 1, the same category 0.5,
+within their stated budget +0.2, the same region +0.2, said they would buy later +0.1, found
+nothing then +0.2. Consent, the frequency cap and the merchant-contact rule apply first. Muse then
+explains the strongest thirty in words and may reorder them; it cannot add anyone. The preview
+shows the counts, the fit reasons and `no_fit` or `over_limit` exclusions.
+
 ## Sender identity
 
 `senderEligibility`: only a merchant linked to Moran AI with a connected number may dispatch, from

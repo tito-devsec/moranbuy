@@ -15,6 +15,7 @@ import { applyOrderStatus } from '../services/order-actions.js';
 import { engagementDeps } from '../services/engagement.js';
 import { startPayment } from '@moranbuy/billing';
 import { loadServicePricing } from '../services/service-pricing.js';
+import { demandOverview } from '../services/insights.js';
 
 export const merchantRouter = express.Router();
 merchantRouter.use(requireMerchantAuth(db));
@@ -125,6 +126,9 @@ merchantRouter.post('/orders/:id/status', validate({ params: idParams, body: z.o
   } catch (err) { if (err.code === 'BAD_TRANSITION') throw new ApiError(409, 'BAD_TRANSITION', err.message); throw err; }
 }));
 
+// What customers ask MoranBuy for in this business's line, where they are, what sold; Muse explains it when it is on.
+merchantRouter.get('/insights', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(365).default(30), language: z.enum(['sw', 'en']).default('sw') }).passthrough() }), asyncHandler(async (req, res) => res.json(await demandOverview({ muse: shoppingDeps().muse, merchantId: req.merchant.id, days: req.query.days, language: req.query.language }))));
+merchantRouter.get('/schedules', asyncHandler(async (req, res) => res.json({ schedules: await db('customer_schedules as s').join('customers as c', 'c.id', 's.customer_id').where('s.merchant_id', req.merchant.id).orderBy('s.due_at', 'asc').limit(200).select('s.*', 'c.name as customer_name', 'c.region', 'c.district') })));
 merchantRouter.get('/enquiries', asyncHandler(async (req, res) => res.json({ enquiries: await db('enquiries').where({ merchant_id: req.merchant.id }).orderBy('created_at', 'desc').limit(200) })));
 
 // A probe that only an active campaign entitlement passes; the campaign routes themselves arrive in Phase 7.

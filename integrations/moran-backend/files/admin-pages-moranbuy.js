@@ -114,7 +114,7 @@ function setupCard(state, onDone) {
 }
 
 // ---- the dashboard: the MoranBuy admin sections, read through the signed proxy ----
-const SECTIONS = ['Overview', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Audit'];
+const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Audit'];
 
 function dashboard() {
   const body = h('div');
@@ -129,6 +129,7 @@ function dashboard() {
 async function load(name) {
   switch (name) {
     case 'Overview': return mb.get('overview');
+    case 'Insights': return { overview: await mb.get('insights?days=30&language=en'), schedules: (await mb.get('schedules')).schedules, uploads: (await mb.get('catalog-uploads')).uploads };
     case 'Merchants': return mb.get('merchants');
     case 'Verification': return mb.get('merchants', { verification: 'pending' });
     case 'Ranking': return { policy: await mb.get('ranking/policy'), runs: (await mb.get('ranking/runs')).runs };
@@ -187,6 +188,20 @@ function render(name, d, reload) {
   ], rows, { empty: t('No merchants yet.') });
 
   switch (name) {
+    case 'Insights': {
+      // What customers asked for across MoranBuy, where, and what sold; Muse's reading when it is on, the plain numbers otherwise.
+      const s = d.overview.stats;
+      const kv = (rows, a, b) => simpleTable([{ key: a, label: t(a) }, { key: b, label: t(b) }], rows);
+      return h('div', {}, card({ title: t(`Demand, last ${s.days} days (${d.overview.source === 'muse' ? 'read by Muse Spark' : 'from the numbers'})`), body: h('div', {}, h('p', { style: 'white-space: pre-line', text: d.overview.summary }), d.overview.actions.length ? h('ul', {}, ...d.overview.actions.map((a) => h('li', { text: a }))) : null) }),
+        h('div', { class: 'row g-3 mt-1' },
+          h('div', { class: 'col-lg-4' }, card({ title: t('Most asked products'), body: simpleTable([{ key: 'productType', label: t('Product') }, { key: 'asks', label: t('Asks') }, { key: 'customers', label: t('Customers') }, { key: 'avgBudget', label: t('Avg budget'), render: (r) => r.avgBudget ? money(r.avgBudget, 'TZS') : '' }], s.topProducts) })),
+          h('div', { class: 'col-lg-4' }, card({ title: t('Where customers are'), body: simpleTable([{ key: 'region', label: t('Region') }, { key: 'district', label: t('District') }, { key: 'asks', label: t('Asks') }], s.byDistrict.length ? s.byDistrict : s.byRegion) })),
+          h('div', { class: 'col-lg-4' }, card({ title: t('Best sellers'), body: simpleTable([{ key: 'name', label: t('Product') }, { key: 'orders', label: t('Orders') }, { key: 'revenue', label: t('Revenue'), render: (r) => money(r.revenue, 'TZS') }], s.bestSellers) }))),
+        h('div', { class: 'row g-3 mt-1' },
+          h('div', { class: 'col-lg-4' }, card({ title: t('Asked for but not found'), body: kv(s.unmetDemand, 'productType', 'asks') })),
+          h('div', { class: 'col-lg-4' }, card({ title: t('Customer schedules (open)'), body: simpleTable([{ key: 'kind', label: t('Kind') }, { key: 'when_text', label: t('When') }, { key: 'due_at', label: t('Due'), render: (r) => r.due_at ? new Date(r.due_at).toLocaleDateString() : '' }, { key: 'region', label: t('Region') }, { key: 'business_name', label: t('Business') }], d.schedules) })),
+          h('div', { class: 'col-lg-4' }, card({ title: t('Products sent by chat'), body: simpleTable([{ key: 'business_name', label: t('Business') }, { key: 'kind', label: t('Kind') }, { key: 'status', label: t('Status'), render: (r) => badge(r.status) }, { key: 'muse_status', label: t('Muse') }], d.uploads) }))));
+    }
     case 'Overview': return h('div', { class: 'row g-3' }, Object.entries(d).map(([k, v]) => h('div', { class: 'col-md-4' }, card({ title: t(k), body: pre(v) }))));
     case 'Merchants': case 'Verification': return card({ title: t(name), body: mTable(d.merchants) });
     case 'Ranking': {

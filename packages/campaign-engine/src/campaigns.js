@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApiError, notFound } from '@moranbuy/core';
 import { audit } from '@moranbuy/observability';
-import { museDraftCampaign, museDraftOutreach } from '@moranbuy/muse-intelligence';
+import { museDraftCampaign, museDraftOutreach, museAudienceFit } from '@moranbuy/muse-intelligence';
 import { resolveAudience } from '@moranbuy/consent-management';
 import { priceCampaign, startPayment } from '@moranbuy/billing';
 import { evaluateDispatchGates } from './gates.js';
@@ -11,7 +11,7 @@ export const campaignInput = z.object({
   objective: z.string().max(1000).nullable().optional(),
   listingId: z.string().uuid().nullable().optional(),
   templateId: z.string().uuid().nullable().optional(),
-  audience: z.object({ segment: z.enum(['consented_contacts', 'tag', 'phones']).default('consented_contacts'), tag: z.string().max(40).optional(), phones: z.array(z.string().max(20)).max(5000).optional() }).optional(),
+  audience: z.object({ segment: z.enum(['consented_contacts', 'tag', 'phones', 'best_fit']).default('consented_contacts'), tag: z.string().max(40).optional(), phones: z.array(z.string().max(20)).max(5000).optional(), listingId: z.string().uuid().optional(), limit: z.number().int().min(1).max(5000).optional() }).optional(),
   language: z.enum(['sw', 'en']).optional(),
   mediaUrl: z.string().url().max(600).nullable().optional(),
 });
@@ -115,14 +115,28 @@ export async function approveDraft(db, merchantId, id, { actorId, ip = null }) {
 }
 
 // Audience and cost with every exclusion reason; the provider rate is reported unknown when nobody configured it.
-export async function priceAndPreview(db, merchantId, id, { pricing, actorId, ip = null }) {
+export async function priceAndPreview(db, merchantId, id, { pricing, actorId, ip = null, muse = null }) {
   const campaign = await getCampaign(db, merchantId, id);
   if (!['approved', 'priced', 'awaiting_payment', 'draft'].includes(campaign.status)) throw new ApiError(409, 'CAMPAIGN_LOCKED', 'This campaign can no longer be priced.');
-  const audience = await resolveAudience(db, { merchantId, audience: campaign.audience_json, purpose: 'marketing' });
+  // A best-fit audience follows the campaign's own product unless the merchant named another.
+  const audienceSpec = campaign.audience_json?.segment === 'best_fit' ? { ...campaign.audience_json, listingId: campaign.audience_json.listingId || campaign.listing_id || null } : campaign.audience_json;
+  const audience = await resolveAudience(db, { merchantId, audience: audienceSpec, purpose: 'marketing' });
+  // Muse explains the fit of the strongest matches in words; it can reorder and explain, never add anyone.
+  let fit = null;
+  if (audienceSpec?.segment === 'best_fit' && audience.included.length) {
+    const top = audience.included.slice(0, 30).map((i, idx) => ({ ref: `c${idx + 1}`, phone: i.phone, asked: i.fit }));
+    fit = { counted: audience.included.length, explained: [] };
+    if (muse?.enabled) {
+      const facts = await campaignFacts(db, await db('merchants').where({ id: merchantId }).first(), campaign);
+      const r = await museAudienceFit(muse, { offer: facts.product, candidates: top.map(({ ref, asked }) => ({ ref, ...asked })), language: campaign.language || 'sw', merchantId }).catch(() => ({ ok: false }));
+      if (r.ok && Array.isArray(r.json?.ranked)) fit.explained = r.json.ranked.filter((x) => top.some((c) => c.ref === x.ref)).slice(0, 30).map((x) => ({ phone: top.find((c) => c.ref === x.ref).phone.replace(/^(\d{6})\d+(\d{2})$/, '$1***$2'), score: Number(x.score) || 0, reason: String(x.reason || '').slice(0, 200) }));
+    }
+    if (!fit.explained.length) fit.explained = top.map((c) => ({ phone: c.phone.replace(/^(\d{6})\d+(\d{2})$/, '$1***$2'), score: c.asked.score, reason: c.asked.reasons.join(', ') }));
+  }
   const price = priceCampaign({ recipients: audience.included.length, pricing });
-  const [row] = await db('campaigns').where({ id }).update({ audience_preview_json: JSON.stringify({ counts: audience.counts, exclusionReasons: audience.exclusionReasons, previewedAt: new Date().toISOString() }), pricing_json: JSON.stringify(price), status: campaign.status === 'approved' || campaign.status === 'priced' ? 'priced' : campaign.status, updated_at: db.fn.now() }).returning('*');
+  const [row] = await db('campaigns').where({ id }).update({ audience_preview_json: JSON.stringify({ counts: audience.counts, exclusionReasons: audience.exclusionReasons, segment: audience.segment, fit, previewedAt: new Date().toISOString() }), pricing_json: JSON.stringify(price), status: campaign.status === 'approved' || campaign.status === 'priced' ? 'priced' : campaign.status, updated_at: db.fn.now() }).returning('*');
   await audit(db, { actorType: 'merchant', actorId, merchantId, action: 'campaign.priced', targetType: 'campaign', targetId: id, after: { recipients: audience.included.length, estimatedTotal: price.estimatedTotal }, ip });
-  return { campaign: row, audience: { counts: audience.counts, exclusionReasons: audience.exclusionReasons }, pricing: price };
+  return { campaign: row, audience: { counts: audience.counts, exclusionReasons: audience.exclusionReasons, segment: audience.segment, fit }, pricing: price };
 }
 
 export async function startCampaignPayment(db, provider, merchantId, id, { phone = null, actorId, ip = null }) {

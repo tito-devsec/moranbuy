@@ -51,7 +51,7 @@ campaignsRouter.post('/:id/draft', needCampaign, validate({ params: idParams, bo
 }));
 campaignsRouter.post('/:id/approve', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await approveDraft(db, req.merchant.id, req.params.id, actor(req))) })));
 campaignsRouter.post('/:id/price', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => {
-  const out = await priceAndPreview(db, req.merchant.id, req.params.id, { pricing: await loadCampaignPricing(), ...actor(req) });
+  const out = await priceAndPreview(db, req.merchant.id, req.params.id, { pricing: await loadCampaignPricing(), muse: engagementDeps().muse, ...actor(req) });
   res.json({ campaign: publicCampaign(out.campaign), audience: out.audience, pricing: out.pricing });
 }));
 campaignsRouter.post('/:id/pay', needCampaign, validate({ params: idParams, body: z.object({ phone: z.string().max(20).optional() }) }), asyncHandler(async (req, res) => {

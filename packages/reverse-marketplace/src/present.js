@@ -1,10 +1,11 @@
 import { formatMoney } from '@moranbuy/core';
 
 // Turns a ranking result into facts and a deterministic reply; the reply uses only these facts.
-export function buildFacts(result, request, { max = 3 } = {}) {
+export function buildFacts(result, request, { max = 5 } = {}) {
   const line = (r, i) => ({
     option: i + 1,
     listingId: r.offer.id,
+    merchantId: r.offer.merchantId || null,
     name: r.offer.name,
     merchant: r.offer.merchantName,
     price: r.cost.unitPrice,
@@ -23,6 +24,8 @@ export function buildFacts(result, request, { max = 3 } = {}) {
     stock: r.offer.stock,
     imageUrl: r.offer.imageUrl || null,
     source: r.offer.source,
+    description: r.offer.description ? String(r.offer.description).replace(/\s+/g, ' ').slice(0, 140) : null,
+    attributes: r.offer.attributes || {},
     reasons: r.reasons,
   });
   const ranked = result.ranked.slice(0, max).map(line);
@@ -87,7 +90,7 @@ export function renderReply(facts, language = 'sw') {
     else if (o.locationLabel) bits.push(o.locationLabel);
     if (o.merchantVerified) bits.push(t.verified);
     if (o.source === 'web') bits.push(t.web);
-    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.`);
+    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}`);
   }
   lines.push(facts.noneWithinBudget ? t.askNone : t.ask);
   return lines.join('\n');

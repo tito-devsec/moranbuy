@@ -215,7 +215,7 @@ index e44d3cf..0553144 100644
          recordAuthEvent(req, { principalType: 'owner', principalId: tenant.id, tenantId: tenant.id, event: 'login_success', identifier });
          return res.json(await issueSession(tenant, {}, null, { via: 'web' }));
 diff --git a/src/api/routes/whatsapp-webhook.routes.js b/src/api/routes/whatsapp-webhook.routes.js
-index e5a7702..e2a2999 100644
+index e5a7702..752a0cd 100644
 --- a/src/api/routes/whatsapp-webhook.routes.js
 +++ b/src/api/routes/whatsapp-webhook.routes.js
 @@ -6,6 +6,7 @@ import { resolveTenantByPhoneNumberId, isTenantOperational, invalidateTenantCach
@@ -235,7 +235,17 @@ index e5a7702..e2a2999 100644
        // And for patient testimonials sent (services/healthcare/testimonials.service.js); none match otherwise.
        import('../../services/healthcare/testimonials.service.js')
          .then((m) => m.recordTestimonialStatuses(change.statuses)).catch(() => {});
-@@ -884,6 +887,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+@@ -528,7 +531,8 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+      * which messages start it; it only means the entitlement read next sees
+      * the trial this very message is starting.
+      */
+-    const paidMedia = PAID_MEDIA_TYPES.has(message.type);
++    // MoranBuy's own number (docs/moranbuy.md) reads photos and voice notes as part of the service; the media gate is for businesses' agents.
++    const paidMedia = PAID_MEDIA_TYPES.has(message.type) && !isMoranBuyTenant(tenant);
+     if (paidMedia) await startTrialOnFirstMessage(tenant, customerNumber);
+     const mediaGate = paidMedia ? await mayOpenMedia(tenant, customerNumber) : { allowed: true };
+     if (!mediaGate.allowed) {
+@@ -884,6 +888,12 @@ whatsappWebhookRouter.post('/', async (req, res) => {
        }
      }
  

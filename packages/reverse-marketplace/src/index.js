@@ -4,3 +4,5 @@ export * from './clarify.js';
 export * from './discover.js';
 export * from './present.js';
 export * from './engine.js';
+export * from './signals.js';
+export * from './vocabulary.js';

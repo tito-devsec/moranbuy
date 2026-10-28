@@ -23,6 +23,7 @@ import { describeCredentials, saveCredentials, CREDENTIAL_FIELDS } from '../serv
 import { proxiedAdmin } from '../middleware/proxied-admin.js';
 import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '../services/merchant-notify.js';
 import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
+import { demandOverview } from '../services/insights.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -66,6 +67,11 @@ adminRouter.get('/overview', asyncHandler(async (_req, res) => {
     flags: { campaignDryRun: config().CAMPAIGN_DRY_RUN, followupDryRun: config().FOLLOWUP_DRY_RUN, paymentProvider: config().PAYMENT_PROVIDER, museProvider: config().MUSE_PROVIDER, webResearch: config().MORANBUY_WEB_RESEARCH_ENABLED },
   });
 }));
+
+// Demand across the platform, or for one merchant, with Muse's reading when it is on.
+adminRouter.get('/insights', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(365).default(30), merchantId: z.string().uuid().optional(), language: z.enum(['sw', 'en']).default('en') }).passthrough() }), asyncHandler(async (req, res) => res.json(await demandOverview({ muse: shoppingDeps().muse, merchantId: req.query.merchantId || null, days: req.query.days, language: req.query.language }))));
+adminRouter.get('/schedules', asyncHandler(async (_req, res) => res.json({ schedules: await db('customer_schedules as s').join('customers as c', 'c.id', 's.customer_id').leftJoin('merchants as m', 'm.id', 's.merchant_id').where('s.status', 'scheduled').orderBy('s.due_at', 'asc').limit(200).select('s.*', 'c.region', 'c.district', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, customer_id: undefined }))) })));
+adminRouter.get('/catalog-uploads', asyncHandler(async (_req, res) => res.json({ uploads: await db('catalog_uploads as u').join('merchants as m', 'm.id', 'u.merchant_id').orderBy('u.created_at', 'desc').limit(200).select('u.id', 'u.kind', 'u.status', 'u.reason', 'u.muse_status', 'u.listing_id', 'u.created_at', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, from_phone: undefined }))) })));
 
 // ---- merchants ----
 adminRouter.get('/merchants', validate({ query: z.object({ type: z.enum(['standalone', 'moran']).optional(), status: z.string().max(16).optional(), verification: z.string().max(16).optional(), search: z.string().max(80).optional() }).passthrough() }), asyncHandler(async (req, res) => {
