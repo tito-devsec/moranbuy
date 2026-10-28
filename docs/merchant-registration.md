@@ -10,6 +10,16 @@
 | Locations | created in MoranBuy, geocoded or pinned | imported read-only from Moran's business locations; delivery reach from Moran's radius, fee unknown unless stated |
 | Later | can link Moran with `POST /api/merchants/auth/link-moran/attach` and keep its id, listings and orders | |
 
+## Businesses that appear by themselves
+
+A worker (`moran-listings-pull`, every 10 minutes, a full pass every 6 hours) reads Moran's
+`/internal/moranbuy/listings`: every business whose owner switched on "List my products on
+MoranBuy" becomes a MoranBuy merchant automatically (`registration_type = moran`, no login, owner
+WhatsApp number as contact, verified when its number is connected), with its default location and
+products. Re-pulls update in place; a full pass archives products no longer listed. The owner can
+claim the merchant later with "Link Moran AI account", keeping its id, orders and listings. Admins
+can pull on demand from Integration Health.
+
 ## Source of truth
 
 For an imported product, Moran owns `name, description, price, currency, stock, status, imageUrl,

@@ -32,6 +32,8 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 | MoranBuy managed from Moran's Super Admin: setup wizard (register, connect WhatsApp, name, open), signed identity-carrying proxy, proxied-admin acceptance with replay and tamper tests | done as part of the Moran patch; UI verified by syntax and import only (no browser run here) | `integrations/moran-backend/files/admin-pages-moranbuy.js`, `services/api/src/middleware/proxied-admin.js`, `tests/security/proxied-admin.test.js` |
 
+| Opted-in Moran businesses appear automatically; order alerts answered by WhatsApp for businesses without a dashboard; customer status messages | done | `packages/product-catalog/src/moran-listings-sync.js`, `services/api/src/services/order-actions.js`, `tests/integration/moran-listings-pull.test.js`, `tests/integration/order-replies.test.js` |
+
 ## Still open for the owner
 
 - A Meta Model API key (`MUSE_API_KEY`) so Muse Spark runs live; every Muse path is tested with fakes and the admin page shows the real status.

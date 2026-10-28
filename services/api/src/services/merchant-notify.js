@@ -8,9 +8,9 @@ export const DEFAULT_ORDER_ALERT = Object.freeze({
   enabled: true,
   templateName: '',        // an APPROVED template on the MoranBuy number, e.g. moranbuy_order_alert; blank: text only (works inside a 24-hour window)
   templateLanguage: 'sw',
-  // Placeholders: {order_ref} {product} {quantity} {total} {fulfilment} {customer_phone} {customer_location} {merchant}
-  textSw: 'MoranBuy: oda mpya {order_ref}. {product} x{quantity}, {total}, {fulfilment}. Mteja: {customer_phone}{customer_location}. Fungua MoranBuy kukubali au kukataa.',
-  textEn: 'MoranBuy: new order {order_ref}. {product} x{quantity}, {total}, {fulfilment}. Customer: {customer_phone}{customer_location}. Open MoranBuy to accept or reject.',
+  // Placeholders: {order_ref} {product} {quantity} {total} {fulfilment} {customer_phone} {customer_location} {merchant} {reply_hint}
+  textSw: 'MoranBuy: oda mpya {order_ref}. {product} x{quantity}, {total}, {fulfilment}. Mteja: {customer_phone}{customer_location}. {reply_hint}',
+  textEn: 'MoranBuy: new order {order_ref}. {product} x{quantity}, {total}, {fulfilment}. Customer: {customer_phone}{customer_location}. {reply_hint}',
   // The order of template body parameters {{1}}..{{n}}, by placeholder name.
   templateParams: ['order_ref', 'product', 'quantity', 'total', 'fulfilment', 'customer_phone'],
 });
@@ -25,15 +25,18 @@ export function renderOrderAlert(text, facts) {
   return String(text).replace(/\{(\w+)\}/g, (_m, k) => (facts[k] === undefined || facts[k] === null ? '' : String(facts[k])));
 }
 
-export function orderAlertFacts({ order, listing, merchant, customer, language = 'sw' }) {
+export function orderAlertFacts({ order, listing, merchant, customer, language = 'sw', hasDashboard = false }) {
   const sw = language !== 'en';
+  // A business without a MoranBuy login manages the order by replying; a registered one may also use the dashboard.
+  const feeHint = order.total_confirmed ? '' : (sw ? ` (ongeza ada ya delivery, mfano KUBALI ${order.order_ref} 15000)` : ` (add the delivery fee, e.g. ACCEPT ${order.order_ref} 15000)`);
+  const replyHint = sw ? `Jibu KUBALI ${order.order_ref}${feeHint} au KATAA ${order.order_ref}.${hasDashboard ? ' Au fungua MoranBuy.' : ''}` : `Reply ACCEPT ${order.order_ref}${feeHint} or REJECT ${order.order_ref}.${hasDashboard ? ' Or open MoranBuy.' : ''}`;
   const total = order.total_confirmed ? formatMoney(order.known_total, order.currency) : `${formatMoney(order.known_total, order.currency)} (${sw ? 'delivery haijathibitishwa' : 'delivery not confirmed'})`;
   const loc = order.customer_location_json?.label ? `, ${order.customer_location_json.label}` : '';
   return {
     order_ref: order.order_ref, product: listing?.name || (sw ? 'bidhaa' : 'product'), quantity: order.quantity, total,
     fulfilment: order.fulfilment === 'delivery' ? 'delivery' : (sw ? 'pickup (mteja atachukua)' : 'pickup'),
     customer_phone: customer?.channel === 'whatsapp' ? `+${customer.channel_ref}` : (sw ? 'mteja wa tovuti' : 'web customer'),
-    customer_location: loc, merchant: merchant.business_name,
+    customer_location: loc, merchant: merchant.business_name, reply_hint: replyHint,
   };
 }
 
@@ -50,7 +53,8 @@ export async function notifyMerchantOfOrder({ dbImpl = db, moran, order, dryRun 
   const to = toMsisdn(merchant.contact_phone);
   if (!isValidMsisdn(to)) return record({ kind: 'text', status: 'skipped', skip_reason: 'merchant_has_no_phone' });
   const language = merchant.settings_json?.language === 'en' ? 'en' : 'sw';
-  const facts = orderAlertFacts({ order, listing, merchant, customer, language });
+  const hasDashboard = !!(await dbImpl('merchant_users').where({ merchant_id: merchant.id, is_active: true }).first('id'));
+  const facts = orderAlertFacts({ order, listing, merchant, customer, language, hasDashboard });
   const body = renderOrderAlert(language === 'en' ? settings.textEn : settings.textSw, facts);
   const useTemplate = !!settings.templateName;
   const params = useTemplate ? (settings.templateParams || []).map((k) => ({ type: 'text', text: String(facts[k] ?? '') })) : [];

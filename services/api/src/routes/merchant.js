@@ -10,6 +10,8 @@ import { asyncHandler } from '../middleware/async-handler.js';
 import { validate } from '../middleware/validate.js';
 import { db } from '../db/connection.js';
 import { merchantDeps } from '../services/merchants.js';
+import { shoppingDeps } from '../services/shopping.js';
+import { applyOrderStatus } from '../services/order-actions.js';
 
 export const merchantRouter = express.Router();
 merchantRouter.use(requireMerchantAuth(db));
@@ -99,11 +101,10 @@ merchantRouter.get('/orders', asyncHandler(async (req, res) => {
 merchantRouter.post('/orders/:id/status', validate({ params: idParams, body: z.object({ status: z.enum(['accepted', 'rejected', 'fulfilled', 'cancelled']), note: z.string().max(500).optional(), deliveryFee: z.number().int().nonnegative().optional() }) }), asyncHandler(async (req, res) => {
   const order = await db('orders').where({ id: req.params.id, merchant_id: req.merchant.id }).first();
   if (!order) throw notFound('ORDER_NOT_FOUND');
-  const patch = { status: req.body.status, notes: req.body.note || order.notes, updated_at: db.fn.now() };
-  if (req.body.deliveryFee !== undefined && !order.total_confirmed) { patch.delivery_fee = req.body.deliveryFee; patch.known_total = order.unit_price * order.quantity + req.body.deliveryFee; patch.total_confirmed = true; }
-  const [row] = await db('orders').where({ id: order.id }).update(patch).returning('*');
-  await audit(db, { actorType: 'merchant', actorId: req.merchantUser.id, merchantId: req.merchant.id, action: 'order.status_changed', targetType: 'order', targetId: order.id, before: { status: order.status }, after: { status: row.status }, ip: req.ip });
-  res.json({ order: row });
+  try {
+    const out = await applyOrderStatus({ moran: shoppingDeps().moran, order, status: req.body.status, deliveryFee: req.body.deliveryFee ?? null, note: req.body.note || null, actor: { type: 'merchant', id: req.merchantUser.id, via: 'dashboard' } });
+    res.json({ order: out.order, customerAlert: out.customerAlert });
+  } catch (err) { if (err.code === 'BAD_TRANSITION') throw new ApiError(409, 'BAD_TRANSITION', err.message); throw err; }
 }));
 
 merchantRouter.get('/enquiries', asyncHandler(async (req, res) => res.json({ enquiries: await db('enquiries').where({ merchant_id: req.merchant.id }).orderBy('created_at', 'desc').limit(200) })));

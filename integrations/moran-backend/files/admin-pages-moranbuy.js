@@ -222,7 +222,10 @@ function render(name, d, reload) {
       const hSave = button(t('Save Hermes and enable research'), { onClick: () => busy(hSave, async () => { const f = readForm(hForm); if (!f.reason) return toastError(new Error(t('A reason is required.'))); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/hermes', { ...f, enabled: !!f.allowedDomains }); toast(t('Hermes saved.')); reload(); }).catch(toastError) });
       return h('div', {}, card({ title: t('Snippe mobile money (the same account as Moran)'), body: h('div', {}, sForm, h('div', { class: 'mt-2' }, sSave), h('p', { class: 'fs-xs text-muted mt-2', text: t('Register the MoranBuy webhook URL with Snippe: {u}', { u: `${(d.credentials.snippe.baseUrl ? '' : '')}https://buy.moranai.co.tz/webhooks/payments` }) })) }), card({ cls: 'mt-3', title: t('Hermes research agent (optional)'), body: h('div', {}, hForm, h('div', { class: 'mt-2' }, hSave)) }));
     }
-    case 'Integration Health': return card({ title: t('Integration health'), body: pre(d) });
+    case 'Integration Health': {
+      const pull = button(t('Pull opted-in Moran businesses now'), { onClick: () => busy(pull, async () => { const r = await mb.post('sync/moran-listings', {}); toast(r.ok ? t('Pulled: {m} businesses, {c} new, {u} updated', { m: r.merchants, c: r.created, u: r.updated }) : t('Pull failed: {s}', { s: r.status }), r.ok ? 'success' : 'warning'); reload(); }).catch(toastError) });
+      return card({ title: t('Integration health'), right: pull, body: pre(d) });
+    }
     case 'Audit': return card({ title: t('MoranBuy audit log'), body: simpleTable([{ key: 'created_at', label: t('When'), render: (e) => formatDateTime(e.created_at) }, { key: 'actor_type', label: t('Actor') }, { key: 'action', label: t('Action') }, { key: 'target_type', label: t('Target'), render: (e) => `${e.target_type || ''} ${e.target_id || ''}` }, { key: 'reason', label: t('Reason') }], d.events) });
     default: return pre(d);
   }

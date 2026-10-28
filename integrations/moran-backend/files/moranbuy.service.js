@@ -139,7 +139,7 @@ export async function listedProducts({ since = null, page = 1, pageSize = 200 } 
     .where('p.is_active', true)
     .where('p.item_type', 'product')
     .select('p.id', 'p.tenant_id', 'p.service_id', 'p.name', 'p.description', 'p.price', 'p.currency', 'p.stock', 'p.status', 'p.category', 'p.condition', 'p.image_url', 'p.sku', 'p.retailer_id', 'p.variants', 'p.updated_at',
-      't.business_name', 't.wa_connection_status', 't.moranbuy_listed_at',
+      't.business_name', 't.wa_connection_status', 't.moranbuy_listed_at', 't.owner_wa_number', 't.whatsapp_display_number', 't.owner_email', 't.industry', 's.name as service_name',
       'l.id as location_id', 'l.name as location_name', 'l.region', 'l.district', 'l.ward', 'l.formatted_address', 'l.latitude', 'l.longitude', 'l.radius_meters')
     .orderBy('p.updated_at', 'desc').limit(limit + 1).offset(offset);
   if (since) q = q.where('p.updated_at', '>', new Date(since));

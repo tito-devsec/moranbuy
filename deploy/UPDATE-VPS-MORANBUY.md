@@ -72,6 +72,10 @@ Only a Super Admin (`super_admin`) may change credentials; other roles read. Eve
 audited in MoranBuy under the admin's email. `https://buy.moranai.co.tz/admin/` remains as a
 fallback with its own `ADMIN_BOOTSTRAP_EMAIL` login for when weare is unavailable.
 
+Opted-in businesses need no sign-up: the worker pulls them every 10 minutes (Integration Health
+has a "Pull now" button). Owners without a MoranBuy login get order alerts on their WhatsApp number
+and answer with `KUBALI MB-XXXX [ada ya delivery]` or `KATAA MB-XXXX`.
+
 ## 6. Smoke test
 
 1. Send "Nina laki tatu na nusu ya sofa ya watu watatu, nipo Sinza, delivery" to the MoranBuy

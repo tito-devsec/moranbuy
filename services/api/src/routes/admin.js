@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { ApiError, notFound, config } from '@moranbuy/core';
 import { requireAdminAuth, signAccessToken, issueRefreshToken, rotateRefreshToken, verifyPassword, activateEntitlement, pauseEntitlement, listEntitlements, SERVICES } from '@moranbuy/authorization';
 import { publicMerchant } from '@moranbuy/merchant-management';
-import { listListings, listLocations } from '@moranbuy/product-catalog';
+import { listListings, listLocations, pullMoranListings } from '@moranbuy/product-catalog';
 import { museTelemetry } from '@moranbuy/muse-intelligence';
 import { consentHistory, consentState, toMsisdn } from '@moranbuy/consent-management';
 import { publicCampaign, publicTemplate } from '@moranbuy/campaign-engine';
@@ -226,7 +226,14 @@ adminRouter.get('/integrations', asyncHandler(async (_req, res) => {
     muse: shoppingDeps().muse.status(),
     research: { enabled: c.MORANBUY_WEB_RESEARCH_ENABLED, provider: shoppingDeps().researcher?.name || null, allowedDomains: c.MORANBUY_ALLOWED_DOMAINS ? c.MORANBUY_ALLOWED_DOMAINS.split(',') : [] },
     flags: { campaignDryRun: c.CAMPAIGN_DRY_RUN, followupDryRun: c.FOLLOWUP_DRY_RUN },
+    moranListingsSync: (await db('platform_settings').where({ key: 'moran_listings_sync' }).first())?.value || { lastRunAt: null },
   });
+}));
+// Pulls opted-in Moran businesses and products now instead of waiting for the worker.
+adminRouter.post('/sync/moran-listings', manage, validate({ body: z.object({ full: z.boolean().optional() }).optional() }), asyncHandler(async (req, res) => {
+  const out = await pullMoranListings(db, shoppingDeps().moran, { full: !!req.body?.full });
+  await act(req, { action: 'moran.listings_pull_requested', targetType: 'sync', targetId: 'moran_listings', after: out });
+  res.json(out);
 }));
 adminRouter.get('/audit', validate({ query: z.object({ merchantId: z.string().uuid().optional(), action: z.string().max(80).optional() }).passthrough() }), asyncHandler(async (req, res) => {
   let q = db('audit_events').orderBy('id', 'desc').limit(300);
@@ -262,7 +269,7 @@ adminRouter.put('/agent-profile', manage, validate({ body: z.object({ name: z.st
 // ---- the message business owners get when an order is confirmed; wording and template set here ----
 adminRouter.get('/notifications/order-confirmed', asyncHandler(async (_req, res) => {
   const settings = await loadOrderAlertSettings();
-  const sample = { order_ref: 'MB-7K2P9Q', product: 'Sofa ya watu watatu', quantity: 1, total: 'TSh 305,000', fulfilment: 'delivery', customer_phone: '+2557…78', customer_location: ', Sinza, Dar es Salaam', merchant: 'Duka la Mfano' };
+  const sample = { order_ref: 'MB-7K2P9Q', product: 'Sofa ya watu watatu', quantity: 1, total: 'TSh 305,000', fulfilment: 'delivery', customer_phone: '+2557…78', customer_location: ', Sinza, Dar es Salaam', merchant: 'Duka la Mfano', reply_hint: 'Jibu KUBALI MB-7K2P9Q au KATAA MB-7K2P9Q.' };
   res.json({ settings, defaults: DEFAULT_ORDER_ALERT, preview: { sw: renderOrderAlert(settings.textSw, sample), en: renderOrderAlert(settings.textEn, sample) }, placeholders: Object.keys(sample), recent: await db('merchant_notifications as n').join('merchants as m', 'm.id', 'n.merchant_id').orderBy('n.created_at', 'desc').limit(50).select('n.*', 'm.business_name') });
 }));
 adminRouter.put('/notifications/order-confirmed', manage, validate({ body: z.object({ enabled: z.boolean().optional(), templateName: z.string().max(120).regex(/^[a-z0-9_]*$/).optional(), templateLanguage: z.string().max(8).optional(), textSw: z.string().min(10).max(1000).optional(), textEn: z.string().min(10).max(1000).optional(), templateParams: z.array(z.string().max(30)).max(10).optional(), reason: z.string().min(3).max(500) }) }), asyncHandler(async (req, res) => {

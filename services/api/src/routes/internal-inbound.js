@@ -8,6 +8,7 @@ import { shoppingDeps, upsertCustomer } from '../services/shopping.js';
 import { db } from '../db/connection.js';
 import { detectOptOut, detectOptIn, optOut, optIn } from '@moranbuy/consent-management';
 import { stopLeadsForPhone } from '@moranbuy/followup-engine';
+import { handleMerchantOrderReply } from '../services/order-actions.js';
 
 export const internalInboundRouter = express.Router();
 
@@ -39,8 +40,13 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     await optIn(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
     out = { replies: [{ text: 'Karibu tena. / Welcome back.' }], session: { id: null, state: 'opted_in' } };
   } else {
-    await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
-    out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location });
+    // "KUBALI MB-XXXX 15000" from a merchant's own number answers an order alert; everything else is a shopping message.
+    const merchantReply = await handleMerchantOrderReply({ moran, from, text });
+    if (merchantReply) out = { replies: [{ text: merchantReply.reply }], session: { id: null, state: merchantReply.order ? `order_${merchantReply.order.status}` : 'order_reply_rejected' } };
+    else {
+      await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
+      out = await engine.handleMessage({ customer, text, imageUrl, sharedLocation: location });
+    }
   }
   const sent = [];
   for (const [i, r] of out.replies.entries()) {
