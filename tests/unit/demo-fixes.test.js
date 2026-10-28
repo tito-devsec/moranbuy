@@ -36,3 +36,10 @@ test('a business product price uses the same Swahili amount reader as customer b
   // The seat count is not mistaken for a price.
   assert.equal(fallbackExtractProduct('Bidhaa: Sofa ya watu 3, idadi 2').price, null);
 });
+
+test('the signed channel to Moran uses the private address when one is set, else the public one', async () => {
+  const { MoranInternalClient } = await import('@moranbuy/integrations');
+  const base = { MORAN_SHARED_SECRET: 'x'.repeat(32) };
+  assert.equal(new MoranInternalClient({ cfg: { ...base, MORAN_BACKEND_BASE_URL: 'https://api.example', MORAN_INTERNAL_BASE_URL: 'http://backend:3000/' } }).baseUrl, 'http://backend:3000');
+  assert.equal(new MoranInternalClient({ cfg: { ...base, MORAN_BACKEND_BASE_URL: 'https://api.example' } }).baseUrl, 'https://api.example');
+});

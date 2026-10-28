@@ -26,6 +26,8 @@ const schema = z.object({
   ADMIN_BOOTSTRAP_PASSWORD: opt(),
 
   MORAN_BACKEND_BASE_URL: opt(),
+  // Moran's /internal routes are closed at its public nginx, so the signed channel can use a private address (http://backend:3000 on the VPS).
+  MORAN_INTERNAL_BASE_URL: opt(),
   MORAN_SHARED_SECRET: opt(),
 
   WHATSAPP_APP_SECRET: opt(),

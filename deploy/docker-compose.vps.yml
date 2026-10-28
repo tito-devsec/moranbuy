@@ -60,6 +60,8 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
       REDIS_URL: redis://moranbuy-redis:6379
     command: ["node", "services/api/src/workers/main.js"]
+    # The worker pulls listings and sends replies over Moran's private network too.
+    networks: [default, moran]
     mem_limit: 384m
     # The retention purge removes expired customer photos from the same volume.
     volumes:

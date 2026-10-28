@@ -332,7 +332,7 @@ adminRouter.get('/integrations', asyncHandler(async (_req, res) => {
   const lastPayment = await db('webhook_events').whereIn('source', ['snippe', 'sandbox']).orderBy('received_at', 'desc').first('received_at', 'status', 'source');
   res.json({
     checks,
-    moran: { baseUrl: c.MORAN_BACKEND_BASE_URL || null, sharedSecretConfigured: !!c.MORAN_SHARED_SECRET, ownerClientConfigured: merchantDeps().moran.configured, internalClientConfigured: shoppingDeps().moran?.configured ?? false, lastInbound: lastInbound || null },
+    moran: { baseUrl: c.MORAN_BACKEND_BASE_URL || null, internalBaseUrl: c.MORAN_INTERNAL_BASE_URL || c.MORAN_BACKEND_BASE_URL || null, sharedSecretConfigured: !!c.MORAN_SHARED_SECRET, ownerClientConfigured: merchantDeps().moran.configured, internalClientConfigured: shoppingDeps().moran?.configured ?? false, lastInbound: lastInbound || null },
     payments: { provider: engagementDeps().payments.name, lastWebhook: lastPayment || null },
     muse: shoppingDeps().muse.status(),
     research: { enabled: c.MORANBUY_WEB_RESEARCH_ENABLED, provider: shoppingDeps().researcher?.name || null, allowedDomains: c.MORANBUY_ALLOWED_DOMAINS ? c.MORANBUY_ALLOWED_DOMAINS.split(',') : [] },

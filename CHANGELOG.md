@@ -2,6 +2,10 @@
 
 All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
+## 1.0.1 (2026-10-28)
+
+- `MORAN_INTERNAL_BASE_URL`: the signed channel to Moran (listings pull and every WhatsApp reply) goes to Moran's backend over the Docker network, because Moran's public nginx closes `/internal`; the worker joins that network too.
+
 ## 1.0.0 (2026-10-28)
 
 - Deployment: the Moran patch rebased on Moran `680d6f5` with a checksum list, its migration renumbered to `...103` with a receipt index, MoranBuy behind Moran's Docker nginx on Moran's Docker network, Compose project `moranbuy`, host check port `MORANBUY_HOST_PORT` (4100), memory limits, Redis `noeviction`, and the night-time queue test fixed.

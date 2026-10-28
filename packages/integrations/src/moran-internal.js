@@ -5,7 +5,7 @@ import { signBody } from './signing.js';
 export class MoranInternalClient {
   constructor({ cfg = null, fetchImpl = globalThis.fetch } = {}) {
     const c = cfg || config();
-    this.baseUrl = String(c.MORAN_BACKEND_BASE_URL || '').replace(/\/+$/, '');
+    this.baseUrl = String(c.MORAN_INTERNAL_BASE_URL || c.MORAN_BACKEND_BASE_URL || '').replace(/\/+$/, '');
     this.secret = c.MORAN_SHARED_SECRET || null;
     this.fetchImpl = fetchImpl;
   }

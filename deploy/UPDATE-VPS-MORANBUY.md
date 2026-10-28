@@ -79,6 +79,7 @@ products on MoranBuy** in their dashboard (the MoranBuy entry sits at the right 
 ```bash
 cd /opt/moranbuy
 cp deploy/env.production.example .env && chmod 600 .env && nano .env   # every CHANGE_ME, the shared secret, APP_URL; keep the dry-run flags true
+# MORAN_INTERNAL_BASE_URL=http://backend:3000: Moran's nginx closes /internal to the public, so the signed channel uses the Docker network
 docker network ls | grep moran-backend          # Moran's network; set MORAN_DOCKER_NETWORK in .env if it is not moran-backend_default
 docker compose -f deploy/docker-compose.vps.yml --env-file .env up -d --build
 docker compose -f deploy/docker-compose.vps.yml logs -f moranbuy-api   # until "MoranBuy API listening"
