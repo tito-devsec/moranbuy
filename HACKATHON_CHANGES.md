@@ -28,6 +28,8 @@ This file lists what is new in this repository and the evidence for it. It is up
 
 Nothing above is claimed as working until its row says "done" and names a test or a run.
 
+| Runtime credentials entered in Admin (Muse Spark, Snippe, Hermes) and the buy.moranai.co.tz deployment stack | done; the VPS steps are the owner's | `services/api/src/services/runtime-settings.js`, `tests/integration/credentials.test.js`, `deploy/` |
+
 ## Still open for the owner
 
 - A Meta Model API key (`MUSE_API_KEY`) so Muse Spark runs live; every Muse path is tested with fakes and the admin page shows the real status.

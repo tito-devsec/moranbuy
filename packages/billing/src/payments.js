@@ -3,8 +3,9 @@ import { audit } from '@moranbuy/observability';
 // Starts a payment and records it pending; nothing is marked paid here.
 export async function startPayment(db, provider, { merchantId, purpose, targetId, amount, currency = 'TZS', phone = null, breakdown = {}, actorId = null }) {
   const started = await provider.createPayment({ amount, currency, phone, metadata: { merchantId, purpose, targetId } });
-  const [row] = await db('payments').insert({ merchant_id: merchantId, purpose, target_id: targetId, provider: provider.name, reference: started.reference, amount: Math.round(amount), currency, phone, status: 'pending', breakdown_json: JSON.stringify(breakdown), provider_json: JSON.stringify(started.providerData || {}) }).returning('*');
-  await audit(db, { actorType: actorId ? 'merchant' : 'system', actorId, merchantId, action: 'payment.started', targetType: 'payment', targetId: row.id, after: { purpose, amount, provider: provider.name } });
+  const providerName = provider.name;
+  const [row] = await db('payments').insert({ merchant_id: merchantId, purpose, target_id: targetId, provider: providerName, reference: started.reference, amount: Math.round(amount), currency, phone, status: 'pending', breakdown_json: JSON.stringify(breakdown), provider_json: JSON.stringify(started.providerData || {}) }).returning('*');
+  await audit(db, { actorType: actorId ? 'merchant' : 'system', actorId, merchantId, action: 'payment.started', targetType: 'payment', targetId: row.id, after: { purpose, amount, provider: providerName } });
   return row;
 }
 

@@ -119,3 +119,16 @@ export function createResearcher(cfg = config(), deps = {}) {
   if (!cfg.MORANBUY_WEB_RESEARCH_ENABLED) return null;
   return cfg.HERMES_BASE_URL && cfg.HERMES_API_KEY ? new HermesResearchClient({ cfg, ...deps }) : new PlainFetchResearcher({ cfg, ...deps });
 }
+
+// Resolves the admin-entered research settings on every call and builds the matching researcher.
+export class RuntimeResearcher {
+  constructor({ resolve, cfg = null, deps = {} }) { this.resolve = resolve; this.cfg = cfg || config(); this.deps = deps; this.name = 'runtime'; }
+  async research(request, opts) {
+    const s = await this.resolve();
+    if (!s.enabled || !s.allowedDomains) return { ok: false, status: 'disabled', results: [] };
+    const merged = { ...this.cfg, MORANBUY_WEB_RESEARCH_ENABLED: true, MORANBUY_ALLOWED_DOMAINS: s.allowedDomains, HERMES_BASE_URL: s.baseUrl, HERMES_API_KEY: s.apiKey, HERMES_MODEL: s.model };
+    const r = s.baseUrl && s.apiKey ? new HermesResearchClient({ cfg: merged, ...this.deps }) : new PlainFetchResearcher({ cfg: merged, ...this.deps });
+    this.name = r.name;
+    return r.research(request, opts);
+  }
+}

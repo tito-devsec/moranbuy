@@ -4,8 +4,9 @@ import { recordMuseRequest } from './telemetry.js';
 
 // Muse Spark on the Meta Model API, called through its OpenAI-compatible chat completions endpoint.
 export class MuseClient {
-  constructor({ cfg = null, fetchImpl = globalThis.fetch, db = null } = {}) {
+  constructor({ cfg = null, fetchImpl = globalThis.fetch, db = null, resolve = null } = {}) {
     const c = cfg || config();
+    this.resolve = resolve;
     this.provider = c.MUSE_PROVIDER;
     this.baseUrl = String(c.MUSE_API_BASE_URL).replace(/\/+$/, '');
     this.apiKey = c.MUSE_API_KEY || null;
@@ -14,6 +15,14 @@ export class MuseClient {
     this.reasoningEffort = c.MUSE_REASONING_EFFORT;
     this.fetchImpl = fetchImpl;
     this.db = db;
+  }
+
+  // Refreshes provider, URL, key and model from the admin-entered credentials when a resolver is set.
+  async refresh() {
+    if (!this.resolve) return;
+    const r = await this.resolve().catch(() => null);
+    if (!r) return;
+    this.provider = r.provider; this.baseUrl = String(r.baseUrl).replace(/\/+$/, ''); this.apiKey = r.apiKey || null; this.model = r.model; this.reasoningEffort = r.reasoningEffort || this.reasoningEffort; this.timeoutMs = r.timeoutMs || this.timeoutMs;
   }
 
   // True when a provider and a key are configured; the engines use deterministic fallbacks otherwise.
@@ -26,6 +35,7 @@ export class MuseClient {
 
   // One chat completion; returns parsed JSON when asked for it, and always records telemetry from the real outcome.
   async complete({ feature, system, messages, json = true, maxTokens = 1200, merchantId = null, requestRef = null }) {
+    await this.refresh();
     if (!this.enabled) {
       await recordMuseRequest(this.db, { feature, provider: this.provider, model: this.model, status: 'disabled', merchantId, requestRef });
       return { ok: false, status: 'disabled' };
@@ -75,6 +85,7 @@ export class MuseClient {
 
   // A tiny real request so the admin page can prove the connection works right now.
   async testConnection() {
+    await this.refresh();
     const r = await this.complete({ feature: 'test_connection', system: 'Reply with the JSON object {"ok": true}.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20 });
     return { ...this.status(), result: r.ok ? 'ok' : r.status, code: r.code || null, latencyMs: r.latencyMs ?? null, model: r.model || this.model };
   }

@@ -103,6 +103,12 @@ tests/unit|integration|security|end-to-end
 docs/                  architecture, assessment, ranking, Muse, workflows, API, deployment, testing, demo
 ```
 
+## Going live
+
+`deploy/UPDATE-VPS-MORANBUY.md` puts MoranBuy on the Moran VPS as `buy.moranai.co.tz`, a separate
+Compose stack talking to `https://api.moranai.co.tz`. Muse Spark, Snippe and Hermes credentials are
+entered in MoranBuy Admin and take effect at once.
+
 ## Install and run
 
 ```bash

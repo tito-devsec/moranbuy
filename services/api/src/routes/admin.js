@@ -19,6 +19,7 @@ import { checkRedisConnection } from '../db/redis.js';
 import { shoppingDeps } from '../services/shopping.js';
 import { engagementDeps } from '../services/engagement.js';
 import { merchantDeps } from '../services/merchants.js';
+import { describeCredentials, saveCredentials, CREDENTIAL_FIELDS } from '../services/runtime-settings.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -231,6 +232,21 @@ adminRouter.get('/audit', validate({ query: z.object({ merchantId: z.string().uu
   if (req.query.action) q = q.whereILike('action', `${req.query.action}%`);
   res.json({ events: await q });
 }));
+// ---- credentials entered by an administrator: Muse Spark, Snippe, Hermes; stored encrypted, shown masked, used at once ----
+adminRouter.get('/credentials', asyncHandler(async (_req, res) => res.json({ credentials: await describeCredentials({ fresh: true }) })));
+const credentialBodies = {
+  muse: z.object({ provider: z.enum(['meta', 'openai-compatible', 'disabled']).optional(), baseUrl: z.string().url().optional(), apiKey: z.string().max(400).optional(), model: z.string().max(64).optional(), reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high', 'xhigh']).optional(), reason: z.string().min(3).max(500) }),
+  snippe: z.object({ apiKey: z.string().max(400).optional(), webhookSecret: z.string().max(400).optional(), baseUrl: z.string().url().optional(), reason: z.string().min(3).max(500) }),
+  hermes: z.object({ baseUrl: z.union([z.string().url(), z.literal('')]).optional(), apiKey: z.string().max(400).optional(), model: z.string().max(64).optional(), enabled: z.boolean().optional(), allowedDomains: z.string().max(2000).optional(), reason: z.string().min(3).max(500) }),
+};
+adminRouter.put('/credentials/:group', requireAdminAuth(db, 'super_admin'), validate({ params: z.object({ group: z.enum(Object.keys(CREDENTIAL_FIELDS)) }) }), asyncHandler(async (req, res) => {
+  const body = credentialBodies[req.params.group].parse(req.body || {});
+  const { reason: why, ...patch } = body;
+  await saveCredentials(req.params.group, patch, { updatedBy: req.admin.email });
+  await act(req, { action: `credentials.${req.params.group}_updated`, targetType: 'settings', targetId: 'credentials', after: { fields: Object.keys(patch) }, reason: why });
+  res.json({ credentials: await describeCredentials({ fresh: true }) });
+}));
+
 adminRouter.get('/settings', asyncHandler(async (_req, res) => res.json({ settings: await db('platform_settings').orderBy('key'), admins: await db('admin_users').select('id', 'email', 'name', 'role', 'is_active', 'last_login_at') })));
 adminRouter.post('/admins', requireAdminAuth(db, 'super_admin'), validate({ body: z.object({ email: z.string().email(), name: z.string().min(2).max(120), password: z.string().min(12).max(128), role: z.enum(['super_admin', 'admin', 'support']).default('admin') }) }), asyncHandler(async (req, res) => {
   const { hashPassword } = await import('@moranbuy/authorization');

@@ -89,14 +89,39 @@
       </div></template>
 
       <template x-if="section === 'Muse Spark Intelligence'"><div class="space-y-4">
-        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Configuration (no key shown)</div><pre class="text-xs" x-text="JSON.stringify(data.muse?.status, null, 1)"></pre><button class="underline text-sm mt-2" @click="testMuse()">Test connection (makes one real request)</button><pre class="text-xs mt-2" x-text="JSON.stringify(data.museTest, null, 1)"></pre></div>
+        <div class="bg-white rounded-xl border p-4">
+          <div class="font-semibold mb-1">Muse Spark API key (Meta Model API, https://dev.meta.ai)</div>
+          <p class="text-xs text-gray-500 mb-2">Enter the key here and MoranBuy starts using Muse Spark within seconds, no restart. The key is stored encrypted and never shown again; only its last four characters are.</p>
+          <div class="grid md:grid-cols-5 gap-2 text-sm">
+            <select class="border rounded p-1" x-model="cred.muse.provider"><option value="meta">Meta Model API</option><option value="openai-compatible">OpenAI-compatible host</option><option value="disabled">Disabled</option></select>
+            <input class="border rounded p-1" placeholder="Base URL" x-model="cred.muse.baseUrl">
+            <input class="border rounded p-1" placeholder="Model id (muse-spark-1.3)" x-model="cred.muse.model">
+            <input class="border rounded p-1" type="password" placeholder="API key (leave blank to keep)" x-model="cred.muse.apiKey">
+            <select class="border rounded p-1" x-model="cred.muse.reasoningEffort"><template x-for="e in ['minimal','low','medium','high','xhigh']" :key="e"><option :value="e" x-text="e"></option></template></select>
+          </div>
+          <div class="flex gap-2 mt-2 text-sm items-center"><input class="border rounded p-1 w-64" placeholder="Reason (audited)" x-model="cred.muse.reason"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="saveCred('muse')">Save</button><span class="text-xs text-gray-500" x-text="data.credentials?.muse ? `Key: ${data.credentials.muse.apiKey.configured ? '…' + data.credentials.muse.apiKey.last4 + ' (' + data.credentials.muse.source + ')' : 'not set'}` : ''"></span></div>
+        </div>
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Configuration in use (no key shown)</div><pre class="text-xs" x-text="JSON.stringify(data.muse?.status, null, 1)"></pre><button class="underline text-sm mt-2" @click="testMuse()">Test connection (makes one real request)</button><pre class="text-xs mt-2" x-text="JSON.stringify(data.museTest, null, 1)"></pre></div>
         <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Telemetry from stored requests</div><pre class="text-xs" x-text="JSON.stringify(data.muse?.telemetry, null, 1)"></pre></div>
         <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Recent requests (redacted)</div><pre class="text-xs overflow-x-auto" x-text="JSON.stringify(data.muse?.recent, null, 1)"></pre></div>
       </div></template>
 
       <template x-if="section === 'Integration Health'"><div class="bg-white rounded-xl border p-4"><pre class="text-xs" x-text="JSON.stringify(data.integrations, null, 1)"></pre></div></template>
       <template x-if="section === 'Audit Logs'"><div class="bg-white rounded-xl border overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100 text-left"><tr><th class="p-2">When</th><th class="p-2">Actor</th><th class="p-2">Action</th><th class="p-2">Target</th><th class="p-2">Reason</th></tr></thead><tbody><template x-for="e in data.audit || []" :key="e.id"><tr class="border-t"><td class="p-2 whitespace-nowrap" x-text="e.created_at"></td><td class="p-2" x-text="e.actor_type + (e.actor_id ? ' ' + e.actor_id.slice(0, 8) : '')"></td><td class="p-2" x-text="e.action"></td><td class="p-2 text-xs" x-text="(e.target_type || '') + ' ' + (e.target_id || '')"></td><td class="p-2" x-text="e.reason || ''"></td></tr></template></tbody></table></div></template>
-      <template x-if="section === 'Security and Settings'"><div class="bg-white rounded-xl border p-4"><pre class="text-xs" x-text="JSON.stringify(data.settings, null, 1)"></pre></div></template>
+      <template x-if="section === 'Security and Settings'"><div class="space-y-4">
+        <div class="bg-white rounded-xl border p-4">
+          <div class="font-semibold mb-1">Snippe mobile money (the same keys Moran AI uses on this VPS)</div>
+          <div class="grid md:grid-cols-3 gap-2 text-sm"><input class="border rounded p-1" type="password" placeholder="Snippe API key (blank keeps)" x-model="cred.snippe.apiKey"><input class="border rounded p-1" type="password" placeholder="Snippe webhook secret (blank keeps)" x-model="cred.snippe.webhookSecret"><input class="border rounded p-1" placeholder="Base URL (https://api.snippe.sh)" x-model="cred.snippe.baseUrl"></div>
+          <div class="flex gap-2 mt-2 text-sm items-center"><input class="border rounded p-1 w-64" placeholder="Reason (audited)" x-model="cred.snippe.reason"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="saveCred('snippe')">Save</button><span class="text-xs text-gray-500" x-text="data.credentials?.snippe ? `Key: ${data.credentials.snippe.apiKey.configured ? '…' + data.credentials.snippe.apiKey.last4 : 'not set'} · webhook secret: ${data.credentials.snippe.webhookSecret.configured ? 'set' : 'not set'} · source: ${data.credentials.snippe.source}` : ''"></span></div>
+          <p class="text-xs text-gray-500 mt-1">Register the webhook URL <code x-text="location.origin + '/webhooks/payments'"></code> with Snippe for MoranBuy's payments.</p>
+        </div>
+        <div class="bg-white rounded-xl border p-4">
+          <div class="font-semibold mb-1">Hermes research agent (optional)</div>
+          <div class="grid md:grid-cols-4 gap-2 text-sm"><input class="border rounded p-1" placeholder="Hermes base URL (blank = plain fetch)" x-model="cred.hermes.baseUrl"><input class="border rounded p-1" type="password" placeholder="Hermes API key (blank keeps)" x-model="cred.hermes.apiKey"><input class="border rounded p-1" placeholder="Allowed shop domains, comma separated" x-model="cred.hermes.allowedDomains"><label class="flex items-center gap-2"><input type="checkbox" x-model="cred.hermes.enabled"> Research enabled</label></div>
+          <div class="flex gap-2 mt-2 text-sm items-center"><input class="border rounded p-1 w-64" placeholder="Reason (audited)" x-model="cred.hermes.reason"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="saveCred('hermes')">Save</button></div>
+        </div>
+        <div class="bg-white rounded-xl border p-4"><div class="font-semibold mb-1">Settings and admins</div><pre class="text-xs" x-text="JSON.stringify(data.settings, null, 1)"></pre></div>
+      </div></template>
     </main>
   </div>
 
@@ -112,7 +137,7 @@
         return d;
       };
       return {
-        me: null, section: 'Overview', data: {}, error: '', notice: '', form: { email: '', password: '' }, newService: '', policyJson: '', policyReason: '', pricingJson: '', pricingReason: '', consentPhone: '',
+        me: null, section: 'Overview', data: {}, error: '', notice: '', cred: { muse: { provider: 'meta', baseUrl: 'https://api.meta.ai/v1', model: 'muse-spark-1.3', apiKey: '', reasoningEffort: 'low', reason: '' }, snippe: { apiKey: '', webhookSecret: '', baseUrl: 'https://api.snippe.sh', reason: '' }, hermes: { baseUrl: '', apiKey: '', allowedDomains: '', enabled: false, reason: '' } }, form: { email: '', password: '' }, newService: '', policyJson: '', policyReason: '', pricingJson: '', pricingReason: '', consentPhone: '',
         sections: ['Overview', 'Standalone Businesses', 'Registered Businesses', 'Verification', 'Products and Catalogues', 'Product Matching and Ranking', 'Locations', 'Customer Consent', 'Campaign Engine', 'New-Product Outreach', 'Templates and Media', 'Follow-up Operations', 'Orders and Enquiries', 'Billing and Refunds', 'Muse Spark Intelligence', 'Integration Health', 'Audit Logs', 'Security and Settings'],
         async init() { if (get('moranbuy_admin_access')) { try { this.me = await api('/me'); await this.go('Overview'); } catch { set('moranbuy_admin_access', null); } } },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.message; if (e.status === 401) { this.me = null; set('moranbuy_admin_access', null); } } },
@@ -129,11 +154,13 @@
           if (s === 'Follow-up Operations') this.data.followup = await api('/followup');
           if (s === 'Orders and Enquiries') this.data.orders = await api('/orders');
           if (s === 'Billing and Refunds') { this.data.pricing = await api('/pricing'); this.data.payments = (await api('/payments')).payments; }
-          if (s === 'Muse Spark Intelligence') this.data.muse = await api('/muse');
+          if (s === 'Muse Spark Intelligence') { this.data.muse = await api('/muse'); await this.loadCred(); }
           if (s === 'Integration Health') this.data.integrations = await api('/integrations');
           if (s === 'Audit Logs') this.data.audit = (await api('/audit')).events;
-          if (s === 'Security and Settings') this.data.settings = await api('/settings');
+          if (s === 'Security and Settings') { this.data.settings = await api('/settings'); await this.loadCred(); }
         }); },
+        async loadCred() { const d = (await api('/credentials')).credentials; this.data.credentials = d; this.cred.muse = { ...this.cred.muse, provider: d.muse.provider === 'disabled' && !d.muse.apiKey.configured ? 'meta' : d.muse.provider, baseUrl: d.muse.baseUrl, model: d.muse.model, reasoningEffort: d.muse.reasoningEffort, apiKey: '' }; this.cred.snippe = { ...this.cred.snippe, baseUrl: d.snippe.baseUrl, apiKey: '', webhookSecret: '' }; this.cred.hermes = { ...this.cred.hermes, baseUrl: d.hermes.baseUrl || '', allowedDomains: d.hermes.allowedDomains, enabled: !!d.hermes.enabled, apiKey: '' }; },
+        saveCred(group) { return this.run(async () => { const body = { ...this.cred[group] }; for (const k of ['apiKey', 'webhookSecret']) if (body[k] === '') delete body[k]; await api(`/credentials/${group}`, { method: 'PUT', body }); await this.loadCred(); if (group === 'muse') { this.data.museTest = await api('/muse/test', { method: 'POST' }); this.data.muse = await api('/muse'); } }, `${group} credentials saved and in use.`); },
         openMerchant(id) { this.section = 'Merchant'; return this.run(async () => { this.data.merchant = await api(`/merchants/${id}`); }); },
         decide(m, decision) { const reason = prompt('Reason:') || undefined; return this.run(async () => { await api(`/merchants/${m.id}/verification`, { method: 'POST', body: { decision, reason } }); await this.go(this.section); }); },
         setStatus(m, status) { const reason = prompt('Reason (required):'); if (!reason) return; return this.run(async () => { await api(`/merchants/${m.id}/status`, { method: 'POST', body: { status, reason } }); await this.go(this.section); }); },

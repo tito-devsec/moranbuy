@@ -1,5 +1,9 @@
 # Deployment
 
+Going live on the Moran VPS as `buy.moranai.co.tz`: follow `deploy/UPDATE-VPS-MORANBUY.md`
+(Nginx site, production Compose stack, `.env` example, Super Admin registration, credentials in
+MoranBuy Admin).
+
 ## Local
 
 ```bash
@@ -11,6 +15,11 @@ npm run worker                           # campaign dispatch and follow-up deliv
 ```
 
 ## Environment
+
+Muse Spark, Snippe and Hermes credentials can be entered in MoranBuy Admin instead of `.env`
+(Muse Spark Intelligence and Security and Settings). They are stored encrypted with
+`ENCRYPTION_KEY`, shown masked, audited, and used on the next request without a restart. Values
+in Admin win over the environment.
 
 See `.env.example`. Required: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET` (32+ chars),
 `ENCRYPTION_KEY` (32 bytes hex). Production refuses placeholder secrets, requires

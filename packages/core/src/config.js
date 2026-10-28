@@ -78,8 +78,7 @@ export function assertProductionConfig(c) {
   const problems = [];
   if (/change_me|example|dev-secret/i.test(c.AUTH_SECRET)) problems.push('AUTH_SECRET is a placeholder');
   if (!c.MORAN_SHARED_SECRET) problems.push('MORAN_SHARED_SECRET is required in production');
-  if (c.PAYMENT_PROVIDER === 'snippe' && (!c.SNIPPE_API_KEY || !c.SNIPPE_WEBHOOK_SECRET)) problems.push('Snippe credentials are missing');
-  if (!c.CAMPAIGN_DRY_RUN && c.PAYMENT_PROVIDER === 'sandbox') problems.push('CAMPAIGN_DRY_RUN=false needs a real payment provider');
+  if (!c.CAMPAIGN_DRY_RUN && c.PAYMENT_PROVIDER === 'sandbox') problems.push('CAMPAIGN_DRY_RUN=false needs PAYMENT_PROVIDER=snippe (keys may be entered in MoranBuy Admin)');
   if (problems.length) throw new Error(`Unsafe production configuration:\n  ${problems.join('\n  ')}`);
 }
 

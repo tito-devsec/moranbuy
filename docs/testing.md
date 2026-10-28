@@ -22,6 +22,7 @@ or Moran; each has a fake with the real request and response shapes.
 | integration | all passing |
 | security | all passing |
 | end-to-end | all passing |
+| Docker image | `Dockerfile` and `deploy/docker-compose.vps.yml` are syntax-checked only; the sandbox has no Docker daemon, so the first `docker compose up --build` happens on the VPS |
 | migrations rollback and re-apply | pass |
 
 CI (`.github/workflows/ci.yml`) runs the same on every push: https://github.com/tito-devsec/moranbuy/actions

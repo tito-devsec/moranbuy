@@ -1,0 +1,60 @@
+# MoranBuy on the Moran VPS as its own stack: own Postgres and Redis containers, the API on 127.0.0.1:4000 for Nginx.
+# Run from the repository root:  docker compose -f deploy/docker-compose.vps.yml --env-file .env up -d --build
+services:
+  moranbuy-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moranbuy
+      POSTGRES_USER: moranbuy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - moranbuy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moranbuy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  moranbuy-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - moranbuy_redisdata:/data
+
+  moranbuy-api:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      APP_ENV: production
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
+      REDIS_URL: redis://moranbuy-redis:6379
+    command: ["sh", "-c", "npm run migrate && npm run seed && node services/api/src/server.js"]
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      moranbuy-postgres: { condition: service_healthy }
+      moranbuy-redis: { condition: service_started }
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  moranbuy-worker:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      APP_ENV: production
+      NODE_ENV: production
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
+      REDIS_URL: redis://moranbuy-redis:6379
+    command: ["node", "services/api/src/workers/main.js"]
+    depends_on:
+      moranbuy-api: { condition: service_started }
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+volumes:
+  moranbuy_pgdata:
+  moranbuy_redisdata:
