@@ -44,7 +44,8 @@ services:
       - moranbuy_uploads:/app/data/uploads
     ports: ["127.0.0.1:${MORANBUY_HOST_PORT:-4100}:4000"]
     networks: [default, moran]
-    mem_limit: 512m
+    # Room for Meta's MMS voice (about 300 MB while loaded; let go after ten idle minutes).
+    mem_limit: 900m
     depends_on:
       moranbuy-postgres: { condition: service_healthy }
       moranbuy-redis: { condition: service_started }

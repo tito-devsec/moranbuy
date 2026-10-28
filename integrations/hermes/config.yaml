@@ -1,11 +1,12 @@
 # MoranBuy's own Hermes Agent (Nous Research) for product research on the public web.
 # Reached only by the MoranBuy API on the internal Docker network; its key is HERMES_API_KEY.
 # Unlike Moran's Hermes (every tool off), this one has exactly the web and browser toolsets and one skill.
+# Every model MoranBuy uses at runtime is a Meta model: Hermes reasons with Muse Spark on the Meta Model API.
 model:
   provider: custom
-  base_url: https://api.openai.com/v1
-  default: gpt-6-luna
-  api_key: ${OPENAI_API_KEY}
+  base_url: https://api.meta.ai/v1
+  default: muse-spark-1.3
+  api_key: ${META_API_KEY}
 
 platform_toolsets:
   api_server: [web, browser, skills]

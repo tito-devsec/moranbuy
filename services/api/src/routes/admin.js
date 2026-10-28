@@ -357,7 +357,7 @@ adminRouter.get('/credentials', asyncHandler(async (_req, res) => res.json({ cre
 const credentialBodies = {
   muse: z.object({ provider: z.enum(['meta', 'openai-compatible', 'disabled']).optional(), baseUrl: z.string().url().optional(), apiKey: z.string().max(400).optional(), model: z.string().max(64).optional(), reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high', 'xhigh']).optional(), reason: z.string().min(3).max(500) }),
   snippe: z.object({ apiKey: z.string().max(400).optional(), webhookSecret: z.string().max(400).optional(), baseUrl: z.string().url().optional(), reason: z.string().min(3).max(500) }),
-  tts: z.object({ provider: z.enum(['azure', 'disabled']).optional(), region: z.string().regex(/^[a-z0-9]{2,30}$/).or(z.literal('')).optional(), apiKey: z.string().max(400).optional(), voiceSw: z.string().max(80).optional(), voiceEn: z.string().max(80).optional(), mode: z.enum(['mirror', 'always', 'off']).optional(), reason: z.string().min(3).max(500) }),
+  tts: z.object({ provider: z.enum(['meta_mms', 'disabled']).optional(), mode: z.enum(['mirror', 'always', 'off']).optional(), reason: z.string().min(3).max(500) }),
   hermes: z.object({ baseUrl: z.union([z.string().url(), z.literal('')]).optional(), apiKey: z.string().max(400).optional(), model: z.string().max(64).optional(), enabled: z.boolean().optional(), allowedDomains: z.string().max(2000).optional(), reason: z.string().min(3).max(500) }),
 };
 adminRouter.put('/credentials/:group', requireAdminAuth(db, 'super_admin'), validate({ params: z.object({ group: z.enum(Object.keys(CREDENTIAL_FIELDS)) }) }), asyncHandler(async (req, res) => {

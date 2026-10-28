@@ -2,6 +2,12 @@
 
 All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
+## 1.1.0 (2026-10-29)
+
+- Every model MoranBuy calls at runtime is now a Meta model (the hackathon rule). Spoken replies use Meta's MMS text-to-speech voices (`facebook/mms-tts-swh`, `mms-tts-eng`) instead of Azure Speech: exported to ONNX and quantized to 8 bits when the image is built (`scripts/tts/`), run in the API process with the ONNX runtime, numbers spelled the way Tanzanians say prices, written as an Ogg Opus voice note in-process. No key is needed; the voices load on first use and are let go after ten idle minutes. On WhatsApp the voice note is sent after Moran has the text answer, so speech never delays it.
+- The optional Hermes research agent reasons with Muse Spark on the Meta Model API instead of OpenAI.
+- The image is Debian slim (the ONNX runtime needs glibc); the API container may use 900 MB.
+
 ## 1.0.1 (2026-10-28)
 
 - `MORAN_INTERNAL_BASE_URL`: the signed channel to Moran (listings pull and every WhatsApp reply) goes to Moran's backend over the Docker network, because Moran's public nginx closes `/internal`; the worker joins that network too.

@@ -89,5 +89,5 @@ A voice note or photo is opened only after the sender accepted the terms. Moran 
 WhatsApp and forwards the bytes in its signed request; Moran's own transcription and image tools are
 not used for MoranBuy. MoranBuy keeps it privately (never public), decodes voice notes inside its own
 process, and sends them to the Meta Model API to be heard; the transcript is stored beside the
-recording. Spoken replies are made by Azure Speech from the written reply and sent back as a voice
-note. Both are removed by the retention purge (30 and 7 days).
+recording. Spoken replies are made inside MoranBuy by Meta's MMS voices from the written reply and sent back
+as a voice note; no text leaves the server for speech. Both are removed by the retention purge (30 and 7 days).

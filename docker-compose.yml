@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
     environment:
       API_SERVER_KEY: ${HERMES_API_KEY:-}
-      OPENAI_API_KEY: ${HERMES_OPENAI_API_KEY:-}
+      META_API_KEY: ${MUSE_API_KEY:-}
     volumes:
       - ./integrations/hermes/config.yaml:/root/.hermes/config.yaml:ro
       - ./integrations/hermes/skills:/root/.hermes/skills:ro

@@ -7,8 +7,8 @@ export const CREDENTIAL_FIELDS = Object.freeze({
   muse: ['provider', 'baseUrl', 'apiKey', 'model', 'reasoningEffort'],
   snippe: ['apiKey', 'webhookSecret', 'baseUrl'],
   hermes: ['baseUrl', 'apiKey', 'model', 'enabled', 'allowedDomains'],
-  // Spoken replies: Meta's API has no text-to-speech, so a speech service is used; Azure Speech has Tanzanian Swahili voices.
-  tts: ['provider', 'region', 'apiKey', 'voiceSw', 'voiceEn', 'mode'],
+  // Spoken replies with Meta's MMS voices, run inside MoranBuy; no key is needed, only on or off and when to speak.
+  tts: ['provider', 'mode'],
 });
 const SECRET = new Set(['apiKey', 'webhookSecret']);
 const CACHE_MS = 15000;
@@ -57,7 +57,7 @@ export async function describeCredentials(opts) {
   const env = config();
   const mask = (v) => (v ? { configured: true, last4: String(v).slice(-4) } : { configured: false });
   return {
-    tts: { provider: c.tts.provider || 'disabled', region: c.tts.region || null, voiceSw: c.tts.voiceSw || DEFAULT_VOICES.sw, voiceEn: c.tts.voiceEn || DEFAULT_VOICES.en, mode: c.tts.mode || 'mirror', apiKey: mask(c.tts.apiKey) },
+    tts: { ...(await ttsRuntimeConfig(opts)) },
     muse: { provider: c.muse.provider || env.MUSE_PROVIDER, baseUrl: c.muse.baseUrl || env.MUSE_API_BASE_URL, model: c.muse.model || env.MUSE_MODEL_ID, reasoningEffort: c.muse.reasoningEffort || env.MUSE_REASONING_EFFORT, apiKey: mask(c.muse.apiKey || env.MUSE_API_KEY), source: c.muse.apiKey ? 'admin' : env.MUSE_API_KEY ? 'environment' : 'none' },
     snippe: { baseUrl: c.snippe.baseUrl || env.SNIPPE_BASE_URL, apiKey: mask(c.snippe.apiKey || env.SNIPPE_API_KEY), webhookSecret: mask(c.snippe.webhookSecret || env.SNIPPE_WEBHOOK_SECRET), provider: env.PAYMENT_PROVIDER, source: c.snippe.apiKey ? 'admin' : env.SNIPPE_API_KEY ? 'environment' : 'none' },
     hermes: { baseUrl: c.hermes.baseUrl || env.HERMES_BASE_URL || null, model: c.hermes.model || env.HERMES_MODEL, enabled: c.hermes.enabled ?? env.MORANBUY_WEB_RESEARCH_ENABLED, allowedDomains: c.hermes.allowedDomains || env.MORANBUY_ALLOWED_DOMAINS || '', apiKey: mask(c.hermes.apiKey || env.HERMES_API_KEY) },
@@ -89,11 +89,13 @@ export async function researchRuntimeConfig(opts) {
 
 export function resetCredentialsCacheForTests() { cache = { at: 0, value: null }; }
 
-export const DEFAULT_VOICES = Object.freeze({ sw: 'sw-TZ-RehemaNeural', en: 'en-KE-AsiliaNeural' });
+export const MMS_VOICES = Object.freeze({ sw: 'facebook/mms-tts-swh', en: 'facebook/mms-tts-eng' });
 
-// Effective speech settings: off unless a provider, region and key are all set.
+// Effective speech settings: Meta MMS is on by default once its models are in the image; any older provider value reads as Meta MMS.
 export async function ttsRuntimeConfig(opts) {
   const c = (await getCredentials(opts)).tts || {};
-  const enabled = c.provider === 'azure' && !!c.region && !!c.apiKey;
-  return { enabled, provider: c.provider || 'disabled', region: c.region || null, apiKey: c.apiKey || null, voiceSw: c.voiceSw || DEFAULT_VOICES.sw, voiceEn: c.voiceEn || DEFAULT_VOICES.en, mode: c.mode || 'mirror' };
+  const provider = c.provider === 'disabled' ? 'disabled' : 'meta_mms';
+  const { mmsAvailable } = await import('./speech/mms.js');
+  const models = { sw: mmsAvailable('sw'), en: mmsAvailable('en') };
+  return { enabled: provider === 'meta_mms' && (models.sw || models.en), provider, mode: c.mode || 'mirror', models, voices: MMS_VOICES };
 }

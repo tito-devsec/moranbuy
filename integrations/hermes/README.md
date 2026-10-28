@@ -6,6 +6,7 @@ sites so a customer can see "found online, not confirmed" alternatives next to v
 - Container: `docker compose --profile research up hermes` (image `nousresearch/hermes-agent`,
   config `config.yaml`, skill `skills/moranbuy-product-research/SKILL.md`).
 - Toolsets on: `web`, `browser`, `skills`. Everything else off, no memory, no self-editing skills.
+- Its model is Muse Spark on the Meta Model API (`META_API_KEY` in the Hermes container), like every model MoranBuy uses at runtime.
 - MoranBuy calls its OpenAI-compatible API (`HERMES_BASE_URL`, `HERMES_API_KEY`) through
   `packages/integrations/src/research.js`, which parses the skill's JSON and validates every item
   (URL on an allowed domain, numeric price or null).

@@ -231,18 +231,15 @@ function locationsPage(d, reload) {
     ], d.locations, { empty: t('No locations match.') }), pager('Locations', d, reload)) }));
 }
 
-// Spoken replies: Meta's API has no text to speech, so voice replies go through Azure Speech's Tanzanian Swahili voices.
+// Spoken replies with Meta's MMS voices, run inside MoranBuy: only on or off and when to speak.
 function ttsCard(c, reload) {
   const form = h('div', { class: 'row g-2 align-items-end' },
-    h('div', { class: 'col-md-2' }, select({ name: 'provider', label: t('Provider'), value: c.provider, options: [{ value: 'disabled', label: t('Off') }, { value: 'azure', label: 'Azure Speech' }] })),
-    h('div', { class: 'col-md-2' }, input({ name: 'region', label: t('Region'), value: c.region || '', placeholder: 'westeurope' })),
-    h('div', { class: 'col-md-2' }, input({ name: 'apiKey', label: t('Speech key'), type: 'password', placeholder: c.apiKey.configured ? `…${c.apiKey.last4} (${t('blank keeps')})` : '' })),
-    h('div', { class: 'col-md-2' }, input({ name: 'voiceSw', label: t('Swahili voice'), value: c.voiceSw })),
-    h('div', { class: 'col-md-2' }, input({ name: 'voiceEn', label: t('English voice'), value: c.voiceEn })),
-    h('div', { class: 'col-md-2' }, select({ name: 'mode', label: t('Speak'), value: c.mode, options: [{ value: 'mirror', label: t('Answer voice with voice') }, { value: 'always', label: t('Always') }, { value: 'off', label: t('Never') }] })),
+    h('div', { class: 'col-md-3' }, select({ name: 'provider', label: t('Voice'), value: c.provider, options: [{ value: 'meta_mms', label: t('Meta MMS voices') }, { value: 'disabled', label: t('Off') }] })),
+    h('div', { class: 'col-md-3' }, select({ name: 'mode', label: t('Speak'), value: c.mode, options: [{ value: 'mirror', label: t('Answer voice with voice') }, { value: 'always', label: t('Always') }, { value: 'off', label: t('Never') }] })),
     h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
-  const save = button(t('Save spoken replies'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/tts', f); toast(t('Saved.')); reload(); }).catch(toastError) });
-  return card({ cls: 'mt-3', title: t('Spoken replies (text to speech)'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t("Voice notes are heard by Muse Spark. Meta's API has no text to speech, so replies are spoken with Azure Speech; the voice note goes back through the MoranBuy number.") }), form, h('div', { class: 'mt-2' }, save)) });
+  const save = button(t('Save spoken replies'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); await mb.put('credentials/tts', f); toast(t('Saved.')); reload(); }).catch(toastError) });
+  const state = c.enabled ? t('Voices installed and on.') : c.models?.sw ? t('Off.') : t('Voices not installed in this image.');
+  return card({ cls: 'mt-3', title: t('Spoken replies (text to speech)'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: `${t("Voice notes are heard by Muse Spark and answered with Meta's MMS voices (Swahili and English), run inside MoranBuy; the voice note goes back through the MoranBuy number.")} ${state}` }), form, h('div', { class: 'mt-2' }, save)) });
 }
 
 // What Muse cost and the rate card behind it; Meta's price is not in the API response, so the rates are entered here.

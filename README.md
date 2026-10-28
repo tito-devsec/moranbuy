@@ -6,7 +6,7 @@ matches to the customer, prioritizing budget fit and total cost before location 
 
 > Build status: complete and tested for customers (WhatsApp and web, text, photos and voice), standalone and
 > Moran-registered businesses, and administrators in Moran's Super Admin. Live services (WhatsApp, the Meta
-> Model API, Snippe, Azure Speech) run once their keys are entered; `HACKATHON_CHANGES.md` lists what is new.
+> Model API, Snippe) run once their keys are entered; every model it calls at runtime is a Meta model; `HACKATHON_CHANGES.md` lists what is new.
 
 ## The problem
 
@@ -71,10 +71,11 @@ See `docs/muse-integration.md` and `docs/muse-duties.md` (everything Muse does, 
 | Muse Spark 1.2 (audio) | Hears WhatsApp and browser voice notes in Swahili, English or a mix (`input_audio`, WAV) |
 | Muse Voice Transcribe | Second ear for voice notes when Muse Spark audio is unavailable (`/v1/asr/transcribe`) |
 | Segment Anything 3.1 | Finds every product Muse named in a business's photo; each box is cut out in-process and becomes that listing's photo, so one shelf photo lists several products |
+| MMS text-to-speech (`facebook/mms-tts-swh`, `mms-tts-eng`) | Speaks the reply back as a WhatsApp voice note, in Swahili or English, run inside MoranBuy with no outside speech service |
 
 Voice notes are decoded from Ogg Opus to 16 kHz WAV inside the Node process (`ogg-opus-decoder`, WebAssembly); nothing is
-installed on the server. Meta's API has no text to speech, so spoken replies use Azure Speech's Tanzanian Swahili voices,
-returned directly as Ogg Opus voice notes. Every Meta call is recorded with its latency, tokens and cost.
+installed on the server. Spoken replies use Meta's MMS text-to-speech voices (Swahili and English), exported to ONNX when the
+image is built and run in the same process; the speech is written as an Ogg Opus voice note in-process too. Every Meta call is recorded with its latency, tokens and cost.
 
 ## How it scales
 
@@ -143,7 +144,8 @@ npm run migrate
 npm run dev              # http://localhost:4000/health
 ```
 
-Or `docker compose up` for Postgres, Redis, the API and the workers.
+Or `docker compose up` for Postgres, Redis, the API and the workers. The Docker image exports Meta's MMS voices itself;
+to hear spoken replies outside Docker, run once `pip install -r scripts/tts/requirements.txt && python scripts/tts/export-mms-tts.py models/tts`.
 
 ## Tests
 
@@ -178,5 +180,5 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 - Web research (Hermes) is off by default and needs an allow-list of shop domains.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - The Meta Model API needs a key; Muse Voice Transcribe does not list Swahili among its 25 languages, so Swahili voice notes go to Muse Spark 1.2 audio first.
-- Spoken replies need an Azure Speech key (Meta's API has no text to speech).
+- Spoken replies use Meta's MMS voices, whose licence is non-commercial (CC-BY-NC 4.0): right for the hackathon and pilots; paid production use needs a commercial voice from Meta or the voices switched off.
 - Live campaign and follow-up sending stays in dry-run until every gate is verified in production.

@@ -81,6 +81,8 @@ cd /opt/moranbuy
 cp deploy/env.production.example .env && chmod 600 .env && nano .env   # every CHANGE_ME, the shared secret, APP_URL; keep the dry-run flags true
 # MORAN_INTERNAL_BASE_URL=http://backend:3000: Moran's nginx closes /internal to the public, so the signed channel uses the Docker network
 docker network ls | grep moran-backend          # Moran's network; set MORAN_DOCKER_NETWORK in .env if it is not moran-backend_default
+# The first build also exports Meta's MMS voices (Swahili, English) to ONNX: it downloads about 1 GB of Python packages once,
+# takes several minutes, and leaves two 38 MB voices in the image; `docker builder prune` afterwards frees the build cache.
 docker compose -f deploy/docker-compose.vps.yml --env-file .env up -d --build
 docker compose -f deploy/docker-compose.vps.yml logs -f moranbuy-api   # until "MoranBuy API listening"
 curl -s http://127.0.0.1:4100/ready

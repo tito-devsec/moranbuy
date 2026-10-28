@@ -8,7 +8,10 @@ import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setShoppingDepsForTests } from '../../services/api/src/services/shopping.js';
 import { toSpeechWav, encodeWav } from '../../services/api/src/services/audio.js';
-import { spokenText, shouldSpeak } from '../../services/api/src/services/voice-reply.js';
+import os from 'node:os';
+import path from 'node:path';
+import { spokenText, shouldSpeak, setSynthesizerForTests } from '../../services/api/src/services/voice-reply.js';
+import { settleVoiceJobs } from '../../services/api/src/routes/internal-inbound.js';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { MuseClient, parseSamBoxes, museTranscribeVoice } from '@moranbuy/muse-intelligence';
 import { FakeGeocoder, FakeMoranInternalClient, signBody } from '@moranbuy/integrations';
@@ -69,13 +72,13 @@ before(async () => {
   for (const p of ['255700000501', '255712000333']) await acceptedCustomer(p);
   const [root] = await db('admin_users').insert({ email: 'root@moranbuy.test', name: 'Root', password_hash: await hashPassword('x'.repeat(12)), role: 'super_admin' }).returning('*');
   rootTok = signAccessToken({ type: 'admin', sub: root.id, role: 'super_admin', email: root.email });
-  // Spoken replies go to Azure Speech; this stand-in answers with a real Ogg Opus voice note.
-  globalThis.fetch = async (url, init) => {
-    if (String(url).includes('.tts.speech.microsoft.com')) { calls.push({ kind: 'tts', url: String(url), headers: init.headers, ssml: init.body }); return new Response(TONE, { status: 200, headers: { 'Content-Type': 'audio/ogg' } }); }
-    return realFetch(url, init);
-  };
+  // Spoken replies come from Meta's MMS voices; the model files are only marked present and this stand-in answers with a real Ogg Opus note.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mms-'));
+  for (const code of ['swh', 'eng']) { fs.mkdirSync(path.join(dir, code)); fs.writeFileSync(path.join(dir, code, 'model.onnx'), ''); fs.writeFileSync(path.join(dir, code, 'tokenizer.json'), '{}'); }
+  process.env.TTS_MODEL_DIR = dir;
+  setSynthesizerForTests(async ({ text, language }) => { calls.push({ kind: 'tts', text, language }); return { ok: true, audio: TONE, voice: 'facebook/mms-tts-swh' }; });
 });
-after(async () => { globalThis.fetch = realFetch; server.close(); await closeDatabase(); });
+after(async () => { setSynthesizerForTests(null); delete process.env.TTS_MODEL_DIR; server.close(); await closeDatabase(); });
 
 test('a WhatsApp voice note (Ogg Opus) and a browser WAV are decoded in-process to 16 kHz mono WAV; other bytes are refused', async () => {
   const ogg = await toSpeechWav(TONE);
@@ -116,9 +119,9 @@ test('Muse Spark 1.2 hears the voice note; when it fails, Muse Voice Transcribe 
 });
 
 test('a customer voice note on WhatsApp is heard by Muse, shopped from, kept privately with its transcript, and answered in voice too', async () => {
-  const set = await api('/api/admin/credentials/tts', { method: 'PUT', token: rootTok, body: { provider: 'azure', region: 'westeurope', apiKey: 'speech-key-1234', mode: 'mirror', reason: 'Spoken replies for the demo' } });
+  const set = await api('/api/admin/credentials/tts', { method: 'PUT', token: rootTok, body: { provider: 'meta_mms', mode: 'mirror', reason: 'Spoken replies for the demo' } });
   assert.equal(set.status, 200);
-  assert.equal(set.body.credentials.tts.apiKey.last4, '1234');
+  assert.deepEqual([set.body.credentials.tts.provider, set.body.credentials.tts.enabled, set.body.credentials.tts.voices.sw], ['meta_mms', true, 'facebook/mms-tts-swh']);
   calls = [];
   const r = await send({ messageId: 'wv1', from: '255700000501', kind: 'audio', media: { base64: TONE.toString('base64'), mime: 'audio/ogg; codecs=opus' } });
   assert.equal(r.status, 200);
@@ -131,12 +134,11 @@ test('a customer voice note on WhatsApp is heard by Muse, shopped from, kept pri
   assert.equal(note.duration_ms, 1200);
   const sig = await db('demand_signals').where({ source_kind: 'voice' }).first();
   assert.equal(sig.product_type, 'sofa');
-  // The spoken reply: Azure Speech asked for a Tanzanian Swahili Ogg Opus voice note, sent back through Moran as audio.
+  // The spoken reply: Meta's Swahili MMS voice says the written reply, sent back through Moran as audio after Moran had its answer.
+  await settleVoiceJobs();
   const tts = calls.find((c) => c.kind === 'tts');
-  assert.match(tts.url, /^https:\/\/westeurope\.tts\.speech\.microsoft\.com\//);
-  assert.equal(tts.headers['X-Microsoft-OutputFormat'], 'ogg-24khz-16bit-mono-opus');
-  assert.match(tts.ssml, /sw-TZ-RehemaNeural/);
-  assert.match(tts.ssml, /Sofa ya watu watatu - Duka la Picha/);
+  assert.equal(tts.language, 'sw');
+  assert.match(tts.text, /Sofa ya watu watatu - Duka la Picha/);
   const audio = moran.sent.find((m) => m.type === 'audio');
   assert.equal(Buffer.from(audio.audioBase64, 'base64').subarray(0, 4).toString(), 'OggS');
   assert.equal(audio.idempotencyKey, 'moranbuy:wv1:voice');

@@ -87,15 +87,20 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     sent.push({ idempotencyKey, status: result.status });
     if (!result.ok) logger.warn({ status: result.status }, 'Reply to Moran not delivered');
   }
-  // A voice note is answered with a voice note too, when spoken replies are set up; the written reply always goes first.
-  const spoken = await voiceReplyFor({ replies: out.replies, language: customer.language === 'en' ? 'en' : 'sw', inboundKind: kind, state: out.session?.state, customerId: customer.id }).catch(() => null);
-  if (spoken?.ok) {
-    const r = await moran.sendAudio({ to: from, audioBase64: spoken.audio.toString('base64'), mime: spoken.mime, idempotencyKey: `moranbuy:${messageId}:voice` });
-    sent.push({ idempotencyKey: `moranbuy:${messageId}:voice`, status: r.status, voice: true });
-  }
   await db('webhook_events').where({ source: 'moran', event_id: String(messageId) }).update({ status: 'processed', processed_at: db.fn.now() });
   res.json({ ok: true, sessionId: out.session.id, state: out.session.state, sent, heard: heard ? { ok: heard.ok, source: heard.source || null, reason: heard.reason || null } : null });
+  // A voice note is answered with a voice note too, after the written reply and after Moran has its answer, so speech never delays the text.
+  const job = voiceReplyFor({ replies: out.replies, language: customer.language === 'en' ? 'en' : 'sw', inboundKind: kind, state: out.session?.state, customerId: customer.id })
+    .then((spoken) => (spoken?.ok ? moran.sendAudio({ to: from, audioBase64: spoken.audio.toString('base64'), mime: spoken.mime, idempotencyKey: `moranbuy:${messageId}:voice` }) : null))
+    .then((r) => { if (r && !r.ok) logger.warn({ status: r.status }, 'Spoken reply to Moran not delivered'); })
+    .catch((err) => logger.warn({ err: err.message }, 'Spoken reply failed; the text reply stands'))
+    .finally(() => voiceJobs.delete(job));
+  voiceJobs.add(job);
 }));
+
+// Spoken replies still being made, so tests and a graceful shutdown can wait for them.
+const voiceJobs = new Set();
+export const settleVoiceJobs = () => Promise.all([...voiceJobs]);
 
 // Delivery receipts (sent, delivered, read, failed) for messages MoranBuy sent, forwarded by Moran; each only moves the ledger forward.
 internalInboundRouter.post('/status', asyncHandler(async (req, res) => {

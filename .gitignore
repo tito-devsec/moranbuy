@@ -9,3 +9,4 @@ dist/
 uploads/
 *.log
 .DS_Store
+models/

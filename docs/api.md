@@ -66,7 +66,7 @@ MoranBuy admin token for the fallback app.
 - `GET /merchants/:id/uploads`, `GET /uploads/:id` (a private file as base64 for review; audited)
 - `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`
 - `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
-- `PUT /credentials/tts` `{ provider: azure|disabled, region, apiKey, voiceSw, voiceEn, mode: mirror|always|off, reason }` (spoken replies; super admin)
+- `PUT /credentials/tts` `{ provider: meta_mms|disabled, mode: mirror|always|off, reason }` (spoken replies with Meta's MMS voices; super admin)
 - `GET|PUT /retention` (keep periods in days, floors, last preview and purge), `POST /retention/run` `{ dryRun, confirm?, reason }` (a real purge: super admin and `confirm: true`)
 - `GET|PUT /notifications/schedule-reminder` `{ enabled?, templateName?, templateLanguage?, textSw?, textEn?, templateParams?, quietFrom?, quietTo?, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
