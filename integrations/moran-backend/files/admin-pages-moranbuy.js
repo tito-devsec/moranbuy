@@ -114,7 +114,7 @@ function setupCard(state, onDone) {
 }
 
 // ---- the dashboard: the MoranBuy admin sections, read through the signed proxy ----
-const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Audit'];
+const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Retention', 'Audit'];
 
 function dashboard() {
   const body = h('div');
@@ -142,6 +142,7 @@ async function load(name) {
     case 'Muse Spark': return { muse: await mb.get('muse'), credentials: (await mb.get('credentials')).credentials };
     case 'Credentials': return mb.get('credentials');
     case 'Integration Health': return mb.get('integrations');
+    case 'Retention': return mb.get('retention');
     case 'Audit': return mb.get('audit');
     default: return {};
   }
@@ -270,6 +271,16 @@ function render(name, d, reload) {
       const hForm = h('div', { class: 'row g-2 align-items-end' }, h('div', { class: 'col-md-3' }, input({ name: 'baseUrl', label: t('Hermes base URL (blank: plain fetch)'), value: hm.baseUrl || '' })), h('div', { class: 'col-md-3' }, input({ name: 'apiKey', label: t('Hermes API key'), type: 'password', placeholder: hm.apiKey.configured ? t('set (blank keeps)') : '', maxlength: 400 })), h('div', { class: 'col-md-3' }, input({ name: 'allowedDomains', label: t('Allowed shop domains'), value: hm.allowedDomains, maxlength: 2000 })), h('div', { class: 'col-md-3' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
       const hSave = button(t('Save Hermes and enable research'), { onClick: () => busy(hSave, async () => { const f = readForm(hForm); if (!f.reason) return toastError(new Error(t('A reason is required.'))); if (!f.apiKey) delete f.apiKey; await mb.put('credentials/hermes', { ...f, enabled: !!f.allowedDomains }); toast(t('Hermes saved.')); reload(); }).catch(toastError) });
       return h('div', {}, card({ title: t('Snippe mobile money (the same account as Moran)'), body: h('div', {}, sForm, h('div', { class: 'mt-2' }, sSave), h('p', { class: 'fs-xs text-muted mt-2', text: t('Register the MoranBuy webhook URL with Snippe: {u}', { u: `${(d.credentials.snippe.baseUrl ? '' : '')}https://buy.moranai.co.tz/webhooks/payments` }) })) }), card({ cls: 'mt-3', title: t('Hermes research agent (optional)'), body: h('div', {}, hForm, h('div', { class: 'mt-2' }, hSave)) }));
+    }
+    case 'Retention': {
+      // How long each kind of record is kept; a preview counts what would go, a purge deletes it and is audited.
+      const keys = Object.keys(d.defaults);
+      const form = h('div', { class: 'row g-2' }, ...keys.map((k) => h('div', { class: 'col-md-3' }, input({ name: k, label: t(`${k.replace(/Days$/, '').replace(/([A-Z])/g, ' $1').toLowerCase()} (days, min ${d.floors[k]})`), type: 'number', value: d.settings[k] }))), h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+      const save = button(t('Save retention'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) return toastError(new Error(t('A reason is required.'))); const body = { reason: f.reason }; for (const k of keys) if (f[k] !== '' && f[k] !== undefined) body[k] = Number(f[k]); await mb.put('retention', body); toast(t('Saved.')); reload(); }).catch(toastError) });
+      const run = (dryRun) => confirmAction({ title: dryRun ? t('Preview what would be removed') : t('Delete expired records now'), requireReason: true, danger: !dryRun, action: async (reason) => { await mb.post('retention/run', { dryRun, confirm: dryRun ? undefined : true, reason }); reload(); } });
+      const res = (x) => x ? simpleTable([{ key: 'table', label: t('Records') }, { key: 'keepDays', label: t('Kept (days)') }, { key: 'expired', label: t('Expired') }, { key: 'removed', label: t('Removed') }], Object.entries(x.result).map(([table, v]) => ({ table, ...v }))) : h('p', { class: 'text-muted', text: t('Not run yet.') });
+      return h('div', {}, card({ title: t('Retention'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('{s}Never purged here: {n}.', { s: d.scheduledDryRun ? 'The scheduled purge runs every 6 hours in count-only mode (RETENTION_DRY_RUN=true). ' : 'The scheduled purge deletes expired records every 6 hours. ', n: d.neverPurged.join(', ') }) }), form, h('div', { class: 'mt-2 d-flex gap-2' }, save, button(t('Preview'), { variant: 'secondary', onClick: () => run(true) }), button(t('Purge now'), { variant: 'danger', onClick: () => run(false) }))) }),
+        h('div', { class: 'row g-3 mt-1' }, h('div', { class: 'col-lg-6' }, card({ title: t('Last preview {w}', { w: d.lastPreview ? formatDateTime(d.lastPreview.ranAt) : '' }), body: res(d.lastPreview) })), h('div', { class: 'col-lg-6' }, card({ title: t('Last purge {w}', { w: d.lastRun ? formatDateTime(d.lastRun.ranAt) : '' }), body: res(d.lastRun) }))));
     }
     case 'Integration Health': {
       const pull = button(t('Pull opted-in Moran businesses now'), { onClick: () => busy(pull, async () => { const r = await mb.post('sync/moran-listings', {}); toast(r.ok ? t('Pulled: {m} businesses, {c} new, {u} updated', { m: r.merchants, c: r.created, u: r.updated }) : t('Pull failed: {s}', { s: r.status }), r.ok ? 'success' : 'warning'); reload(); }).catch(toastError) });

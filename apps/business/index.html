@@ -246,6 +246,11 @@
                   <button class="underline" x-show="c.status === 'priced'" @click="pay(c)">Pay</button>
                   <button class="underline" x-show="['awaiting_payment','paid','ready'].includes(c.status)" @click="act(c, 'readiness')">Check gates</button>
                   <button class="underline font-semibold" x-show="c.status === 'ready'" @click="confirmSend(c)">Confirm and send</button>
+                  <span class="inline-flex items-center gap-1" x-show="c.status === 'ready'"><input type="datetime-local" class="border rounded p-1 text-xs" x-model="sendAt[c.id]"><button class="underline" @click="scheduleSend(c)">Schedule</button></span>
+                  <span class="text-xs rounded bg-blue-50 border border-blue-200 px-2 py-0.5" x-show="c.status === 'scheduled'" x-text="'Scheduled for ' + new Date(c.scheduledAt).toLocaleString()"></span>
+                  <button class="underline" x-show="c.status === 'scheduled'" @click="act(c, 'unschedule')">Unschedule</button>
+                  <button class="underline" x-show="c.status === 'scheduled'" @click="act(c, 'pause')">Pause</button>
+                  <span class="text-xs text-red-700" x-show="c.status === 'failed' && c.statusReason" x-text="c.statusReason"></span>
                   <button class="underline" x-show="c.status === 'dispatching'" @click="act(c, 'pause')">Pause</button>
                   <button class="underline" x-show="c.status === 'paused'" @click="act(c, 'resume')">Resume</button>
                 </div>
@@ -299,7 +304,7 @@
       return {
         me: null, tab: 'Overview', tabs: ['Overview', 'Products', 'Locations', 'Orders', 'Campaigns', 'Follow-up'],
         templates: [], offers: [], campaigns: [], senderInfo: null, followup: { question: '', decision: null, registrationUrl: null, active: false, settings: { scheduleText: '24, 72', maxAttempts: 2, paused: false }, leads: [], summary: '' }, error: '', notice: '',
-        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, insights: null, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
+        listings: [], locations: [], orders: [], editing: null, editingLoc: null, pricing: {}, lastPayment: null, insights: null, sendAt: {}, registration: null, registrationToken: (location.hash.match(/followup=([A-Za-z0-9_-]+)/) || [])[1] || null,
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
         async init() { if (this.registrationToken) this.tab = 'Follow-up'; if (MoranBuy.session.loggedIn()) await this.loadMe(); },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
@@ -362,6 +367,8 @@
         revise(c) { const revision = prompt('How should the draft change?'); if (!revision) return; return this.act(c, 'draft', { revision }); },
         editBody(c) { const draftBody = prompt('Message text:', c.draftBody || ''); if (draftBody === null) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/${c.id}`, { method: 'PATCH', body: { draftBody } }); await this.load(); }); },
         pay(c) { const phone = prompt('Mobile money number to charge:') || undefined; return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/pay`, { method: 'POST', body: { phone } }); await this.load(); this.notice = `Payment ${d.payment.reference} started (${d.payment.provider}): ${MoranBuy.money(d.payment.amount, d.payment.currency)}. The campaign waits until the provider confirms it.`; }); },
+        // Confirms now, but sending waits for the chosen time (08:00 to 21:00 Tanzania time); every gate is checked again then.
+        scheduleSend(c) { const v = this.sendAt[c.id]; if (!v) { this.error = 'Pick a date and time first.'; return; } const when = new Date(v); if (!confirm(`Schedule "${c.name}" for ${c.pricing.recipients} people at ${when.toLocaleString()}?`)) return; return this.run(async () => { await MoranBuy.api(`/api/merchant/campaigns/${c.id}/confirm`, { method: 'POST', body: { confirm: true, sendAt: when.toISOString() } }); await this.load(); }, `Scheduled for ${when.toLocaleString()}. You can unschedule it until then.`); },
         confirmSend(c) { if (!confirm(`Send "${c.name}" to ${c.pricing.recipients} people now? This cannot be undone.`)) return; return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/campaigns/${c.id}/confirm`, { method: 'POST', body: { confirm: true } }); await this.load(); this.notice = d.dryRun ? 'Confirmed in dry-run mode: recipients are recorded, nothing leaves the server.' : 'Confirmed. Messages are being sent.'; }); },
         async loadFollowup() { const o = await MoranBuy.api('/api/merchant/followup/offer'); this.followup.question = o.question; this.followup.decision = o.decision; this.followup.active = (this.me?.entitlements || []).some((e) => e.service === 'paid_followup' && e.status === 'active'); if (this.followup.active) { const s = (await MoranBuy.api('/api/merchant/followup/settings')).settings; this.followup.settings = { scheduleText: s.scheduleHours.join(', '), maxAttempts: s.maxAttempts, paused: s.paused }; this.followup.leads = (await MoranBuy.api('/api/merchant/followup/leads')).leads; } },
         answerFollowup(accept) { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/followup/offer/answer', { method: 'POST', body: { accept } }); this.followup.decision = d.decision; this.followup.registrationUrl = d.registrationUrl; await this.loadMe(); await this.loadFollowup(); }); },

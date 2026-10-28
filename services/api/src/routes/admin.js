@@ -25,6 +25,7 @@ import { loadOrderAlertSettings, renderOrderAlert, DEFAULT_ORDER_ALERT } from '.
 import { loadTerms, termsPrompt, DEFAULT_TERMS } from '../services/terms.js';
 import { demandOverview } from '../services/insights.js';
 import { loadReminderSettings, renderReminder, DEFAULT_SCHEDULE_REMINDER } from '../services/schedule-reminders.js';
+import { loadRetention, purgeExpired, retentionFloor, DEFAULT_RETENTION, NEVER_PURGED } from '../services/retention.js';
 
 export const adminRouter = express.Router();
 const idParams = z.object({ id: z.string().uuid() });
@@ -73,6 +74,31 @@ adminRouter.get('/overview', asyncHandler(async (_req, res) => {
 adminRouter.get('/insights', validate({ query: z.object({ days: z.coerce.number().int().min(1).max(365).default(30), merchantId: z.string().uuid().optional(), language: z.enum(['sw', 'en']).default('en') }).passthrough() }), asyncHandler(async (req, res) => res.json(await demandOverview({ muse: shoppingDeps().muse, merchantId: req.query.merchantId || null, days: req.query.days, language: req.query.language }))));
 adminRouter.get('/schedules', asyncHandler(async (_req, res) => res.json({ schedules: await db('customer_schedules as s').join('customers as c', 'c.id', 's.customer_id').leftJoin('merchants as m', 'm.id', 's.merchant_id').where('s.status', 'scheduled').orderBy('s.due_at', 'asc').limit(200).select('s.*', 'c.region', 'c.district', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, customer_id: undefined }))) })));
 adminRouter.get('/catalog-uploads', asyncHandler(async (_req, res) => res.json({ uploads: await db('catalog_uploads as u').join('merchants as m', 'm.id', 'u.merchant_id').orderBy('u.created_at', 'desc').limit(200).select('u.id', 'u.kind', 'u.status', 'u.reason', 'u.muse_status', 'u.listing_id', 'u.created_at', 'm.business_name').then((rows) => rows.map((r) => ({ ...r, from_phone: undefined }))) })));
+
+// ---- retention ----
+// How long each record is kept, what the last runs did, and what would go now.
+adminRouter.get('/retention', asyncHandler(async (_req, res) => {
+  const [settings, lastRun, lastPreview] = [await loadRetention(), (await db('platform_settings').where({ key: 'retention_last_run' }).first())?.value || null, (await db('platform_settings').where({ key: 'retention_last_preview' }).first())?.value || null];
+  res.json({ settings, defaults: DEFAULT_RETENTION, floors: Object.fromEntries(Object.keys(DEFAULT_RETENTION).map((k) => [k, retentionFloor(k)])), neverPurged: NEVER_PURGED, scheduledDryRun: config().RETENTION_DRY_RUN, lastRun, lastPreview });
+}));
+const retentionDays = Object.fromEntries(Object.keys(DEFAULT_RETENTION).map((k) => [k, z.number().int().min(retentionFloor(k)).max(3650).optional()]));
+adminRouter.put('/retention', manage, validate({ body: z.object({ ...retentionDays, reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  const { reason: why, ...patch } = req.body;
+  const before = await loadRetention();
+  await db('platform_settings').insert({ key: 'retention', value: JSON.stringify({ ...before, ...patch }), updated_by: req.admin.email, updated_at: db.fn.now() }).onConflict('key').merge();
+  await act(req, { action: 'retention.changed', targetType: 'settings', targetId: 'retention', before, after: { ...before, ...patch }, reason: why });
+  res.json({ settings: await loadRetention() });
+}));
+// A preview counts what would go; a real run deletes it and needs a super admin, a reason and an explicit confirmation.
+adminRouter.post('/retention/run', manage, validate({ body: z.object({ dryRun: z.boolean().default(true), confirm: z.literal(true).optional(), reason: z.string().min(5).max(500) }) }), asyncHandler(async (req, res) => {
+  if (!req.body.dryRun) {
+    if (req.admin.role !== 'super_admin') throw new ApiError(403, 'SUPER_ADMIN_ONLY', 'Only a super admin can delete expired records.');
+    if (req.body.confirm !== true) throw new ApiError(400, 'CONFIRM_REQUIRED', 'Send confirm: true to delete expired records.');
+  }
+  const out = await purgeExpired({ dryRun: req.body.dryRun, actor: req.admin.email, reason: req.body.reason });
+  if (req.body.dryRun) await act(req, { action: 'retention.previewed', targetType: 'settings', targetId: 'retention', after: out.totals, reason: req.body.reason });
+  res.json(out);
+}));
 
 // ---- merchants ----
 adminRouter.get('/merchants', validate({ query: z.object({ type: z.enum(['standalone', 'moran']).optional(), status: z.string().max(16).optional(), verification: z.string().max(16).optional(), search: z.string().max(80).optional() }).passthrough() }), asyncHandler(async (req, res) => {

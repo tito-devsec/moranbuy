@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ApiError } from '@moranbuy/core';
 import { requireMerchantAuth, requireEntitlement } from '@moranbuy/authorization';
 import { moranAccessTokenFor } from '@moranbuy/merchant-management';
-import { templateInput, listTemplates, saveTemplate, submitTemplate, refreshTemplateStatus, campaignInput, listCampaigns, getCampaign, createCampaign, updateCampaign, draftCampaign, approveDraft, priceAndPreview, startCampaignPayment, checkReadiness, confirmDispatch, pauseCampaign, publicCampaign, senderEligibility } from '@moranbuy/campaign-engine';
+import { templateInput, listTemplates, saveTemplate, submitTemplate, refreshTemplateStatus, campaignInput, listCampaigns, getCampaign, createCampaign, updateCampaign, draftCampaign, approveDraft, priceAndPreview, startCampaignPayment, checkReadiness, confirmDispatch, unscheduleCampaign, pauseCampaign, publicCampaign, senderEligibility } from '@moranbuy/campaign-engine';
 import { listOutreachOffers, answerOutreachOffer } from '@moranbuy/campaign-outreach';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validate } from '../middleware/validate.js';
@@ -64,11 +64,13 @@ campaignsRouter.post('/:id/readiness', needCampaign, validate({ params: idParams
   res.json({ campaign: publicCampaign(out.campaign), ready: out.ok, gates: out.gates, audience: out.audience.counts });
 }));
 // The one call that queues messages; it re-runs every gate first and records who confirmed.
-campaignsRouter.post('/:id/confirm', needCampaign, validate({ params: idParams, body: z.object({ confirm: z.literal(true) }) }), asyncHandler(async (req, res) => {
+campaignsRouter.post('/:id/confirm', needCampaign, validate({ params: idParams, body: z.object({ confirm: z.literal(true), sendAt: z.string().datetime({ offset: true }).optional() }) }), asyncHandler(async (req, res) => {
   const pricing = await loadCampaignPricing();
-  const row = await confirmDispatch(db, req.merchant, req.params.id, { pricingConfigured: pricing.providerUnitTzs !== null, dryRun: engagementDeps().dryRun, ...actor(req) });
-  res.json({ campaign: publicCampaign(row), dryRun: row.dry_run });
+  const row = await confirmDispatch(db, req.merchant, req.params.id, { pricingConfigured: pricing.providerUnitTzs !== null, dryRun: engagementDeps().dryRun, sendAt: req.body.sendAt || null, ...actor(req) });
+  res.json({ campaign: publicCampaign(row), dryRun: row.dry_run, scheduledAt: row.scheduled_at || null });
 }));
+// A campaign waiting for its send time goes back to ready, with its queued ledger removed.
+campaignsRouter.post('/:id/unschedule', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await unscheduleCampaign(db, req.merchant.id, req.params.id, actor(req))) })));
 campaignsRouter.post('/:id/pause', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await pauseCampaign(db, req.merchant.id, req.params.id, actor(req))) })));
 campaignsRouter.post('/:id/resume', needCampaign, validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ campaign: publicCampaign(await pauseCampaign(db, req.merchant.id, req.params.id, { resume: true, ...actor(req) })) })));
 

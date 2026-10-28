@@ -10,7 +10,7 @@ import { setShoppingDepsForTests } from '../../services/api/src/services/shoppin
 import { MuseClient } from '@moranbuy/muse-intelligence';
 import { FakeGeocoder, FakeMoranInternalClient, MoranOwnerClient, signBody } from '@moranbuy/integrations';
 import { SandboxPaymentProvider } from '@moranbuy/billing';
-import { DryRunSender, MoranMerchantSender, processCampaignQueue } from '@moranbuy/campaign-engine';
+import { DryRunSender, MoranMerchantSender, processCampaignQueue, startDueCampaigns } from '@moranbuy/campaign-engine';
 import { processDueFollowups, createLead } from '@moranbuy/followup-engine';
 import { recordConsent, upsertContact } from '@moranbuy/consent-management';
 import { hashPassword, signAccessToken, activateEntitlement } from '@moranbuy/authorization';
@@ -290,4 +290,87 @@ test('a confirmed order gives the merchant a contact with service consent and, w
   assert.equal(await db('consent_events').where({ merchant_id: moranM.id, phone: '255711000008', purpose: 'marketing' }).first(), undefined);
   const lead = await db('followup_leads').where({ merchant_id: moranM.id, phone: '255711000008' }).first();
   assert.equal(lead.consent_basis, 'service_relationship');
+});
+
+// A paid, approved campaign to one consented contact, ready to confirm.
+async function readyCampaign(name, phone) {
+  await upsertContact(db, { merchantId: moranM.id, phone, source: 'order' });
+  await recordConsent(db, { merchantId: moranM.id, phone, purpose: 'marketing', status: 'granted', source: 'web_form' });
+  const c = await api('/api/merchant/campaigns', { method: 'POST', token: moranTok, body: { name, templateId: template.id, audience: { segment: 'phones', phones: [phone] } } });
+  const id = c.body.campaign.id;
+  await api(`/api/merchant/campaigns/${id}`, { method: 'PATCH', token: moranTok, body: { draftBody: 'Ofa. Jibu STOP kuacha.' } });
+  await api(`/api/merchant/campaigns/${id}/approve`, { method: 'POST', token: moranTok });
+  await api(`/api/merchant/campaigns/${id}/price`, { method: 'POST', token: moranTok });
+  const pay = await api(`/api/merchant/campaigns/${id}/pay`, { method: 'POST', token: moranTok, body: {} });
+  await api(`/api/sandbox/payments/${pay.body.payment.reference}/settle`, { method: 'POST', body: { status: 'completed' } });
+  return id;
+}
+// Tomorrow (or later) at the given hour in Dar es Salaam, as an ISO time.
+const darTime = (days, hour) => { const d = new Date(Date.now() + days * 86400000); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour - 3, 0, 0)).toISOString(); };
+
+test('a campaign can be scheduled only for a sensible time: not too soon, not at night, not beyond sixty days', async () => {
+  const id = await readyCampaign('Ratiba mbaya', '255711000005');
+  const confirmAt = (sendAt) => api(`/api/merchant/campaigns/${id}/confirm`, { method: 'POST', token: moranTok, body: { confirm: true, sendAt } });
+  assert.equal((await confirmAt(new Date(Date.now() + 60000).toISOString())).body.error, 'SEND_AT_TOO_SOON');
+  assert.equal((await confirmAt(darTime(2, 23))).body.error, 'SEND_AT_QUIET_HOURS');
+  assert.equal((await confirmAt(darTime(2, 6))).body.error, 'SEND_AT_QUIET_HOURS');
+  assert.equal((await confirmAt(darTime(70, 10))).body.error, 'SEND_AT_TOO_FAR');
+  assert.equal((await confirmAt('kesho asubuhi')).status, 400);
+  const c = await db('campaigns').where({ id }).first();
+  assert.equal(c.confirmed_at, null);
+  assert.equal(Number((await db('campaign_recipients').where({ campaign_id: id }).count('id as n').first()).n), 0);
+});
+
+test('a scheduled campaign waits with its ledger, starts when due, then sends; pausing and resuming before then keeps the schedule', async () => {
+  const id = await readyCampaign('Ratiba ya kesho', '255711000006');
+  const sendAt = darTime(1, 10);
+  const r = await api(`/api/merchant/campaigns/${id}/confirm`, { method: 'POST', token: moranTok, body: { confirm: true, sendAt } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.campaign.status, 'scheduled');
+  assert.equal(new Date(r.body.scheduledAt).toISOString(), sendAt);
+  assert.equal(Number((await db('campaign_recipients').where({ campaign_id: id, status: 'queued' }).count('id as n').first()).n), 1);
+  // Nothing goes before its time.
+  const before = moranInternal.sent.length;
+  await processCampaignQueue(db, sender);
+  assert.equal((await startDueCampaigns(db, { now: () => Date.parse(sendAt) - 60000 })).started, 0);
+  assert.equal(moranInternal.sent.length, before);
+  // Pause and resume before the time: it goes back on its schedule, not out early.
+  assert.equal((await api(`/api/merchant/campaigns/${id}/pause`, { method: 'POST', token: moranTok })).body.campaign.status, 'paused');
+  assert.equal((await api(`/api/merchant/campaigns/${id}/resume`, { method: 'POST', token: moranTok })).body.campaign.status, 'scheduled');
+  // Its time comes: gates pass again, it starts once, and the queue sends it.
+  assert.equal((await startDueCampaigns(db, { now: () => Date.parse(sendAt) + 1000 })).started, 1);
+  assert.equal((await startDueCampaigns(db, { now: () => Date.parse(sendAt) + 2000 })).started, 0);
+  const started = await db('campaigns').where({ id }).first();
+  assert.equal(started.status, 'dispatching');
+  assert.ok(started.dispatched_at);
+  await processCampaignQueue(db, sender);
+  assert.equal(moranInternal.sent.length, before + 1);
+  assert.equal(moranInternal.sent.at(-1).to, '255711000006');
+  assert.ok(await db('audit_events').where({ action: 'campaign.schedule_started', target_id: id }).first());
+});
+
+test('unscheduling removes the queued ledger and the campaign can be confirmed again; a gate that fails at send time fails the campaign with the reason', async () => {
+  const id = await readyCampaign('Ratiba ya kubadilisha', '255711000007');
+  await api(`/api/merchant/campaigns/${id}/confirm`, { method: 'POST', token: moranTok, body: { confirm: true, sendAt: darTime(2, 11) } });
+  const un = await api(`/api/merchant/campaigns/${id}/unschedule`, { method: 'POST', token: moranTok });
+  assert.equal(un.status, 200);
+  assert.equal(un.body.campaign.status, 'ready');
+  assert.equal(un.body.campaign.scheduledAt, null);
+  assert.equal(Number((await db('campaign_recipients').where({ campaign_id: id }).count('id as n').first()).n), 0);
+  assert.equal((await api(`/api/merchant/campaigns/${id}/unschedule`, { method: 'POST', token: moranTok })).status, 409);
+  const sendAt = darTime(3, 9);
+  assert.equal((await api(`/api/merchant/campaigns/${id}/confirm`, { method: 'POST', token: moranTok, body: { confirm: true, sendAt } })).body.campaign.status, 'scheduled');
+  // Meta pauses the template before the send time.
+  await db('message_templates').where({ id: template.id }).update({ status: 'paused' });
+  const out = await startDueCampaigns(db, { now: () => Date.parse(sendAt) + 1000 });
+  await db('message_templates').where({ id: template.id }).update({ status: 'approved' });
+  assert.equal(out.failed, 1);
+  const c = await db('campaigns').where({ id }).first();
+  assert.equal(c.status, 'failed');
+  assert.match(c.status_reason, /template \(paused\)/);
+  const rec = await db('campaign_recipients').where({ campaign_id: id }).first();
+  assert.equal(rec.status, 'skipped');
+  assert.equal(rec.skip_reason, 'schedule_gates_failed');
+  const list = await api('/api/merchant/campaigns', { token: moranTok });
+  assert.match(list.body.campaigns.find((x) => x.id === id).statusReason, /Not sent at the scheduled time/);
 });

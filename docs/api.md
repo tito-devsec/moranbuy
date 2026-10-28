@@ -28,6 +28,7 @@ last 15 minutes; refresh tokens rotate.
 - `GET|POST /api/merchant/contacts`, `GET /contacts/:phone/consent`, `DELETE /contacts/:phone`
 
 ## Campaigns (entitlement `campaign_engine`)
+- `POST /:id/confirm` `{ confirm: true, sendAt? }` sends now or schedules (08:00 to 21:00 Tanzania time, 5 minutes to 60 days ahead); `POST /:id/unschedule` takes a scheduled campaign back to ready
 - `GET|POST /api/merchant/campaigns/templates`, `PATCH /templates/:id`, `POST /templates/:id/submit`, `POST /templates/:id/refresh`
 - `GET /api/merchant/campaigns/sender`
 - `GET|POST /api/merchant/campaigns`, `GET|PATCH /:id`, `POST /:id/draft` `{ revision? }`, `/approve`, `/price`, `/pay` `{ phone? }`, `/readiness`, `/confirm` `{ confirm: true }`, `/pause`, `/resume`
@@ -56,6 +57,7 @@ MoranBuy admin token for the fallback app.
 
 - `GET /insights?days=&merchantId=&language=`, `GET /schedules`, `GET /catalog-uploads`
 - `GET|PUT /service-pricing` `{ campaign_engine?, new_product_outreach?, paid_followup?: { monthlyTzs|null, periodDays }, reason }`
+- `GET|PUT /retention` (keep periods in days, floors, last preview and purge), `POST /retention/run` `{ dryRun, confirm?, reason }` (a real purge: super admin and `confirm: true`)
 - `GET|PUT /notifications/schedule-reminder` `{ enabled?, templateName?, templateLanguage?, textSw?, textEn?, templateParams?, quietFrom?, quietTo?, reason }`
 - `GET|PUT /notifications/order-confirmed` (owner alert wording, approved template name, recent sends)
 - `GET|PUT /credentials/:group` (`muse`, `snippe`, `hermes`; super_admin), `GET|PUT /agent-profile`

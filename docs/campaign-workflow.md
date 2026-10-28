@@ -23,6 +23,18 @@ Moran supplies only the template lifecycle with Meta and the merchant's own send
 
 No campaign dispatches because a draft exists or because a payment arrived.
 
+## Scheduling
+
+`POST /:id/confirm` with `{ confirm: true, sendAt }` schedules instead of sending now. The time must
+be at least five minutes ahead, within sixty days, and between 08:00 and 21:00 Tanzania time; a bad
+time confirms nothing. The gates run and the recipient ledger is written at confirmation (the paid
+audience), and the campaign waits as `scheduled`. Every 30 seconds `startDueCampaigns` claims each
+due campaign once and re-runs every gate (entitlement, payment, sender, template, draft, consent,
+rate limit, pricing). If they hold it becomes `dispatching` and the queue sends it, still rechecking
+consent per recipient; if one fails it becomes `failed` with `status_reason` naming the gate, and its
+queued recipients are skipped. `POST /:id/unschedule` removes the queued ledger and returns it to
+`ready`. Pausing a scheduled campaign and resuming it before its time puts it back on the schedule.
+
 ## Best-fit audience
 
 `audience: { segment: "best_fit", listingId?, limit? }` keeps only consented contacts whose recent

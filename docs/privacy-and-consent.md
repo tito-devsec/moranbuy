@@ -48,3 +48,33 @@ Moran refresh tokens are encrypted with AES-256-GCM. Follow-up keeps only the fi
 This is an implementation of consent tracking, not a legal opinion. Tanzania's Personal Data
 Protection Act (2022) and Meta's WhatsApp Business Messaging Policy apply; the owner should review
 retention periods and the lawful basis for each purpose before production use.
+
+## Retention
+
+Records are kept for set periods, then removed by the `retention-purge` worker (every six hours,
+batches of 2,000 so the live service is not locked). Periods are edited in Super Admin → MoranBuy →
+Retention; no period can go below 30 days (7 for the webhook duplicate guard), and every change is
+audited with a reason.
+
+| Records | Kept (days) |
+|---|---|
+| Chat messages | 180 |
+| Finished or expired shopping sessions (with their messages) | 365 |
+| Ranking evidence | 365 |
+| Demand signals behind the statistics | 730 |
+| Finished customer schedules | 180 |
+| Converted or stopped follow-up leads and their tasks | 365 |
+| Per-phone ledger of finished campaigns (the campaign's counts stay) | 365 |
+| Owner alerts sent | 365 |
+| Products sent by chat, as received | 365 |
+| Muse telemetry | 365 |
+| Webhook duplicate guard | 90 |
+| Customers who never ordered or enquired and have not written since | 730 |
+| Delivery location on old orders (the order itself stays) | 730 |
+
+Never purged here: orders, payments, consent events, contacts, merchants, listings and the audit
+trail. Erasure on request (`DELETE /api/merchant/contacts/:phone`) is separate and immediate.
+`RETENTION_DRY_RUN=true` (the default) makes the scheduled purge count only; a super admin can
+preview at any time and purge by hand with a reason and an explicit confirmation. The last preview
+and the last purge are shown with their counts per table. These periods are a starting point; the
+operator must confirm them against Tanzania's Personal Data Protection Act before production.
