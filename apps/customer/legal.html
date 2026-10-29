@@ -57,7 +57,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;paddin
   </a>
   <div class="actions">
     <div class="lang" role="group" aria-label="Language"><button id="lang-en" onclick="setLang('en')">EN</button><button id="lang-sw" onclick="setLang('sw')">SW</button></div>
-    <a class="open" href="/customer/">&#128722; <span id="open-label">Open MoranBuy</span></a>
+    <a class="open" id="open-link" href="/customer/" rel="noopener">&#128722; <span id="open-label">Open MoranBuy</span></a>
     <button class="menu" aria-label="Menu" onclick="document.querySelector('nav.links').scrollIntoView({behavior:'smooth'})">&#9776;</button>
   </div>
 </div>
@@ -333,7 +333,17 @@ function render() {
   }).join('');
   document.getElementById('content').innerHTML = `<h1>${c.title}</h1><div class="modified">${UI[lang].modified}: ${MODIFIED}</div>${body}`;
   document.getElementById('foot').textContent = UI[lang].foot;
+  updateOpenLink();
 }
+// "Open MoranBuy" starts a WhatsApp chat with the MoranBuy number, greeting already typed; without a number it opens the web chat.
+let whatsappLink = null;
+function updateOpenLink() {
+  const a = document.getElementById('open-link');
+  if (!whatsappLink) { a.href = '/customer/'; a.removeAttribute('target'); return; }
+  a.href = `${whatsappLink}?text=${encodeURIComponent(lang === 'sw' ? 'Habari MoranBuy' : 'Hello MoranBuy')}`;
+  a.target = '_blank';
+}
+fetch('/api/public/contact').then((r) => r.json()).then((c) => { whatsappLink = c.whatsapp?.link || null; updateOpenLink(); }).catch(() => {});
 function setLang(l) { lang = l; try { localStorage.setItem('mb_lang', l); } catch {} render(); }
 function goBack() { if (history.length > 1 && document.referrer.startsWith(location.origin)) history.back(); else location.href = '/customer/'; }
 render();

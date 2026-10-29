@@ -26,6 +26,8 @@ const schema = z.object({
   ADMIN_BOOTSTRAP_PASSWORD: opt(),
 
   MORAN_BACKEND_BASE_URL: opt(),
+  // The MoranBuy WhatsApp number in international digits (2557XXXXXXXX); the site's "Open MoranBuy" buttons open a chat with it.
+  MORANBUY_WHATSAPP_NUMBER: opt(),
   // Moran's /internal routes are closed at its public nginx, so the signed channel can use a private address (http://backend:3000 on the VPS).
   MORAN_INTERNAL_BASE_URL: opt(),
   MORAN_SHARED_SECRET: opt(),
