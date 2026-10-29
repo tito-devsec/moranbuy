@@ -10,6 +10,8 @@
     "ogg-opus-decoder": "^1.7.5",
     "onnxruntime-node": "^1.31.1",
     "opusscript": "^0.1.1",
-    "pngjs": "^7.0.0"
+    "pdfkit": "^0.17.2",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
   }
 }

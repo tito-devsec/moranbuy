@@ -13,7 +13,9 @@ import { db } from '../db/connection.js';
 import { config } from '../config/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import { unusablePasswordHash } from './auth.service.js';
-import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage, sendWhatsAppButtons, sendWhatsAppAudio } from './whatsapp-sender.service.js';
+import axios from 'axios';
+import { sendWhatsAppText, sendWhatsAppImage, sendTemplateMessage, sendWhatsAppButtons, sendWhatsAppAudio, sendWhatsAppList, uploadWhatsAppMedia } from './whatsapp-sender.service.js';
+import { authorizeOutbound, completeOutbound, failOutbound, EntitlementError } from './outbound-gate.js';
 import { decrypt } from '../utils/crypto.js';
 import { searchKnowledge } from '../core/knowledge-search.js';
 import { audit } from './admin/audit.js';
@@ -112,13 +114,17 @@ export async function forwardInboundToMoranBuy({ tenant, message, inbound, custo
 }
 
 /** A reply from the MoranBuy number (text or image), through the outbound gate like every message. */
-export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], buttons = [], footer = null, idempotencyKey, audioBase64 = null, mime = null }) {
+export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, templateName, language, components = [], buttons = [], footer = null, idempotencyKey, audioBase64 = null, mime = null, documentBase64 = null, filename = null, button = null, header = null, sections = [] }) {
   const tenant = await moranBuyTenant();
   if (!tenant?.whatsapp_phone_number_id) throw Object.assign(new Error('MORANBUY_NOT_CONNECTED'), { code: 'MORANBUY_NOT_CONNECTED', status: 409 });
   const common = { phoneNumberId: tenant.whatsapp_phone_number_id, accessTokenEncrypted: tenant.wa_access_token_encrypted, to, kind: 'moranbuy', idempotencyKey, tenantId: tenant.id };
   if (type === 'image') return sendWhatsAppImage({ ...common, imageUrl, caption });
   // A spoken reply MoranBuy made; the bytes came in the signed body and go to Meta as a voice note.
   if (type === 'audio') return sendWhatsAppAudio({ ...common, audioBuffer: Buffer.from(String(audioBase64 || ''), 'base64'), mimeType: mime || 'audio/ogg; codecs=opus' });
+  // A receipt PDF MoranBuy made: uploaded to WhatsApp's media store and sent as a document, through the same outbound gate.
+  if (type === 'document') return sendMoranBuyDocument({ ...common, buffer: Buffer.from(String(documentBase64 || ''), 'base64'), filename: filename || 'receipt.pdf', caption });
+  // A list the person taps (their orders, to get a receipt again).
+  if (type === 'list') return sendWhatsAppList({ ...common, body, button: button || 'Chagua', sections, header, footer });
   // Up to three reply buttons (the terms question, for one).
   if (type === 'buttons') return sendWhatsAppButtons({ ...common, body, buttons, footer });
   if (type === 'template') {
@@ -128,6 +134,24 @@ export async function sendFromMoranBuy({ type, to, body, imageUrl, caption, temp
     return sendTemplateMessage({ ...common, templateName, languageCode: language, components });
   }
   return sendWhatsAppText({ ...common, body });
+}
+
+/** A PDF as a WhatsApp document; Moran's sender has no document helper, so this one follows the same gate as every other send. */
+async function sendMoranBuyDocument({ phoneNumberId, accessTokenEncrypted, to, kind, idempotencyKey, tenantId, buffer, filename, caption }) {
+  const gate = await authorizeOutbound({ phoneNumberId, accessTokenEncrypted, to, channel: 'whatsapp', kind, idempotencyKey, tenantId });
+  if (!gate.allowed) throw new EntitlementError(gate);
+  if (gate.alreadySent) return { success: true, messageId: gate.providerMessageId, duplicate: true };
+  try {
+    const mediaId = await uploadWhatsAppMedia({ phoneNumberId, accessTokenEncrypted, buffer, mimeType: 'application/pdf', filename });
+    const token = accessTokenEncrypted ? decrypt(accessTokenEncrypted) : config.meta.systemUserToken;
+    const res = await axios.post(`${config.meta.graphBaseUrl}/${config.meta.apiVersion}/${phoneNumberId}/messages`, { messaging_product: 'whatsapp', to, type: 'document', document: { id: mediaId, filename, ...(caption ? { caption } : {}) } }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 15000 });
+    const messageId = res.data?.messages?.[0]?.id || null;
+    await completeOutbound(gate, { providerMessageId: messageId });
+    return { success: true, messageId };
+  } catch (err) {
+    await failOutbound(gate, err);
+    throw err;
+  }
 }
 
 /** A merchant's own message to its own customer, only for businesses listed on MoranBuy with a connected number. */

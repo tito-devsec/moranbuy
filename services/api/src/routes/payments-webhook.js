@@ -1,6 +1,6 @@
 import express from 'express';
 import { config, ApiError } from '@moranbuy/core';
-import { settlePayment } from '@moranbuy/billing';
+import { settlePayment, amountValue } from '@moranbuy/billing';
 import { logger } from '@moranbuy/observability';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { db } from '../db/connection.js';
@@ -17,7 +17,7 @@ paymentsWebhookRouter.post('/payments', asyncHandler(async (req, res) => {
   res.sendStatus(200);
   const status = event.type === 'payment.completed' ? 'completed' : ['payment.failed', 'payment.expired', 'payment.voided'].includes(event.type) ? 'failed' : null;
   if (!status || !event.data?.reference) return;
-  await settlePayment(db, { reference: event.data.reference, status, settledAmount: event.data.amount ?? null, eventId: event.id || `${event.type}:${event.data.reference}`, source: 'snippe' }).catch((err) => logger.error({ err: err.message }, 'Payment settlement failed'));
+  await settlePayment(db, { reference: event.data.reference, status, settledAmount: amountValue(event.data.amount), eventId: event.id || `${event.type}:${event.data.reference}`, source: 'snippe' }).catch((err) => logger.error({ err: err.message }, 'Payment settlement failed'));
 }));
 
 // Outside production, the sandbox provider is settled by this explicit call so the whole flow can be exercised honestly.

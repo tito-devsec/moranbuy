@@ -12,7 +12,11 @@ export const PURPOSES = Object.freeze({
   customer_photo: { kinds: ['image'], public: false },
   voice_note: { kinds: ['audio'], public: false },  // a voice note a customer or business sent, kept briefly
   voice_reply: { kinds: ['audio'], public: false }, // the spoken reply MoranBuy made, kept briefly for review
+  delivery_photo: { kinds: ['image'], public: false }, // evidence a delivery person sent at the door
+  receipt: { kinds: ['pdf'], public: false }, // a receipt MoranBuy issued; a financial record
 });
+// Files MoranBuy makes or must keep as evidence are not counted against anyone's daily upload cap.
+const UNCAPPED = new Set(['voice_reply', 'delivery_photo', 'receipt']);
 const DAILY_LIMIT = 200;
 
 // The real type of a file from its first bytes: JPEG, PNG, WebP or PDF; anything else is refused.
@@ -44,7 +48,7 @@ export async function saveUpload({ dbImpl = db, buffer, purpose, merchantId = nu
   // A daily cap per owner keeps storage from being filled by one account.
   const owner = merchantId ? { merchant_id: merchantId } : { customer_id: customerId };
   // Spoken replies are made by MoranBuy itself, so the per-owner daily cap does not apply to them.
-  const today = purpose === 'voice_reply' ? { n: 0 } : await dbImpl('uploads').where(owner).where('created_at', '>=', new Date(Date.now() - 86400000)).count('id as n').first();
+  const today = UNCAPPED.has(purpose) ? { n: 0 } : await dbImpl('uploads').where(owner).where('created_at', '>=', new Date(Date.now() - 86400000)).count('id as n').first();
   if (Number(today.n) >= DAILY_LIMIT) throw new ApiError(429, 'UPLOAD_LIMIT', 'Too many uploads today; try again tomorrow.');
   const key = `${crypto.randomUUID()}.${type.ext}`;
   await fs.mkdir(uploadDir(), { recursive: true });

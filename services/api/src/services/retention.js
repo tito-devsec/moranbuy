@@ -21,13 +21,14 @@ export const DEFAULT_RETENTION = Object.freeze({
   unusedProductImagesDays: 30, // product photos no listing shows
   voiceNotesDays: 30,          // voice notes customers and businesses sent (the transcript goes with them)
   voiceRepliesDays: 7,         // spoken replies MoranBuy made
+  deliveryPhotosDays: 180,     // photos taken at the door, kept as evidence for disputes
 });
-const FLOORS = { webhookEventsDays: 7, voiceRepliesDays: 1, voiceNotesDays: 7 };
+const FLOORS = { webhookEventsDays: 7, voiceRepliesDays: 1, voiceNotesDays: 7, deliveryPhotosDays: 60 };
 const MIN_DAYS = 30;
 const BATCH = 2000;
 
 // What is never purged here: orders (the record of a sale), payments, consent events (proof of permission), the audit trail, merchants and listings.
-export const NEVER_PURGED = Object.freeze(['orders', 'payments', 'consent_events', 'audit_events', 'merchants', 'listings', 'contacts']);
+export const NEVER_PURGED = Object.freeze(['orders', 'payments', 'payouts', 'receipts', 'delivery_events', 'disputes', 'consent_events', 'audit_events', 'merchants', 'listings', 'contacts']);
 
 export async function loadRetention(dbImpl = db) {
   const row = await dbImpl('platform_settings').where({ key: 'retention' }).first();
@@ -61,6 +62,7 @@ function rules(d, r, now) {
     { key: 'unusedProductImagesDays', table: 'uploads', label: 'uploads:unused_product_images', files: true, where: (q) => q.where({ purpose: 'product_image' }).where('created_at', '<', before(r.unusedProductImagesDays)).whereNotExists(d('listings').select(d.raw('1')).whereNull('listings.deleted_at').whereRaw("listings.image_url like '%/media/' || uploads.storage_key")) },
     { key: 'voiceNotesDays', table: 'uploads', label: 'uploads:voice_notes', files: true, where: (q) => q.where({ purpose: 'voice_note' }).where('created_at', '<', before(r.voiceNotesDays)) },
     { key: 'voiceRepliesDays', table: 'uploads', label: 'uploads:voice_replies', files: true, where: (q) => q.where({ purpose: 'voice_reply' }).where('created_at', '<', before(r.voiceRepliesDays)) },
+    { key: 'deliveryPhotosDays', table: 'uploads', label: 'uploads:delivery_photos', files: true, where: (q) => q.where({ purpose: 'delivery_photo' }).where('created_at', '<', before(r.deliveryPhotosDays)) },
     // Spent refresh tokens are not personal history; they are cleared after thirty days.
     { key: null, table: 'refresh_tokens', where: (q) => q.where((s) => s.where('expires_at', '<', before(30)).orWhere('revoked_at', '<', before(30))) },
   ];

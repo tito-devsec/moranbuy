@@ -7,6 +7,10 @@ export class SandboxPaymentProvider {
   async createPayment({ amount, currency, phone, metadata }) {
     return { reference: `sbx_${crypto.randomBytes(8).toString('hex')}`, status: 'pending', providerData: { sandbox: true, amount, currency, phone: phone || null, metadata } };
   }
+  // A sandbox payout completes at once, so the protected-order flow can be shown end to end without moving money.
+  async createPayout({ amount, currency = 'TZS', phone, name, narration, metadata }) {
+    return { reference: `sbx_po_${crypto.randomBytes(8).toString('hex')}`, status: 'completed', fee: 0, providerData: { sandbox: true, amount, currency, phone, name, narration, metadata } };
+  }
   // The sandbox has no signature; its "webhook" is the explicit settle route that exists only outside production.
   verifyWebhook() { throw new Error('The sandbox provider has no webhook'); }
 }
@@ -32,6 +36,16 @@ export class SnippePaymentProvider {
     return { reference: json.data.reference, status: json.data.status || 'pending', providerData: json.data };
   }
 
+  // Sends money to a mobile money number (POST /v1/payouts/send); the amount plus Snippe's fee leaves MoranBuy's balance.
+  async createPayout({ amount, phone, name, narration = 'MoranBuy', metadata = {} }) {
+    if (!this.apiKey) throw Object.assign(new Error('Snippe is not configured.'), { code: 'PAYMENT_PROVIDER_NOT_CONFIGURED', status: 503 });
+    const body = { amount: Math.round(amount), channel: 'mobile', recipient_phone: String(phone).replace(/^\+/, ''), recipient_name: String(name || 'MoranBuy recipient').slice(0, 120), narration: String(narration).slice(0, 120), webhook_url: this.callbackUrl, metadata };
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/payouts/send`, { method: 'POST', headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `payout-${metadata.orderId || ''}-${metadata.kind || ''}` }, body: JSON.stringify(body), signal: AbortSignal.timeout(15000) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.data?.reference) throw Object.assign(new Error(json?.message || 'Could not start payout'), { code: 'PAYOUT_START_FAILED' });
+    return { reference: json.data.reference, status: json.data.status || 'pending', fee: amountValue(json.data.fees ?? json.data.fee_amount), providerData: json.data };
+  }
+
   // HMAC-SHA256 over `${timestamp}.${rawBody}`, constant-time, with a five-minute replay window.
   verifyWebhook(rawBody, timestamp, signature) {
     if (!timestamp || !signature || !this.webhookSecret) throw new Error('Missing signature');
@@ -42,6 +56,13 @@ export class SnippePaymentProvider {
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) throw new Error('Invalid webhook signature');
     return JSON.parse(rawBody);
   }
+}
+
+// Snippe sends amounts as plain numbers in requests but as { value, currency } in webhooks and payout responses.
+export function amountValue(a) {
+  if (a === null || a === undefined) return null;
+  if (typeof a === 'object') return a.value === undefined ? null : Number(a.value);
+  return Number(a);
 }
 
 export function createPaymentProvider(cfg = config()) {
@@ -59,6 +80,7 @@ export class RuntimePaymentProvider {
   }
   get name() { return this._name || (this.cfg.APP_ENV === 'production' ? 'snippe' : this.cfg.PAYMENT_PROVIDER); }
   async createPayment(args) { const p = await this.current(); this._name = p.name; return p.createPayment(args); }
+  async createPayout(args) { const p = await this.current(); this._name = p.name; return p.createPayout(args); }
   async verifyWebhookAsync(rawBody, timestamp, signature) { const p = await this.current(); this._name = p.name; return p.verifyWebhook(rawBody, timestamp, signature); }
   verifyWebhook() { throw new Error('Use verifyWebhookAsync'); }
 }

@@ -4,3 +4,4 @@ export * from './drafting.js';
 export * from './telemetry.js';
 export * from './intelligence.js';
 export * from './voice.js';
+export * from './protection.js';

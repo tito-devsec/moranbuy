@@ -27,3 +27,26 @@ export function cropToJpeg(image, box, { margin = 0.06, quality = 85 } = {}) {
   }
   return jpeg.encode({ width: w, height: h, data: out }, quality).data;
 }
+
+// A 64-bit difference hash of a photo: near-identical pictures (a re-sent delivery photo, the catalogue picture) differ in only a few bits.
+export function fingerprint(buf) {
+  const image = Buffer.isBuffer(buf) ? decodeImage(buf) : buf;
+  if (!image) return null;
+  const gray = (x, y) => {
+    const sx = Math.min(image.width - 1, Math.floor((x + 0.5) * image.width / 9));
+    const sy = Math.min(image.height - 1, Math.floor((y + 0.5) * image.height / 8));
+    const i = (sy * image.width + sx) * 4;
+    return image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114;
+  };
+  let bits = 0n;
+  for (let y = 0; y < 8; y += 1) for (let x = 0; x < 8; x += 1) bits = (bits << 1n) | (gray(x, y) > gray(x + 1, y) ? 1n : 0n);
+  return bits.toString(16).padStart(16, '0');
+}
+
+export function fingerprintDistance(a, b) {
+  if (!a || !b) return 64;
+  let v = BigInt(`0x${a}`) ^ BigInt(`0x${b}`);
+  let n = 0;
+  while (v) { n += Number(v & 1n); v >>= 1n; }
+  return n;
+}

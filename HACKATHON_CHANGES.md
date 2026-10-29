@@ -34,7 +34,7 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 | Opted-in Moran businesses appear automatically; order alerts answered by WhatsApp for businesses without a dashboard; customer status messages | done | `packages/product-catalog/src/moran-listings-sync.js`, `services/api/src/services/order-actions.js`, `tests/integration/moran-listings-pull.test.js`, `tests/integration/order-replies.test.js` |
 
-| Terms and privacy gate with reply buttons on WhatsApp and web, versioned, bilingual policy pages | done | `services/api/src/services/terms.js`, `apps/customer/terms.html`, `apps/customer/privacy.html`, `tests/integration/terms-gate.test.js` |
+| Terms and privacy gate with reply buttons on WhatsApp and web, versioned, bilingual policy pages | done | `services/api/src/services/terms.js`, `apps/customer/legal.html`, `tests/integration/terms-gate.test.js` |
 
 ## Still open for the owner
 

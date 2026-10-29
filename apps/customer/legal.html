@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoranBuy · Terms of Use</title>
+<meta name="description" content="MoranBuy by Moran AI: terms of use, privacy policy, payment protection, about, developers, contact and copyright.">
+<style>
+:root{--brand:#0f766e;--brand-dark:#115e59;--band:#9fd3d0;--band-text:#0f4c49;--ink:#1f2933;--muted:#5f6b76;--line:#e3e8ec;--bg:#ffffff;--soft:#f4f8f8;--link:#1b7f86}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.titlebar{position:sticky;top:0;z-index:5;display:flex;align-items:center;height:64px;background:linear-gradient(180deg,#a9dbd8 0%,#8ccac6 100%);color:var(--band-text);box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.titlebar .back{width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-right:1px solid rgba(255,255,255,.55);color:#fff;font-size:28px;cursor:pointer;background:none;border-top:0;border-bottom:0;border-left:0}
+.titlebar h1{flex:1;margin:0;text-align:center;font-size:22px;font-weight:700;letter-spacing:.2px;padding-right:64px}
+.brandbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);box-shadow:0 2px 6px rgba(15,23,42,.04)}
+.logo{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700;font-size:18px}
+.logo svg{width:34px;height:34px}
+.actions{display:flex;align-items:center;gap:14px}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.lang button{border:0;background:#fff;color:var(--muted);font:600 13px/1 inherit;padding:8px 12px;cursor:pointer}
+.lang button.on{background:var(--brand);color:#fff}
+.open{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:600;font-size:15px}
+.menu{border:0;background:none;font-size:24px;color:var(--ink);cursor:pointer;padding:0 4px;border-left:1px solid var(--line);padding-left:14px}
+.wrap{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;gap:40px;padding:28px 24px 64px}
+nav.links{display:flex;flex-direction:column;gap:6px;position:sticky;top:96px;align-self:start}
+nav.links a{color:var(--link);font-size:16px;padding:2px 0}
+nav.links a.on{font-weight:700;color:var(--brand-dark)}
+article h1{font-size:44px;line-height:1.12;font-weight:400;margin:4px 0 14px;letter-spacing:-.5px}
+article .modified{font-size:14px;color:var(--ink);margin-bottom:26px}
+article h2{font-size:28px;font-weight:400;margin:34px 0 10px}
+article h3{font-size:21px;font-weight:500;margin:24px 0 6px}
+article p{margin:0 0 14px}
+article ul{margin:0 0 16px;padding-left:22px}
+article li{margin:4px 0}
+article strong{font-weight:700}
+.note{background:var(--soft);border-left:4px solid var(--brand);padding:12px 16px;border-radius:6px;margin:16px 0;font-size:15px}
+.card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;padding:18px 24px;text-align:center}
+@media (max-width:820px){
+  .wrap{grid-template-columns:1fr;gap:18px;padding:18px 18px 48px}
+  nav.links{position:static}
+  article h1{font-size:36px}
+  .open span{display:none}
+  .titlebar h1{font-size:20px}
+}
+@media print{.titlebar,.brandbar,nav.links,footer{display:none}.wrap{display:block}}
+</style>
+</head>
+<body>
+<div class="titlebar"><button class="back" onclick="goBack()" aria-label="Back">&#8249;</button><h1 id="bar-title">Terms of Use</h1></div>
+<div class="brandbar">
+  <a class="logo" href="/customer/" aria-label="MoranBuy">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#0f766e"/><path d="M12 15h16l-1.6 13.2a2 2 0 0 1-2 1.8h-8.8a2 2 0 0 1-2-1.8z" fill="#fff"/><path d="M16 15v-1.5a4 4 0 0 1 8 0V15" stroke="#fff" stroke-width="2" fill="none"/><circle cx="17" cy="21" r="1.3" fill="#0f766e"/><circle cx="23" cy="21" r="1.3" fill="#0f766e"/></svg>
+    MoranBuy
+  </a>
+  <div class="actions">
+    <div class="lang" role="group" aria-label="Language"><button id="lang-en" onclick="setLang('en')">EN</button><button id="lang-sw" onclick="setLang('sw')">SW</button></div>
+    <a class="open" href="/customer/">&#128722; <span id="open-label">Open MoranBuy</span></a>
+    <button class="menu" aria-label="Menu" onclick="document.querySelector('nav.links').scrollIntoView({behavior:'smooth'})">&#9776;</button>
+  </div>
+</div>
+<div class="wrap">
+  <nav class="links" id="links"></nav>
+  <article id="content"></article>
+</div>
+<footer id="foot"></footer>
+<script>
+const MODIFIED = '29 Oct 2026';
+const PAGES = ['about', 'developers', 'contact', 'terms', 'privacy', 'copyright'];
+const NAV = {
+  en: { about: 'About Us', developers: 'Developers', contact: 'Contact Us', terms: 'Terms of Use', privacy: 'Privacy Policy', copyright: 'Copyrights' },
+  sw: { about: 'Kuhusu Sisi', developers: 'Wasanidi', contact: 'Wasiliana Nasi', terms: 'Masharti ya Matumizi', privacy: 'Sera ya Faragha', copyright: 'Hakimiliki' },
+};
+const UI = {
+  en: { modified: 'Last modified', open: 'Open MoranBuy', foot: '© 2026 Moran AI. All rights reserved. MoranBuy is a product of Moran AI, Dar es Salaam, Tanzania.' },
+  sw: { modified: 'Ilibadilishwa mwisho', open: 'Fungua MoranBuy', foot: '© 2026 Moran AI. Haki zote zimehifadhiwa. MoranBuy ni bidhaa ya Moran AI, Dar es Salaam, Tanzania.' },
+};
+
+// Each page is a list of blocks: [tag, text] or ['ul', [items]] or ['note', text] or ['html', markup].
+const CONTENT = {
+  en: {
+    terms: { title: 'MoranBuy Terms of Use', blocks: [
+      ['h2', 'Welcome to MoranBuy!'],
+      ['h3', 'The Service'],
+      ['p', 'MoranBuy is a reverse marketplace provided by Moran AI ("Moran AI", "we", "us"), a company based in Dar es Salaam, Tanzania. You tell MoranBuy what you want to buy and what you can pay, on WhatsApp or on the web, by text, photo or voice note. MoranBuy finds offers from participating businesses ("Businesses") and shows you the most suitable ones, budget first and location second. These Terms of Use ("Terms") govern your use of MoranBuy, including the MoranBuy WhatsApp number, buy.moranai.co.tz and the MoranBuy business and admin tools (together, the "Service").'],
+      ['p', 'MoranBuy is not the seller. The Business named on an offer sells the product and is responsible for it. MoranBuy connects you, holds your payment under Payment Protection (section 6) and keeps the record of the order.'],
+      ['h3', '1. Accepting these Terms'],
+      ['p', 'Before MoranBuy answers you for the first time, it asks you to accept these Terms and the Privacy Policy. By tapping "I accept" (or "Nakubali") you agree to them. If you do not accept, MoranBuy does not answer you. When these Terms change in a material way, you will be asked to accept the new version before you continue.'],
+      ['h3', '2. Who may use MoranBuy'],
+      ['ul', ['You must be at least 18 years old, or use MoranBuy with the permission of a parent or guardian.', 'You must give true information, including the phone number you pay from and the place you want delivery to.', 'Businesses must be lawfully operating, must register with true details, and must hold any licence their products require.']],
+      ['h3', '3. How offers are chosen'],
+      ['p', 'Ranking is done by fixed rules in our software, never by an AI model on its own. Offers that fit your budget come before those that do not; among similar offers the lower known total cost comes first; then the more convenient location, delivery and availability. An unknown cost (for example a delivery fee not yet confirmed) is shown as "not confirmed", never as zero. We never invent prices, products, stock, distances or fees.'],
+      ['h3', '4. Artificial intelligence'],
+      ['p', 'MoranBuy uses Meta AI models: Muse Spark to understand requests, photos and voice notes and to write replies; Segment Anything (SAM 3.1) to find products in photos; and Meta\'s MMS voices to speak replies. AI never decides prices, rankings, payments, refunds, disputes or your consent; software rules and people do. AI output can be wrong; if something looks wrong, tell us.'],
+      ['h3', '5. Orders'],
+      ['ul', ['An order is placed only after MoranBuy reads back the known total and you confirm it.', 'The Business may accept the order (and confirm the delivery fee) or reject it. You are told either way.', 'Prices and stock come from the Business. If the Business cannot supply the product as offered, it must reject the order rather than change it.']],
+      ['h3', '6. Payment Protection'],
+      ['p', 'When an order is protected, you pay MoranBuy, not the Business. Payment is collected by our licensed payment provider (Snippe) by mobile money (M-Pesa, Airtel Money, Mixx by Yas, HaloPesa) and held by MoranBuy until delivery is proven.'],
+      ['ul', [
+        '<strong>Receipt and handover code.</strong> After your payment succeeds you receive a receipt and a private handover code. The Business never sees your code.',
+        '<strong>Check before you hand over the code.</strong> Give the code to the delivery person only after you have checked the product. Giving the code is your confirmation that you received the right product in acceptable condition.',
+        '<strong>Delivery proof.</strong> The delivery person sends a photo of the product at handover and the code you give them. A correct code marks the order delivered.',
+        '<strong>Release to the Business.</strong> The payment, less any MoranBuy commission shown to the Business, is released to the Business 48 hours after delivery, or earlier if you reply that you received it, unless you report a hidden defect within those 48 hours.',
+        '<strong>Wrong or damaged product at the door.</strong> Do not give the code. The delivery person records the refusal with a photo and reason, you confirm the reason, and you receive a full refund to the number you paid from.',
+        '<strong>No delivery.</strong> If the Business does not assign a delivery person within 48 hours of payment, or the order cannot be delivered, you receive a full refund.',
+        '<strong>Refund timing.</strong> Refunds are sent by mobile money, normally within 3 working days of the decision.',
+      ]],
+      ['note', 'A claim that you did not receive a product, made after a correct handover code was used, is refused. The code is the proof of delivery.'],
+      ['h3', '7. Disputes'],
+      ['p', 'If you and the Business disagree, the payment stays held and a MoranBuy administrator reviews the evidence: the order, the handover-code record, delivery photos, locations and messages. An AI summary may help the administrator, but a person decides whether to release the payment or refund it. We aim to decide within 5 working days and tell both sides the reason.'],
+      ['h3', '8. Rules for Businesses'],
+      ['ul', [
+        'Describe products truthfully, with the real price, and keep stock up to date.',
+        'Deliver what was ordered, on time, through a delivery person whose WhatsApp number you register for that order.',
+        'Never ask a customer for the handover code before they have checked the product, and never ask them to pay outside MoranBuy for a protected order.',
+        'Give a mobile money number for payouts in your own or your business\'s name.',
+      ]],
+      ['h3', '9. Penalties'],
+      ['p', 'A refused delivery caused by the Business (wrong item, damaged item, wrong size or variant, or a product the customer did not order), a missed delivery deadline, or a false claim each counts as a strike against the Business. A claim refused because the evidence shows delivery counts as a strike against the customer. With three strikes in 90 days, new orders or claims are reviewed by a person first. Serious or repeated misuse may lead to suspension or removal from MoranBuy. Payment fees for a refund caused by the Business may be charged to the Business. Strikes and suspensions can be challenged by writing to support@moranai.co.tz.'],
+      ['h3', '10. Messages and consent'],
+      ['p', 'MoranBuy sends you answers to your requests and updates about your orders, receipts and refunds. Marketing and follow-up messages from a Business are sent only with your consent, and you can stop them at any time by replying STOP.'],
+      ['h3', '11. Acceptable use'],
+      ['p', 'Do not use MoranBuy for fraud, for illegal or restricted goods, to harass anyone, to send false photos or codes, or for messages unrelated to shopping. We may limit or suspend the Service for misuse.'],
+      ['h3', '12. Liability'],
+      ['p', 'We provide the Service with reasonable care. The Business is responsible for the product, its quality and safety. Offers marked "found online, not confirmed" are not from MoranBuy Businesses and cannot be ordered through MoranBuy. To the extent the law allows, Moran AI is not liable for indirect losses, and our liability for any order is limited to the amount you paid MoranBuy for that order. Nothing in these Terms limits rights you have under Tanzanian consumer law.'],
+      ['h3', '13. Ending use'],
+      ['p', 'You may stop using MoranBuy at any time. We may suspend or end access for breach of these Terms. Held payments are released or refunded under section 6 even after access ends.'],
+      ['h3', '14. Law'],
+      ['p', 'These Terms are governed by the laws of the United Republic of Tanzania. Disputes that cannot be settled with us first go to the competent courts of Tanzania.'],
+      ['h3', '15. Contact'],
+      ['p', 'Moran AI, Dar es Salaam, Tanzania · support@moranai.co.tz · Hotline +255 724 660 550.'],
+    ] },
+    privacy: { title: 'MoranBuy Privacy Policy', blocks: [
+      ['h2', 'Your privacy at MoranBuy'],
+      ['p', 'This policy explains what MoranBuy collects, why, who it is shared with, how long it is kept and your rights. Moran AI, Dar es Salaam, Tanzania, is responsible for this data. We process personal data in line with the Personal Data Protection Act, 2022 of Tanzania.'],
+      ['h3', '1. What we collect'],
+      ['ul', [
+        '<strong>Your requests:</strong> what you want, your budget, place, timing, and the messages, photos and voice notes you send.',
+        '<strong>Contact details:</strong> your WhatsApp number and the name WhatsApp shows.',
+        '<strong>Location:</strong> the area you describe or a location you share, to rank nearby offers and arrange delivery.',
+        '<strong>Orders and payments:</strong> what you ordered, totals, payment references, receipts, refunds and payouts. We do not see your mobile money PIN.',
+        '<strong>Delivery evidence:</strong> photos the delivery person takes at handover, the result of the handover code (never the code itself), shared locations and the reason for any refusal.',
+        '<strong>Businesses:</strong> business and owner names, phone numbers, payout number, products, prices, locations and verification documents.',
+        '<strong>Consent:</strong> when you accepted these terms and whether you agreed to marketing or follow-up.',
+      ]],
+      ['h3', '2. Why we use it'],
+      ['ul', ['To find and rank offers for you and answer your messages.', 'To place, protect and deliver orders, issue receipts, release payments and send refunds.', 'To prevent fraud and settle disputes.', 'To send marketing or follow-up only where you agreed.', 'To produce statistics without names or phone numbers (for example, which products people ask for in which region).', 'To meet legal duties such as keeping financial records.']],
+      ['h3', '3. AI and your data'],
+      ['p', 'Your messages, photos and voice notes are processed by Meta AI models through the Meta Model API (Muse Spark, Muse Voice Transcribe and SAM 3.1) to understand them. Spoken replies are made inside MoranBuy with Meta\'s MMS voices, so no text leaves our server for speech. Delivery photos are checked by Muse Spark and SAM 3.1 to see whether they show the ordered product. These checks are evidence only; they never decide a payment or dispute.'],
+      ['h3', '4. Who we share with'],
+      ['ul', ['<strong>The Business</strong> you order from: your name, phone number, order and delivery location.', '<strong>The delivery person</strong> registered by that Business: the order reference and delivery details needed to deliver.', '<strong>Moran AI</strong>, which runs the WhatsApp connection that MoranBuy uses.', '<strong>Snippe</strong>, our payment provider, to collect payments, send payouts and refunds.', '<strong>Meta</strong>, as WhatsApp provider and AI model provider.', '<strong>Authorities</strong>, only when the law requires it.']],
+      ['p', 'We do not sell your personal data.'],
+      ['h3', '5. How long we keep it'],
+      ['ul', ['Voice notes: 30 days. Spoken replies: 7 days. Photos you send: 90 days.', 'Delivery photos: 180 days, for disputes.', 'Orders, payments, receipts, payouts, refunds, the evidence timeline and consent records: kept as financial and legal records.', 'Customers with no order who have not written for 2 years are deleted.', 'Old orders keep the order but lose the delivery location after 2 years.']],
+      ['h3', '6. Your rights'],
+      ['p', 'You can ask to see, correct or delete your data, object to marketing (reply STOP), or withdraw consent. Some records (orders, payments, receipts) must be kept by law and cannot be deleted while that duty lasts. Write to support@moranai.co.tz.'],
+      ['h3', '7. Security'],
+      ['p', 'Data is stored on servers we control, secrets are encrypted, handover codes are stored only as one-way codes, receipts carry a check code that shows tampering, and staff access is logged. No system is perfectly secure; tell us at once if you suspect misuse.'],
+      ['h3', '8. Children'],
+      ['p', 'MoranBuy is not meant for children under 18 without a parent or guardian.'],
+      ['h3', '9. Changes'],
+      ['p', 'If we change this policy in a material way, we will ask you to accept the new version before you continue.'],
+    ] },
+    about: { title: 'About Us', blocks: [
+      ['h2', 'Moran AI'],
+      ['p', 'Moran AI was founded in 2026 in Dar es Salaam to give every African business a tireless assistant on WhatsApp. Its AI agents answer customers, take orders and follow up for businesses in Tanzania, Kenya, Uganda, Rwanda and South Africa.'],
+      ['h2', 'MoranBuy'],
+      ['p', 'MoranBuy is a product of Moran AI that turns shopping around. Instead of searching shop by shop, a customer says once what they want and what they can pay. MoranBuy brings back the best five real offers from local businesses, budget first, location second, and explains why each was chosen.'],
+      ['ul', ['<strong>For customers:</strong> ask by text, photo or voice note in Swahili or English; pay safely with Payment Protection; get a receipt for every order.', '<strong>For businesses:</strong> list products by chat or by one photo of a shelf, receive ready-to-pay orders, and get insights on what people near you are asking for.', '<strong>For trust:</strong> money is held until the handover code proves delivery.']],
+      ['p', 'MoranBuy runs on Meta AI models: Muse Spark, Segment Anything (SAM 3.1), Muse Voice Transcribe and MMS text-to-speech.'],
+    ] },
+    developers: { title: 'Developers', blocks: [
+      ['h2', 'Built by Moran AI'],
+      ['p', 'MoranBuy is designed and built by the Moran AI engineering team. Technical lead: <strong>Tito Oscar Mwaisengela</strong> (<a href="https://github.com/tito-devsec">tito-devsec</a>), Co-founder and CTO of Moran AI.'],
+      ['div', [['Leadership', 'Maziku, Co-founder and CEO · Tito Oscar Mwaisengela, Co-founder and CTO'], ['Source code', '<a href="https://github.com/tito-devsec/moranbuy">github.com/tito-devsec/moranbuy</a>']]],
+      ['h3', 'How it is built'],
+      ['ul', ['Node.js API and workers, PostgreSQL for every record, Redis for timed work.', 'Meta AI: Muse Spark 1.3 (text and vision), Muse Spark 1.2 audio and Muse Voice Transcribe (voice notes), SAM 3.1 (products in photos), MMS text-to-speech (spoken replies, run in-process).', 'Rules, not models, decide prices, rankings, money and disputes; every AI answer has a plain fallback.', 'Signed channels between Moran AI and MoranBuy, signed receipts, encrypted secrets and an audit trail.']],
+      ['h3', 'Working with us'],
+      ['p', 'Developers and partners can write to hello@moranai.co.tz. Security reports go to support@moranai.co.tz with "Security" in the subject.'],
+    ] },
+    contact: { title: 'Contact Us', blocks: [
+      ['h2', 'We are happy to help'],
+      ['p', 'Questions about an order, a refund, a dispute, listing your business or your data? Reach Moran AI any of these ways.'],
+      ['div', [['Support', '<a href="mailto:support@moranai.co.tz">support@moranai.co.tz</a>'], ['Sales and businesses', '<a href="mailto:sales@moranai.co.tz">sales@moranai.co.tz</a>'], ['Hotline', '<a href="tel:+255724660550">+255 724 660 550</a>'], ['General', '<a href="mailto:hello@moranai.co.tz">hello@moranai.co.tz</a>']]],
+      ['p', 'Moran AI, Dar es Salaam, Tanzania · <a href="https://moranai.co.tz">moranai.co.tz</a>'],
+      ['note', 'For an order, include your order number (for example MB-7K2Q9P). Never share your handover code or mobile money PIN with anyone, including us.'],
+    ] },
+    copyright: { title: 'Copyrights', blocks: [
+      ['h2', 'Ownership'],
+      ['p', '© 2026 Moran AI. MoranBuy, Moran AI and their logos are names of Moran AI. The MoranBuy source code is published under the Apache License 2.0; the licence covers the code, not the names or logos.'],
+      ['h2', 'Content from Businesses and users'],
+      ['p', 'Businesses keep the rights to their product names, descriptions and photos and allow MoranBuy to show them to customers. You keep the rights to what you send; you allow us to use it to provide the Service.'],
+      ['h2', 'Third-party models and software'],
+      ['ul', ['Meta AI models used through the Meta Model API under Meta\'s terms: Muse Spark, Muse Voice Transcribe, SAM 3.1.', 'Meta MMS text-to-speech voices (facebook/mms-tts-swh, facebook/mms-tts-eng), licensed CC BY-NC 4.0.', 'Open-source software including Node.js, Express, Knex, PostgreSQL, Redis, ONNX Runtime, libopus, PDFKit and qrcode, under their own licences.']],
+      ['h2', 'Reporting infringement'],
+      ['p', 'If you believe something on MoranBuy infringes your copyright, write to hello@moranai.co.tz with "Copyright" in the subject: what the work is, where it appears on MoranBuy, and your contact details. We review every notice and remove infringing material.'],
+    ] },
+  },
+  sw: {
+    terms: { title: 'Masharti ya Matumizi ya MoranBuy', blocks: [
+      ['h2', 'Karibu MoranBuy!'],
+      ['h3', 'Huduma'],
+      ['p', 'MoranBuy ni soko la kinyume linalotolewa na Moran AI ("Moran AI", "sisi"), kampuni iliyoko Dar es Salaam, Tanzania. Unaiambia MoranBuy unachotaka kununua na kiasi unachoweza kulipa, kwa WhatsApp au tovuti, kwa maandishi, picha au ujumbe wa sauti. MoranBuy hutafuta ofa kutoka kwa biashara zilizojiunga ("Biashara") na kukuonyesha zinazofaa zaidi, bajeti kwanza, kisha mahali. Masharti haya yanasimamia matumizi yako ya MoranBuy, ikiwemo namba ya WhatsApp ya MoranBuy, buy.moranai.co.tz na zana za biashara na wasimamizi ("Huduma").'],
+      ['p', 'MoranBuy si muuzaji. Biashara iliyotajwa kwenye ofa ndiyo inayouza na kuwajibika kwa bidhaa. MoranBuy inawaunganisha, inashikilia malipo yako chini ya Ulinzi wa Malipo (kifungu 6) na kutunza kumbukumbu ya oda.'],
+      ['h3', '1. Kukubali Masharti'],
+      ['p', 'Kabla MoranBuy haijakujibu kwa mara ya kwanza, inakuomba ukubali Masharti haya na Sera ya Faragha. Kwa kubonyeza "Nakubali" unayakubali. Usipokubali, MoranBuy haitakujibu. Masharti yakibadilika kwa kiasi kikubwa, utaombwa kukubali toleo jipya kabla ya kuendelea.'],
+      ['h3', '2. Nani anaweza kutumia MoranBuy'],
+      ['ul', ['Uwe na umri wa miaka 18 au zaidi, au utumie MoranBuy kwa ruhusa ya mzazi au mlezi.', 'Utoe taarifa za kweli, ikiwemo namba unayolipia na mahali unapotaka bidhaa iletwe.', 'Biashara ziwe zinafanya kazi kihalali, zijisajili kwa taarifa za kweli na ziwe na leseni zinazohitajika kwa bidhaa zao.']],
+      ['h3', '3. Jinsi ofa zinavyochaguliwa'],
+      ['p', 'Mpangilio hufanywa kwa kanuni za programu, kamwe si na akili bandia peke yake. Ofa zilizo ndani ya bajeti yako hutangulia; kati ya ofa zinazofanana, gharama ndogo inayojulikana hutangulia; kisha mahali, delivery na upatikanaji. Gharama isiyojulikana (kama ada ya delivery ambayo haijathibitishwa) huonyeshwa "haijathibitishwa", si sifuri. Hatubuni bei, bidhaa, stoki, umbali au ada.'],
+      ['h3', '4. Akili bandia'],
+      ['p', 'MoranBuy hutumia mifumo ya Meta AI: Muse Spark kuelewa maombi, picha na ujumbe wa sauti na kuandika majibu; Segment Anything (SAM 3.1) kutambua bidhaa kwenye picha; na sauti za MMS za Meta kusoma majibu kwa sauti. Akili bandia haiamui bei, mpangilio, malipo, marejesho, migogoro wala ridhaa yako; kanuni za programu na watu ndio huamua. Majibu ya akili bandia yanaweza kukosea; ukiona kosa, tuambie.'],
+      ['h3', '5. Oda'],
+      ['ul', ['Oda huwekwa tu baada ya MoranBuy kukusomea jumla inayojulikana na wewe kuithibitisha.', 'Biashara inaweza kukubali oda (na kuthibitisha ada ya delivery) au kuikataa. Utajulishwa kwa vyovyote vile.', 'Bei na stoki hutoka kwa Biashara. Ikishindwa kuleta bidhaa kama ilivyotangazwa, lazima ikatae oda badala ya kuibadilisha.']],
+      ['h3', '6. Ulinzi wa Malipo'],
+      ['p', 'Oda ikilindwa, unailipa MoranBuy, si Biashara. Malipo hukusanywa na mtoa huduma wetu wa malipo mwenye leseni (Snippe) kwa pesa za simu (M-Pesa, Airtel Money, Mixx by Yas, HaloPesa) na kushikiliwa na MoranBuy hadi delivery ithibitishwe.'],
+      ['ul', [
+        '<strong>Risiti na namba ya makabidhiano.</strong> Malipo yakifanikiwa unapokea risiti na namba ya siri ya makabidhiano. Biashara haioni namba yako kamwe.',
+        '<strong>Kagua kabla ya kutoa namba.</strong> Mpe msafirishaji namba BAADA ya kukagua bidhaa. Kutoa namba ni uthibitisho wako kwamba umepokea bidhaa sahihi katika hali nzuri.',
+        '<strong>Ushahidi wa delivery.</strong> Msafirishaji hutuma picha ya bidhaa wakati wa makabidhiano na namba uliyompa. Namba sahihi huonyesha oda imefikishwa.',
+        '<strong>Malipo kwa Biashara.</strong> Malipo, ukitoa kamisheni ya MoranBuy inayoonyeshwa kwa Biashara, hutolewa kwa Biashara saa 48 baada ya delivery, au mapema ukijibu kuwa umepokea, isipokuwa uripoti kasoro iliyofichika ndani ya saa hizo 48.',
+        '<strong>Bidhaa isiyo sahihi au iliyoharibika mlangoni.</strong> Usitoe namba. Msafirishaji hurekodi kukataliwa kwa picha na sababu, wewe unathibitisha sababu, na unarudishiwa pesa zote kwenye namba uliyolipia.',
+        '<strong>Bila delivery.</strong> Biashara isipoweka msafirishaji ndani ya saa 48 baada ya malipo, au oda ikishindwa kufikishwa, unarudishiwa pesa zote.',
+        '<strong>Muda wa kurejesha.</strong> Marejesho hutumwa kwa pesa za simu, kwa kawaida ndani ya siku 3 za kazi baada ya uamuzi.',
+      ]],
+      ['note', 'Dai la kutopokea bidhaa, baada ya namba sahihi ya makabidhiano kutumika, hukataliwa. Namba ndiyo uthibitisho wa delivery.'],
+      ['h3', '7. Migogoro'],
+      ['p', 'Wewe na Biashara mkitofautiana, malipo yanaendelea kushikiliwa na msimamizi wa MoranBuy hupitia ushahidi: oda, kumbukumbu ya namba ya makabidhiano, picha za delivery, mahali na jumbe. Muhtasari wa akili bandia unaweza kumsaidia msimamizi, lakini mtu ndiye anaamua kutoa malipo au kurejesha. Tunalenga kuamua ndani ya siku 5 za kazi na kuwaeleza pande zote sababu.'],
+      ['h3', '8. Kanuni kwa Biashara'],
+      ['ul', ['Elezea bidhaa kwa ukweli, kwa bei halisi, na weka stoki sahihi.', 'Fikisha kilichoagizwa, kwa wakati, kupitia msafirishaji ambaye namba yake ya WhatsApp umeisajili kwa oda hiyo.', 'Usimwombe mteja namba ya makabidhiano kabla hajakagua bidhaa, na usimwombe alipe nje ya MoranBuy kwa oda iliyolindwa.', 'Toa namba ya pesa za simu ya kupokea malipo kwa jina lako au la biashara yako.']],
+      ['h3', '9. Adhabu'],
+      ['p', 'Delivery iliyokataliwa kwa kosa la Biashara (bidhaa isiyo sahihi, iliyoharibika, saizi au aina isiyo sahihi, au bidhaa ambayo mteja hakuagiza), kuchelewa kufikisha, au dai la uongo, kila moja huhesabiwa kama onyo dhidi ya Biashara. Dai lililokataliwa kwa sababu ushahidi unaonyesha delivery ilifanyika huhesabiwa kama onyo dhidi ya mteja. Maonyo matatu ndani ya siku 90 hufanya oda au madai mapya yakaguliwe na mtu kwanza. Matumizi mabaya makubwa au ya kurudia yanaweza kusababisha kusimamishwa au kuondolewa MoranBuy. Ada za malipo kwa marejesho yaliyosababishwa na Biashara zinaweza kutozwa Biashara. Maonyo na kusimamishwa vinaweza kupingwa kwa kuandika support@moranai.co.tz.'],
+      ['h3', '10. Jumbe na ridhaa'],
+      ['p', 'MoranBuy hukutumia majibu ya maombi yako na taarifa za oda, risiti na marejesho. Jumbe za matangazo na ufuatiliaji kutoka kwa Biashara hutumwa tu ukiwa umekubali, na unaweza kuzisimamisha wakati wowote kwa kujibu STOP.'],
+      ['h3', '11. Matumizi yanayokubalika'],
+      ['p', 'Usitumie MoranBuy kwa udanganyifu, bidhaa haramu au zilizozuiliwa, kunyanyasa mtu, kutuma picha au namba za uongo, au jumbe zisizohusu ununuzi. Tunaweza kupunguza au kusimamisha Huduma kwa matumizi mabaya.'],
+      ['h3', '12. Dhima'],
+      ['p', 'Tunatoa Huduma kwa uangalifu unaostahili. Biashara inawajibika kwa bidhaa, ubora na usalama wake. Ofa zilizoandikwa "zimepatikana mtandaoni, hazijathibitishwa" si za Biashara za MoranBuy na haziwezi kuagizwa kupitia MoranBuy. Kwa kadiri sheria inavyoruhusu, Moran AI haiwajibiki kwa hasara zisizo za moja kwa moja, na dhima yetu kwa oda yoyote ni kiasi ulicholipa MoranBuy kwa oda hiyo. Hakuna kifungu kinachopunguza haki zako chini ya sheria za kumlinda mlaji Tanzania.'],
+      ['h3', '13. Kusitisha matumizi'],
+      ['p', 'Unaweza kuacha kutumia MoranBuy wakati wowote. Tunaweza kusimamisha au kusitisha matumizi kwa kuvunja Masharti haya. Malipo yanayoshikiliwa hutolewa au kurejeshwa kwa mujibu wa kifungu 6 hata baada ya kusitishwa.'],
+      ['h3', '14. Sheria'],
+      ['p', 'Masharti haya yanasimamiwa na sheria za Jamhuri ya Muungano wa Tanzania. Migogoro isiyotatuliwa nasi kwanza hupelekwa kwenye mahakama husika za Tanzania.'],
+      ['h3', '15. Mawasiliano'],
+      ['p', 'Moran AI, Dar es Salaam, Tanzania · support@moranai.co.tz · Simu +255 724 660 550.'],
+    ] },
+    privacy: { title: 'Sera ya Faragha ya MoranBuy', blocks: [
+      ['h2', 'Faragha yako MoranBuy'],
+      ['p', 'Sera hii inaeleza MoranBuy hukusanya nini, kwa nini, hushirikisha nani, huhifadhi kwa muda gani na haki zako. Moran AI, Dar es Salaam, Tanzania, inawajibika kwa taarifa hizi. Tunashughulikia taarifa binafsi kwa mujibu wa Sheria ya Ulinzi wa Taarifa Binafsi ya 2022 ya Tanzania.'],
+      ['h3', '1. Tunachokusanya'],
+      ['ul', ['<strong>Maombi yako:</strong> unachotaka, bajeti, mahali, muda, na jumbe, picha na sauti unazotuma.', '<strong>Mawasiliano:</strong> namba yako ya WhatsApp na jina linaloonyeshwa na WhatsApp.', '<strong>Mahali:</strong> eneo unalotaja au location unayotuma, kupanga ofa za karibu na delivery.', '<strong>Oda na malipo:</strong> ulichoagiza, jumla, kumbukumbu za malipo, risiti, marejesho na malipo kwa biashara. Hatuoni PIN yako ya pesa za simu.', '<strong>Ushahidi wa delivery:</strong> picha anazopiga msafirishaji wakati wa makabidhiano, matokeo ya namba ya makabidhiano (si namba yenyewe), location na sababu ya kukataa.', '<strong>Biashara:</strong> majina ya biashara na mmiliki, namba za simu, namba ya kupokea malipo, bidhaa, bei, maeneo na nyaraka za uthibitisho.', '<strong>Ridhaa:</strong> ulipokubali masharti na kama ulikubali matangazo au ufuatiliaji.']],
+      ['h3', '2. Tunavyotumia'],
+      ['ul', ['Kukutafutia na kupanga ofa na kujibu jumbe zako.', 'Kuweka, kulinda na kufikisha oda, kutoa risiti, kutoa malipo na kurejesha pesa.', 'Kuzuia udanganyifu na kutatua migogoro.', 'Kutuma matangazo au ufuatiliaji pale tu ulipokubali.', 'Kutengeneza takwimu zisizo na majina wala namba za simu.', 'Kutimiza wajibu wa kisheria kama kuhifadhi kumbukumbu za fedha.']],
+      ['h3', '3. Akili bandia na taarifa zako'],
+      ['p', 'Jumbe, picha na sauti zako huchakatwa na mifumo ya Meta AI kupitia Meta Model API (Muse Spark, Muse Voice Transcribe na SAM 3.1) ili kuzielewa. Majibu ya sauti hutengenezwa ndani ya MoranBuy kwa sauti za MMS za Meta, hivyo maandishi hayatoki kwenye seva yetu kwa ajili ya sauti. Picha za delivery hukaguliwa na Muse Spark na SAM 3.1 kuona kama zinaonyesha bidhaa iliyoagizwa. Ukaguzi huu ni ushahidi tu; hauamui malipo wala mgogoro.'],
+      ['h3', '4. Tunaowashirikisha'],
+      ['ul', ['<strong>Biashara</strong> unayoagiza kwake: jina, namba ya simu, oda na mahali pa delivery.', '<strong>Msafirishaji</strong> aliyesajiliwa na Biashara hiyo: namba ya oda na taarifa za delivery.', '<strong>Moran AI</strong>, inayoendesha muunganisho wa WhatsApp wa MoranBuy.', '<strong>Snippe</strong>, mtoa huduma wetu wa malipo, kukusanya malipo, kulipa biashara na kurejesha pesa.', '<strong>Meta</strong>, kama mtoa huduma wa WhatsApp na wa mifumo ya akili bandia.', '<strong>Mamlaka</strong>, pale tu sheria inapohitaji.']],
+      ['p', 'Hatuuzi taarifa zako binafsi.'],
+      ['h3', '5. Muda wa kuhifadhi'],
+      ['ul', ['Ujumbe wa sauti: siku 30. Majibu ya sauti: siku 7. Picha unazotuma: siku 90.', 'Picha za delivery: siku 180, kwa ajili ya migogoro.', 'Oda, malipo, risiti, malipo kwa biashara, marejesho, kumbukumbu za ushahidi na ridhaa: huhifadhiwa kama kumbukumbu za fedha na sheria.', 'Wateja wasio na oda ambao hawajaandika kwa miaka 2 hufutwa.', 'Oda za zamani hubaki lakini mahali pa delivery huondolewa baada ya miaka 2.']],
+      ['h3', '6. Haki zako'],
+      ['p', 'Unaweza kuomba kuona, kusahihisha au kufuta taarifa zako, kukataa matangazo (jibu STOP), au kuondoa ridhaa. Baadhi ya kumbukumbu (oda, malipo, risiti) lazima zihifadhiwe kisheria na haziwezi kufutwa wakati wajibu huo upo. Andika support@moranai.co.tz.'],
+      ['h3', '7. Usalama'],
+      ['p', 'Taarifa huhifadhiwa kwenye seva tunazozisimamia, siri husimbwa, namba za makabidhiano huhifadhiwa kwa njia isiyorudishika, risiti zina namba ya ukaguzi inayoonyesha zikibadilishwa, na matumizi ya wafanyakazi hurekodiwa. Hakuna mfumo salama kabisa; tujulishe mara moja ukihisi matumizi mabaya.'],
+      ['h3', '8. Watoto'],
+      ['p', 'MoranBuy haikusudiwi kwa watoto chini ya miaka 18 bila mzazi au mlezi.'],
+      ['h3', '9. Mabadiliko'],
+      ['p', 'Sera hii ikibadilika kwa kiasi kikubwa, tutakuomba ukubali toleo jipya kabla ya kuendelea.'],
+    ] },
+    about: { title: 'Kuhusu Sisi', blocks: [
+      ['h2', 'Moran AI'],
+      ['p', 'Moran AI ilianzishwa mwaka 2026 Dar es Salaam ili kumpa kila mfanyabiashara wa Afrika msaidizi asiyechoka kwenye WhatsApp. Mawakala wake wa akili bandia hujibu wateja, hupokea oda na hufuatilia kwa niaba ya biashara Tanzania, Kenya, Uganda, Rwanda na Afrika Kusini.'],
+      ['h2', 'MoranBuy'],
+      ['p', 'MoranBuy ni bidhaa ya Moran AI inayogeuza ununuzi. Badala ya kutafuta duka kwa duka, mteja anasema mara moja anachotaka na kiasi anachoweza kulipa. MoranBuy humletea ofa tano bora halisi kutoka kwa biashara za karibu, bajeti kwanza, kisha mahali, na kueleza kwa nini kila moja imechaguliwa.'],
+      ['ul', ['<strong>Kwa wateja:</strong> uliza kwa maandishi, picha au sauti kwa Kiswahili au Kiingereza; lipa salama kwa Ulinzi wa Malipo; pata risiti kwa kila oda.', '<strong>Kwa biashara:</strong> orodhesha bidhaa kwa chat au kwa picha moja ya rafu, pokea oda zilizo tayari kulipwa, na pata taarifa za bidhaa zinazoulizwa karibu nawe.', '<strong>Kwa uaminifu:</strong> pesa hushikiliwa hadi namba ya makabidhiano ithibitishe delivery.']],
+      ['p', 'MoranBuy inaendeshwa na mifumo ya Meta AI: Muse Spark, Segment Anything (SAM 3.1), Muse Voice Transcribe na sauti za MMS.'],
+    ] },
+    developers: { title: 'Wasanidi', blocks: [
+      ['h2', 'Imejengwa na Moran AI'],
+      ['p', 'MoranBuy imesanifiwa na kujengwa na timu ya uhandisi ya Moran AI. Kiongozi wa kiufundi: <strong>Tito Oscar Mwaisengela</strong> (<a href="https://github.com/tito-devsec">tito-devsec</a>), Mwanzilishi Mwenza na CTO wa Moran AI.'],
+      ['div', [['Uongozi', 'Maziku, Mwanzilishi Mwenza na CEO · Tito Oscar Mwaisengela, Mwanzilishi Mwenza na CTO'], ['Msimbo', '<a href="https://github.com/tito-devsec/moranbuy">github.com/tito-devsec/moranbuy</a>']]],
+      ['h3', 'Jinsi imejengwa'],
+      ['ul', ['API na workers za Node.js, PostgreSQL kwa kila kumbukumbu, Redis kwa kazi za muda.', 'Meta AI: Muse Spark 1.3 (maandishi na picha), Muse Spark 1.2 audio na Muse Voice Transcribe (sauti), SAM 3.1 (bidhaa kwenye picha), MMS (majibu ya sauti, ndani ya mfumo).', 'Kanuni, si mifumo ya akili bandia, huamua bei, mpangilio, pesa na migogoro; kila jibu la akili bandia lina njia mbadala.', 'Njia zilizosainiwa kati ya Moran AI na MoranBuy, risiti zilizosainiwa, siri zilizosimbwa na kumbukumbu za ukaguzi.']],
+      ['h3', 'Kufanya kazi nasi'],
+      ['p', 'Wasanidi na washirika wanaweza kuandika hello@moranai.co.tz. Ripoti za usalama zitumwe support@moranai.co.tz na neno "Security" kwenye kichwa.'],
+    ] },
+    contact: { title: 'Wasiliana Nasi', blocks: [
+      ['h2', 'Tuko tayari kukusaidia'],
+      ['p', 'Una swali kuhusu oda, marejesho, mgogoro, kuorodhesha biashara yako au taarifa zako? Wasiliana na Moran AI kwa njia yoyote kati ya hizi.'],
+      ['div', [['Msaada', '<a href="mailto:support@moranai.co.tz">support@moranai.co.tz</a>'], ['Mauzo na biashara', '<a href="mailto:sales@moranai.co.tz">sales@moranai.co.tz</a>'], ['Simu', '<a href="tel:+255724660550">+255 724 660 550</a>'], ['Kwa ujumla', '<a href="mailto:hello@moranai.co.tz">hello@moranai.co.tz</a>']]],
+      ['p', 'Moran AI, Dar es Salaam, Tanzania · <a href="https://moranai.co.tz">moranai.co.tz</a>'],
+      ['note', 'Kuhusu oda, taja namba ya oda (mfano MB-7K2Q9P). Usimpe mtu yeyote namba yako ya makabidhiano wala PIN ya pesa za simu, hata sisi.'],
+    ] },
+    copyright: { title: 'Hakimiliki', blocks: [
+      ['h2', 'Umiliki'],
+      ['p', '© 2026 Moran AI. MoranBuy, Moran AI na nembo zao ni majina ya Moran AI. Msimbo wa MoranBuy umechapishwa chini ya Apache License 2.0; leseni hiyo inahusu msimbo, si majina wala nembo.'],
+      ['h2', 'Maudhui ya Biashara na watumiaji'],
+      ['p', 'Biashara zinabaki na haki za majina, maelezo na picha za bidhaa zao na zinairuhusu MoranBuy kuzionyesha kwa wateja. Unabaki na haki za unachotuma; unaturuhusu kukitumia kutoa Huduma.'],
+      ['h2', 'Mifumo na programu za watu wengine'],
+      ['ul', ['Mifumo ya Meta AI kupitia Meta Model API chini ya masharti ya Meta: Muse Spark, Muse Voice Transcribe, SAM 3.1.', 'Sauti za MMS za Meta (facebook/mms-tts-swh, facebook/mms-tts-eng), kwa leseni CC BY-NC 4.0.', 'Programu huria zikiwemo Node.js, Express, Knex, PostgreSQL, Redis, ONNX Runtime, libopus, PDFKit na qrcode, chini ya leseni zao.']],
+      ['h2', 'Kuripoti ukiukaji'],
+      ['p', 'Ukiamini kitu kwenye MoranBuy kinakiuka hakimiliki yako, andika hello@moranai.co.tz na neno "Copyright" kwenye kichwa: kazi hiyo ni ipi, inaonekana wapi kwenye MoranBuy, na mawasiliano yako. Tunapitia kila taarifa na kuondoa kinachokiuka.'],
+    ] },
+  },
+};
+
+const esc = (s) => String(s);
+function pageFromPath() {
+  const p = location.pathname.replace(/\/+$/, '').split('/').pop();
+  const alias = { terms: 'terms', privacy: 'privacy', about: 'about', developers: 'developers', contact: 'contact', copyright: 'copyright' };
+  return alias[p] || (PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'terms');
+}
+let lang = 'en';
+try { lang = localStorage.getItem('mb_lang') === 'sw' ? 'sw' : 'en'; } catch {}
+if (new URLSearchParams(location.search).get('lang') === 'sw') lang = 'sw';
+
+function render() {
+  const page = pageFromPath();
+  const c = CONTENT[lang][page];
+  document.documentElement.lang = lang;
+  document.title = `MoranBuy · ${NAV[lang][page]}`;
+  document.getElementById('bar-title').textContent = NAV[lang][page].replace('Masharti ya Matumizi', 'Masharti');
+  document.getElementById('open-label').textContent = UI[lang].open;
+  document.getElementById('lang-en').classList.toggle('on', lang === 'en');
+  document.getElementById('lang-sw').classList.toggle('on', lang === 'sw');
+  document.getElementById('links').innerHTML = PAGES.map((k) => `<a href="/${k}" class="${k === page ? 'on' : ''}">${NAV[lang][k]}</a>`).join('');
+  const body = c.blocks.map(([tag, v]) => {
+    if (tag === 'ul') return `<ul>${v.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`;
+    if (tag === 'note') return `<div class="note">${esc(v)}</div>`;
+    if (tag === 'div') return `<div class="grid2">${v.map(([h, t]) => `<div class="card"><strong>${h}</strong><br>${t}</div>`).join('')}</div>`;
+    return `<${tag}>${esc(v)}</${tag}>`;
+  }).join('');
+  document.getElementById('content').innerHTML = `<h1>${c.title}</h1><div class="modified">${UI[lang].modified}: ${MODIFIED}</div>${body}`;
+  document.getElementById('foot').textContent = UI[lang].foot;
+}
+function setLang(l) { lang = l; try { localStorage.setItem('mb_lang', l); } catch {} render(); }
+function goBack() { if (history.length > 1 && document.referrer.startsWith(location.origin)) history.back(); else location.href = '/customer/'; }
+render();
+</script>
+</body>
+</html>

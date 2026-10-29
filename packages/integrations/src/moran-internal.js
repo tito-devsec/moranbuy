@@ -35,6 +35,12 @@ export class MoranInternalClient {
   sendAudio({ to, audioBase64, mime = 'audio/ogg; codecs=opus', idempotencyKey }) { return this.call('/send', { body: { type: 'audio', to, audioBase64, mime, idempotencyKey } }); }
   sendMoranBuyTemplate({ to, templateName, language, components = [], idempotencyKey }) { return this.call('/send', { body: { type: 'template', to, templateName, language, components, idempotencyKey } }); }
 
+  // A PDF (a receipt) as a WhatsApp document from the MoranBuy number; the bytes travel in the signed body.
+  sendDocument({ to, documentBase64, filename, caption = '', idempotencyKey }) { return this.call('/send', { body: { type: 'document', to, documentBase64, filename, caption, idempotencyKey } }); }
+
+  // A list message: up to ten rows the person taps (their orders, for receipts).
+  sendList({ to, body, button, sections, header = null, footer = null, idempotencyKey }) { return this.call('/send', { body: { type: 'list', to, body, button, sections, header, footer, idempotencyKey } }); }
+
   // Sends a short question with up to three reply buttons from the MoranBuy number.
   sendButtons({ to, body, buttons, footer = null, idempotencyKey }) { return this.call('/send', { body: { type: 'buttons', to, body, buttons, footer, idempotencyKey } }); }
 
@@ -70,6 +76,8 @@ export class FakeMoranInternalClient {
   async updateOrder(b) { this.orderUpdates = this.orderUpdates || []; this.orderUpdates.push(b); return { ok: true, status: 'ok', data: {} }; }
   async sendButtons(m) { this.sent.push({ type: 'buttons', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendAudio(m) { this.sent.push({ type: 'audio', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async sendDocument(m) { this.sent.push({ type: 'document', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async sendList(m) { this.sent.push({ type: 'list', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMoranBuyTemplate(m) { this.sent.push({ type: 'moranbuy_template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMerchantText(m) { this.sent.push({ type: 'merchant_text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendTemplate(m) { if (this.failNext) { this.failNext = false; return { ok: false, status: 'http_502', data: { error: 'META_ERROR' } }; } this.sent.push({ type: 'template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
