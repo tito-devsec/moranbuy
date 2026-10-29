@@ -4,6 +4,7 @@ import { Geocoder, MoranInternalClient, RuntimeResearcher } from '@moranbuy/inte
 import { museRuntimeConfig, researchRuntimeConfig } from './runtime-settings.js';
 import { notifyMerchantOfOrder } from './merchant-notify.js';
 import { handOrderToMoran } from './moran-order-sync.js';
+import { demoGeocoder, demoMoran } from '../demo/stand-ins.js';
 import { logger } from '@moranbuy/observability';
 import { recordMuseRequest } from '@moranbuy/muse-intelligence';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
@@ -30,8 +31,9 @@ export function shoppingDeps() {
     const c = config();
     shared = {
       muse: new MuseClient({ cfg: c, db, resolve: () => museRuntimeConfig() }),
-      geocoder: new Geocoder({ cfg: c }),
-      moran: new MoranInternalClient({ cfg: c }),
+      // The demo sandbox keeps WhatsApp and the map in memory; everything else is the real code.
+      geocoder: c.DEMO_MODE ? demoGeocoder() : new Geocoder({ cfg: c }),
+      moran: c.DEMO_MODE ? demoMoran() : new MoranInternalClient({ cfg: c }),
     };
     shared.researcher = new RuntimeResearcher({ resolve: () => researchRuntimeConfig(), cfg: c, deps: { recorder: (r) => recordMuseRequest(db, r) } });
     shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });

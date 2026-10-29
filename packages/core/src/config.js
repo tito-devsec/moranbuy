@@ -28,6 +28,10 @@ const schema = z.object({
   MORAN_BACKEND_BASE_URL: opt(),
   // The MoranBuy WhatsApp number in international digits (2557XXXXXXXX); the site's "Open MoranBuy" buttons open a chat with it.
   MORANBUY_WHATSAPP_NUMBER: opt(),
+  // The public demo sandbox: DEMO_MODE runs this process against its own demo database with recording stand-ins for WhatsApp and payments;
+  // DEMO_API_URL is where the main site forwards /api/demo to.
+  DEMO_MODE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  DEMO_API_URL: opt(),
   // Moran's /internal routes are closed at its public nginx, so the signed channel can use a private address (http://backend:3000 on the VPS).
   MORAN_INTERNAL_BASE_URL: opt(),
   MORAN_SHARED_SECRET: opt(),

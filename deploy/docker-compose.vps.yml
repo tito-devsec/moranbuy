@@ -39,6 +39,8 @@ services:
       PORT: "4000"
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy
       REDIS_URL: redis://moranbuy-redis:6379
+      # The website's "Try the demo" calls are passed to the sandbox container below.
+      DEMO_API_URL: http://moranbuy-demo:4000
     command: ["sh", "-c", "npm run migrate && npm run seed && node services/api/src/server.js"]
     volumes:
       - moranbuy_uploads:/app/data/uploads
@@ -71,7 +73,32 @@ services:
       moranbuy-api: { condition: service_started }
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 
+  # The public "Try the demo" sandbox: same image, its own database (moranbuy_demo) and Redis db 1, no .env, so no production keys or numbers.
+  # A Meta key for live Muse in the demo is opt-in: set DEMO_MUSE_PROVIDER=meta and DEMO_MUSE_API_KEY in .env.
+  moranbuy-demo:
+    build: ..
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      NODE_ENV: production
+      PORT: "4000"
+      LOG_LEVEL: warn
+      APP_URL: ${APP_URL:-https://buy.moranai.co.tz}
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy_demo
+      REDIS_URL: redis://moranbuy-redis:6379/1
+      MUSE_PROVIDER: ${DEMO_MUSE_PROVIDER:-disabled}
+      MUSE_API_KEY: ${DEMO_MUSE_API_KEY:-}
+    command: ["node", "services/api/src/demo/start.js"]
+    volumes:
+      - moranbuy_demo:/app/data/demo
+    mem_limit: 700m
+    depends_on:
+      moranbuy-postgres: { condition: service_healthy }
+      moranbuy-redis: { condition: service_started }
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
 volumes:
+  moranbuy_demo:
   moranbuy_uploads:
   moranbuy_pgdata:
   moranbuy_redisdata:

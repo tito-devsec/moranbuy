@@ -50,3 +50,17 @@ test('the deterministic reply states totals, unconfirmed delivery and over-budge
   assert.equal(numbersAreGrounded(text, facts), true);
   assert.equal(numbersAreGrounded('Sofa 3 kwa TSh 250,000 tu!', facts), false);
 });
+
+test('amounts said in words stay out of the product name, and "niletewe" means delivery', async () => {
+  const { parseProductGuess, parseFulfilment } = await import('../../packages/reverse-marketplace/src/parse.js');
+  assert.equal(parseProductGuess('Nina elfu tisini, nataka blenda, nipo Sinza Mori, niletewe'), 'blenda');
+  assert.equal(parseProductGuess('nataka sofa laki tatu na elfu hamsini'), 'sofa');
+  assert.equal(parseFulfilment('nipo Sinza, niletewe nyumbani'), 'delivery');
+});
+
+test('every word for a product is known, so a Swahili request finds English listings', async () => {
+  const { productWords, normalizeProductType } = await import('../../packages/budget-matching/src/vocabulary.js');
+  assert.equal(normalizeProductType('blenda').productType, 'blender');
+  assert.ok(productWords('blender').includes('blender') && productWords('blender').includes('blenda'));
+  assert.deepEqual(productWords('unknown'), []);
+});

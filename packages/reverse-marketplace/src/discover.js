@@ -1,8 +1,11 @@
+import { normalizeProductType, productWords } from '@moranbuy/budget-matching';
+
 // Finds candidate listings for a request from MoranBuy's database and shapes them into offers for the ranking engine.
 const tokens = (s) => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
 
 export async function discoverOffers(db, request, { limit = 200 } = {}) {
-  const words = [...new Set([...tokens(request.productType), ...tokens(request.category), ...Object.values(request.essentialAttributes || {}).flatMap((v) => tokens(typeof v === 'object' ? '' : v))])];
+  const canon = normalizeProductType(request.productType).productType;
+  const words = [...new Set([...tokens(request.productType), ...productWords(canon).flatMap(tokens), ...tokens(request.category), ...Object.values(request.essentialAttributes || {}).flatMap((v) => tokens(typeof v === 'object' ? '' : v))])];
   let q = db('listings as l')
     .join('merchants as m', 'm.id', 'l.merchant_id')
     .leftJoin('merchant_locations as loc', function j() { this.on('loc.merchant_id', 'm.id').andOn('loc.is_default', db.raw('true')).andOnNull('loc.deleted_at'); })

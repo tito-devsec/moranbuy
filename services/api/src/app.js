@@ -26,6 +26,20 @@ export function createApp({ routers = [] } = {}) {
   // Voice notes and photos arrive inside Moran's signed body, base64 encoded (a 16 MB WhatsApp voice note is about 22 MB of text).
   app.use('/internal/inbound', express.raw({ type: '*/*', limit: '24mb' }));
   app.use('/webhooks', express.raw({ type: '*/*', limit: '2mb' }));
+  // The public site's demo runs on its own sandbox server with its own database; this process only passes the calls through.
+  if (!c.DEMO_MODE && c.DEMO_API_URL) {
+    const target = String(c.DEMO_API_URL).replace(/\/+$/, '');
+    app.use('/api/demo', express.raw({ type: '*/*', limit: '8mb' }), async (req, res) => {
+      try {
+        const upstream = await fetch(`${target}/api/demo${req.url}`, { method: req.method, headers: { 'Content-Type': req.get('content-type') || 'application/json', 'X-Forwarded-For': req.ip }, body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body, signal: AbortSignal.timeout(90000) });
+        res.status(upstream.status);
+        for (const h of ['content-type', 'content-disposition', 'cache-control', 'ratelimit', 'ratelimit-policy', 'retry-after']) { const v = upstream.headers.get(h); if (v) res.set(h, v); }
+        res.send(Buffer.from(await upstream.arrayBuffer()));
+      } catch (err) {
+        res.status(502).json({ error: 'DEMO_UNAVAILABLE', message: 'The demo sandbox is not reachable right now.' });
+      }
+    });
+  }
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 
   // One shared ceiling per IP; signed webhooks are authenticated by their signature instead.

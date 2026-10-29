@@ -136,6 +136,7 @@ packages/*             core, reverse-marketplace, budget-matching, location-rank
                        product-catalog, merchant-management, campaign-engine, campaign-outreach,
                        followup-engine, consent-management, billing, authorization, integrations, observability
 apps/customer|business|admin   static web apps served by the API
+apps/site              public website (Home, How it works, For businesses, Try the demo)
 integrations/          Moran-side drop-ins and the Hermes research agent configuration
 tests/unit|integration|security|end-to-end
 docs/                  architecture, assessment, ranking, Muse, workflows, API, deployment, testing, demo
@@ -146,6 +147,14 @@ docs/                  architecture, assessment, ranking, Muse, workflows, API, 
 `deploy/UPDATE-VPS-MORANBUY.md` puts MoranBuy on the Moran VPS as `buy.moranai.co.tz`, a separate
 Compose stack talking to `https://api.moranai.co.tz`. Muse Spark, Snippe and Hermes credentials are
 entered in MoranBuy Admin and take effect at once.
+
+## Try the demo
+
+`/demo` on the website runs the whole story on a simulated phone (customer, shop owner, rider) next to
+the server log. It is served by a separate sandbox container (`moranbuy-demo`) running the same code
+with `DEMO_MODE=true`: its own database, a recording WhatsApp line, the sandbox payment provider and
+five sample shops on reserved numbers. It gets no production keys; the main API only passes `/api/demo`
+calls through to it. Demo sessions are deleted after a day.
 
 ## Install and run
 

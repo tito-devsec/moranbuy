@@ -6,7 +6,7 @@ export const parseBudget = (text) => parseShillings(text);
 
 export function parseFulfilment(text) {
   const t = String(text || '').toLowerCase();
-  if (/\b(delivery|deliver|niletee|nileteewe|kuletewa|tuma)\b/.test(t)) return 'delivery';
+  if (/\b(delivery|deliver|niletee|nileteewe|niletewe|nileteeni|niletewa|kuletewa|tuma)\b/.test(t)) return 'delivery';
   if (/\b(pickup|pick up|nichukue|nitachukua|nije|kuja)\b/.test(t)) return 'pickup';
   return 'any';
 }
@@ -23,11 +23,16 @@ export function parseQuantity(text) {
   return m ? Number(m[1]) : 1;
 }
 
+// Amounts said in words, such as "elfu tisini" or "laki moja na elfu ishirini", so the number words never end up in the product name.
+const NUM = 'moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi|ishirini|thelathini|arobaini|hamsini|sitini|sabini|themanini|tisini';
+const SPOKEN_AMOUNT = new RegExp(`\\b(elfu|laki|milioni|mia)((\\s+(na\\s+)?(${NUM}|elfu|laki|mia))+)\\b`, 'g');
+
 // Best-effort product words: the text with budget, place and filler removed, trimmed to a short phrase.
 export function parseProductGuess(text) {
   let t = String(text || '').toLowerCase();
   t = t.split(/\b(nipo|niko|i am in|i'm in|delivery|nataka delivery|pickup)\b/)[0];
   t = t.replace(/(tsh|tzs|sh)?\s*\d[\d,.]*\s*(m|mil|milioni|million|k|elfu|laki)?/g, ' ');
+  t = t.replace(SPOKEN_AMOUNT, ' ');
   t = t.replace(/\b(bila mbadala|sitaki mbadala|no alternatives?|mbadala sawa|alternatives? ok)\b/g, ' ');
   t = t.replace(/\b(nina|nataka|ninahitaji|naomba|nipo|niko|delivery|ikiwezekana|i want|i need|budget|please|tafadhali|na|ya|wa|of|for|a|an|the|my|is|leo|haraka|today|urgent|asap|kesho|tomorrow|sasa|hivi|tu|hii|only|exactly|laki|elfu|milioni|tsh|tzs)\b/g, ' ');
   t = t.replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim();

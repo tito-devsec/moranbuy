@@ -44,3 +44,9 @@ export function normalizeProductType(text) {
   for (const e of ENTRIES) if (t.includes(` ${e.w} `)) return { productType: e.type, category: e.category, matched: e.w };
   return { productType: null, category: null, matched: null };
 }
+
+// Every word for a canonical product type, so a search for "blenda" also finds listings called "blender".
+export function productWords(type) {
+  const row = VOCAB.find(([t]) => t === type);
+  return row ? [row[0], ...row[2]] : [];
+}

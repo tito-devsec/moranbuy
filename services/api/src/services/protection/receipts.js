@@ -45,7 +45,9 @@ export function checkCode(summary, secret = null) {
 }
 
 export function qrText(f, summary, code, appUrl = null) {
-  const base = String(appUrl || config().APP_URL || 'https://buy.moranai.co.tz').replace(/\/+$/, '');
+  // Sandbox receipts are checked on the sandbox, which the public site serves under /api/demo.
+  const site = () => { const c = config(); return `${String(c.APP_URL || 'https://buy.moranai.co.tz').replace(/\/+$/, '')}${c.DEMO_MODE ? '/api/demo' : ''}`; };
+  const base = String(appUrl || site()).replace(/\/+$/, '');
   return `${summary}\nVerify: ${base}/r/${f.receiptNo}?c=${code.replace('-', '')}\nCheck: ${code}`;
 }
 

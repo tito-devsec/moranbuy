@@ -8,6 +8,7 @@ import { followupRouter } from './routes/followup.js';
 import { contactsRouter } from './routes/contacts.js';
 import { paymentsWebhookRouter, sandboxRouter } from './routes/payments-webhook.js';
 import { adminProtectionRouter } from './routes/admin-protection.js';
+import { demoRouter } from './routes/demo.js';
 import { adminRouter } from './routes/admin.js';
 
 // Every API router with its mount path; phases append to this list.
@@ -23,6 +24,7 @@ export const routers = [
   { path: '/api/merchant/contacts', router: contactsRouter },
   { path: '/webhooks', router: paymentsWebhookRouter },
   { path: '/api/sandbox', router: sandboxRouter },
+  { path: '/api/demo', router: demoRouter },
   { path: '/api/admin', router: adminProtectionRouter },
   { path: '/api/admin', router: adminRouter },
 ];
