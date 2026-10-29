@@ -75,6 +75,7 @@ audited with a reason.
 | Product photos no listing shows (file and record) | 30 |
 | Voice notes customers and businesses sent, with their transcripts | 30 |
 | Spoken replies MoranBuy made | 7 |
+| Delivery and refusal photos (dispute evidence) | 180 |
 
 Never purged here: orders, payments, consent events, contacts, merchants, listings and the audit
 trail. Erasure on request (`DELETE /api/merchant/contacts/:phone`) is separate and immediate.
@@ -91,3 +92,7 @@ not used for MoranBuy. MoranBuy keeps it privately (never public), decodes voice
 process, and sends them to the Meta Model API to be heard; the transcript is stored beside the
 recording. Spoken replies are made inside MoranBuy by Meta's MMS voices from the written reply and sent back
 as a voice note; no text leaves the server for speech. Both are removed by the retention purge (30 and 7 days).
+
+## Payment protection
+
+For a protected order MoranBuy keeps the payment reference, the receipt versions, payouts and refunds, and an evidence timeline (button presses, the result of each handover-code attempt but never the code, which is stored only as a keyed hash, delivery photos, shared locations and refusal reasons). The delivery person sees the order, the place and the customer's phone, which they need to deliver. Orders, payments, payouts, receipts, the timeline and disputes are financial records and are never purged; delivery photos are removed after 180 days. Muse Spark and SAM 3.1 read delivery photos only to compare them with the ordered product; the result is evidence, never a decision.

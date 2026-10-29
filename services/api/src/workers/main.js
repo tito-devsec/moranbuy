@@ -8,6 +8,7 @@ import { db } from '../db/connection.js';
 import { engagementDeps, loadCampaignPricing } from '../services/engagement.js';
 import { processDueReminders } from '../services/schedule-reminders.js';
 import { purgeExpired } from '../services/retention.js';
+import { runProtectionSweep } from '../services/protection/protection.js';
 import { config } from '@moranbuy/core';
 import { QUEUE_NAMES, feedQueues, runOne, queue, redisReady } from '../queue/jobs.js';
 
@@ -36,6 +37,8 @@ export const workers = [
   pollingWorker('retention-purge', Number(process.env.RETENTION_INTERVAL_MS || 6 * 3600000), () => purgeExpired({ dryRun: config().RETENTION_DRY_RUN })),
   pollingWorker('schedule-reminders', Number(process.env.REMINDER_INTERVAL_MS || 60000), () => processDueReminders({ moran: shoppingDeps().moran, dryRun: config().REMINDER_DRY_RUN }), { whenQueueUp: SAFETY_MS }),
   pollingWorker('followup-delivery', 30000, () => processDueFollowups(db, engagementDeps().sender, { dryRun: engagementDeps().followupDryRun, muse: engagementDeps().muse }), { whenQueueUp: SAFETY_MS }),
+  // Payment protection's timed rules: release after the defect window, cancel unpaid orders, refund paid orders nobody is delivering.
+  pollingWorker('payment-protection', Number(process.env.PROTECTION_INTERVAL_MS || 60000), () => runProtectionSweep({ moran: shoppingDeps().moran, payments: engagementDeps().payments })),
   // Opted-in Moran businesses and their products: changes every 10 minutes, a full pass (which archives what is no longer listed) every 6 hours.
   pollingWorker('moran-listings-pull', Number(process.env.MORAN_LISTINGS_SYNC_INTERVAL_MS || 600000), () => pullMoranListings(db, shoppingDeps().moran, { full: Date.now() % (6 * 3600000) < Number(process.env.MORAN_LISTINGS_SYNC_INTERVAL_MS || 600000) })),
 ];

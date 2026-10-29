@@ -14,6 +14,8 @@ import { recordDeliveryStatus } from '@moranbuy/campaign-engine';
 import { handleMerchantChat } from '../services/merchant-chat.js';
 import { intakeVoice, intakeImage } from '../services/media-intake.js';
 import { voiceReplyFor } from '../services/voice-reply.js';
+import { engagementDeps } from '../services/engagement.js';
+import { handleDelivererMessage, handleCustomerProtectionMessage, handleMerchantProtectionMessage, isActiveDeliverer } from '../services/protection/chat.js';
 
 export const internalInboundRouter = express.Router();
 
@@ -45,7 +47,7 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   const customer = await upsertCustomer({ channel: 'whatsapp', channelRef: String(from), name });
   const { engine, moran } = shoppingDeps();
   // A bare STOP to the MoranBuy number ends marketing and follow-up from every merchant; START restores only the MoranBuy relationship.
-  let out; let gate;
+  let out; let gate; let delivery; let protectedReply;
   if (detectOptOut(text)) {
     await optOut(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
     await stopLeadsForPhone(db, { phone: from, reason: 'opted_out' });
@@ -53,6 +55,9 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   } else if (detectOptIn(text)) {
     await optIn(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
     out = { replies: [{ text: 'Karibu tena. / Welcome back.' }], session: { id: null, state: 'opted_in' } };
+  } else if ((delivery = await deliveryMessage({ from, text, buttonId, kind, media, location, customer, messageId }))) {
+    // A delivery person acts for the business at the customer's door: their buttons, photos and codes come before anything else.
+    out = { replies: delivery.reply ? [{ text: delivery.reply }] : [], session: { id: null, state: 'delivery' } };
   } else if (!(gate = await termsGate({ customer, text, buttonId, channel: 'whatsapp' })).pass) {
     // Nobody, customer or business owner, is answered before accepting the terms; the question is repeated until they do.
     out = { replies: gate.replies, session: { id: null, state: gate.accepted ? 'terms_accepted' : gate.rejected ? 'terms_rejected' : 'terms_prompted' } };
@@ -68,8 +73,10 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     // "KUBALI MB-XXXX 15000" from a merchant's own number answers an order alert; everything else is a shopping message.
     const merchantReply = await handleMerchantOrderReply({ moran, from, text });
     // A registered business sending a product or asking "RIPOTI" is served as a business, not as a shopper.
-    const merchantChat = merchantReply ? null : await handleMerchantChat({ muse: shoppingDeps().muse, from, text, imageUrl: imageDataUrl || imageUrl, imageBuffer: kind === 'image' ? media : null, kind, messageId: String(messageId) });
-    if (merchantReply) out = { replies: [{ text: merchantReply.reply }], session: { id: null, state: merchantReply.order ? `order_${merchantReply.order.status}` : 'order_reply_rejected' } };
+    if (!merchantReply) protectedReply = await handleMerchantProtectionMessage({ moran, from, text }) || await handleCustomerProtectionMessage({ moran, payments: engagementDeps().payments, muse: shoppingDeps().muse, customer, text, buttonId, photoUploadId: String(imageUrl || '').startsWith('upload:') ? String(imageUrl).slice(7) : null });
+    const merchantChat = merchantReply || protectedReply ? null : await handleMerchantChat({ muse: shoppingDeps().muse, from, text, imageUrl: imageDataUrl || imageUrl, imageBuffer: kind === 'image' ? media : null, kind, messageId: String(messageId) });
+    if (protectedReply) out = { replies: protectedReply.reply ? [{ text: protectedReply.reply }] : [], session: { id: null, state: 'protection' } };
+    else if (merchantReply) out = { replies: [{ text: merchantReply.reply }], session: { id: null, state: merchantReply.order ? `order_${merchantReply.order.status}` : 'order_reply_rejected' } };
     else if (merchantChat) out = { replies: [{ text: merchantChat.reply }], session: { id: null, state: `merchant_${merchantChat.kind}` } };
     else {
       await stopLeadsForPhone(db, { phone: from, reason: 'customer_replied', outcome: 'replied' }).catch(() => 0);
@@ -97,6 +104,14 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     .finally(() => voiceJobs.delete(job));
   voiceJobs.add(job);
 }));
+
+// A delivery person's message, read once: a voice note is heard first (the reason for a refusal may be spoken), a photo goes as evidence.
+async function deliveryMessage({ from, text, buttonId, kind, media, location, customer, messageId }) {
+  if (!buttonId?.startsWith('dlv:') && !(await isActiveDeliverer(db, from))) return null;
+  let said = text;
+  if (kind === 'voice' && media) { const heard = await intakeVoice({ muse: shoppingDeps().muse, buffer: media, customerId: customer.id, requestRef: String(messageId) }); said = heard.ok ? heard.text : ''; }
+  return handleDelivererMessage({ moran: shoppingDeps().moran, payments: engagementDeps().payments, muse: shoppingDeps().muse, from, text: said, buttonId, imageBuffer: kind === 'image' ? media : null, location });
+}
 
 // Spoken replies still being made, so tests and a graceful shutdown can wait for them.
 const voiceJobs = new Set();

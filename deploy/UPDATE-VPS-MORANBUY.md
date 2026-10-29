@@ -138,6 +138,12 @@ Opted-in businesses need no sign-up: the worker pulls them every 10 minutes (Int
 has a "Pull now" button). Owners without a MoranBuy login get order alerts on their WhatsApp number
 and answer with `KUBALI MB-XXXX [ada ya delivery]` or `KATAA MB-XXXX`.
 
+### Payment protection
+
+- Snippe: the same webhook URL (`https://buy.moranai.co.tz/webhooks/payments`) receives payment and payout events. Keep enough balance in the Snippe account for payouts and refunds plus Snippe's fees.
+- Template for delivery people (Super Admin → MoranBuy business → Templates): `moranbuy_delivery_request`, UTILITY, Swahili, body with `{{1}}` order ref, `{{2}}` business, `{{3}}` product, `{{4}}` place, `{{5}}` customer phone, and three quick-reply buttons (Nimefika, Imekataliwa, Mteja hayupo). Once approved, enter its name under MoranBuy → Payment Protection → Rules. Until then the buttons reach only riders who wrote to the MoranBuy number in the last 24 hours.
+- Each business enters its owner name and payout number in the business app (Orders tab); the contact phone is used until then.
+
 ## 6. Smoke test
 
 1. Send "Nina laki tatu na nusu ya sofa ya watu watatu, nipo Sinza, delivery" to the MoranBuy

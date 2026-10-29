@@ -85,6 +85,19 @@ image is built and run in the same process; the speech is written as an Ogg Opus
 - Muse cost is priced per request with a monthly budget and an optional hard cap; every Muse duty has a deterministic fallback, so a cap or an outage never stops answers.
 - Next steps at volume: a search index for listings beyond tens of thousands of products, read replicas for statistics, and partitioning the demand-signal table by month.
 
+## Payment protection
+
+A WhatsApp customer pays MoranBuy, not the business, and the money is held until delivery is proven:
+
+1. The business accepts with the full total; MoranBuy sends the customer a Snippe mobile money request.
+2. Snippe's verified webhook marks the payment held. The customer gets a receipt (PDF, QR code with the signed summary) and a private six-character handover code; the business never sees it.
+3. The business names its delivery person; MoranBuy sends that number three buttons: Arrived, Refused, Customer not there.
+4. At the door the customer checks the product and only then gives the code. The rider sends a photo and the code: a correct code marks the order delivered. Three wrong codes lock the order for an administrator.
+5. The payment goes to the business 48 hours later (or at once when the customer replies RECEIVED), unless the customer reports a hidden defect.
+6. A wrong product is refused at the door with a reason and a photo; the customer confirms and is refunded, and the business gets a strike. A contested refusal or a defect becomes a dispute that only a super admin settles, with the whole evidence timeline.
+
+Fixed rules move the money. Muse Spark and SAM 3.1 check that the delivery photo shows the ordered product and flag staged or catalogue pictures, Muse sorts the refusal reason and summarises disputes for the administrator; none of that decides anything. A photo fingerprint catches a re-sent delivery photo. "Not received" after a correct code is refused, because only the customer had the code. Receipts are re-issued as the order moves (paid, delivered, completed or refunded), and `buy.moranai.co.tz/r/<number>?c=<check>` proves one is genuine. Customers type "oda zangu" for their orders and receipts.
+
 ## Campaigns, outreach and follow-up
 
 This repository introduces a new MoranBuy campaign engine, new-product promotional outreach and an

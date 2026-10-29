@@ -4,17 +4,29 @@ import { toMsisdn } from '@moranbuy/consent-management';
 import { db } from '../db/connection.js';
 import { syncOrderStatusToMoran } from './moran-order-sync.js';
 import { convertLeadsForOrder, releaseLeadsForOrder } from '@moranbuy/followup-engine';
+import { protectsOrder, startProtection } from './protection/protection.js';
+import { engagementDeps } from './engagement.js';
 
 const NEXT = { accepted: ['pending_merchant'], rejected: ['pending_merchant', 'accepted'], fulfilled: ['accepted', 'paid'], cancelled: ['pending_merchant', 'accepted'] };
 
 // Moves an order forward (merchant dashboard or a WhatsApp reply from the merchant), audits it, and tells the customer.
-export async function applyOrderStatus({ dbImpl = db, moran, order, status, deliveryFee = null, note = null, actor }) {
+export async function applyOrderStatus({ dbImpl = db, moran, order, status, deliveryFee = null, note = null, actor, payments = null }) {
   if (!NEXT[status]?.includes(order.status)) throw Object.assign(new Error(`An order that is ${order.status} cannot become ${status}.`), { code: 'BAD_TRANSITION', status: 409 });
+  // A protected order is closed only by the handover code, a refund or an administrator, never by a status change.
+  const protection = await dbImpl('order_protection').where({ order_id: order.id }).first();
+  if (protection && protection.state !== 'awaiting_payment') throw Object.assign(new Error('This order is paid and protected by MoranBuy: delivery is confirmed with the customer\'s handover code.'), { code: 'PROTECTED_ORDER', status: 409 });
+  const isProtected = status === 'accepted' && await protectsOrder(dbImpl, order);
+  if (isProtected && order.fulfilment === 'delivery' && !order.total_confirmed && (deliveryFee === null || deliveryFee === undefined)) {
+    throw Object.assign(new Error(`Add the delivery fee so the customer can pay the full amount, e.g. KUBALI ${order.order_ref} 5000 (0 if free).`), { code: 'DELIVERY_FEE_REQUIRED', status: 409 });
+  }
   const patch = { status, notes: note || order.notes, updated_at: dbImpl.fn.now() };
   if (deliveryFee !== null && deliveryFee !== undefined && !order.total_confirmed) { patch.delivery_fee = deliveryFee; patch.known_total = order.unit_price * order.quantity + deliveryFee; patch.total_confirmed = true; }
   const [row] = await dbImpl('orders').where({ id: order.id }).update(patch).returning('*');
   await audit(dbImpl, { actorType: actor.type, actorId: actor.id || null, merchantId: order.merchant_id, action: 'order.status_changed', targetType: 'order', targetId: order.id, before: { status: order.status }, after: { status, deliveryFee: patch.delivery_fee ?? null, via: actor.via } });
-  const customerAlert = await notifyCustomerOfOrderStatus({ dbImpl, moran, order: row });
+  if (protection && ['cancelled', 'rejected'].includes(status)) await dbImpl('order_protection').where({ id: protection.id }).update({ state: 'expired', closed_at: dbImpl.fn.now() });
+  // Accepted with a known total: MoranBuy asks the customer to pay it, and that request replaces the plain "accepted" message.
+  const protectedStart = isProtected && row.total_confirmed ? await startProtection({ dbImpl, moran, payments: payments || engagementDeps().payments, order: row }) : null;
+  const customerAlert = protectedStart ? { protected: true, state: protectedStart.state } : await notifyCustomerOfOrderStatus({ dbImpl, moran, order: row });
   // Follow-up leads follow the order: a sale converts them, a failed order releases them.
   const customer = await dbImpl('customers').where({ id: row.customer_id }).first();
   let leads = null;

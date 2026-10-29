@@ -16,6 +16,9 @@ import { engagementDeps } from '../services/engagement.js';
 import { startPayment } from '@moranbuy/billing';
 import { loadServicePricing } from '../services/service-pricing.js';
 import { demandOverview } from '../services/insights.js';
+import { toMsisdn, isValidMsisdn } from '@moranbuy/consent-management';
+import { assignDeliverer } from '../services/protection/protection.js';
+import { latestReceipt } from '../services/protection/receipts-store.js';
 
 export const merchantRouter = express.Router();
 merchantRouter.use(requireMerchantAuth(db));
@@ -59,7 +62,8 @@ merchantRouter.post('/services/:service/pay', validate({ params: z.object({ serv
   const payment = await startPayment(db, engagementDeps().payments, { merchantId: req.merchant.id, purpose: 'entitlement', targetId: req.params.service, amount: price.monthlyTzs, currency: pricing.currency, phone: req.body.phone || req.merchant.contact_phone || null, breakdown: { service: req.params.service, monthlyTzs: price.monthlyTzs, periodDays: price.periodDays || 30 }, actorId: req.merchantUser.id });
   res.json({ payment: pub(payment) });
 }));
-merchantRouter.get('/payments', asyncHandler(async (req, res) => res.json({ payments: await db('payments').where({ merchant_id: req.merchant.id }).orderBy('created_at', 'desc').limit(50).select('id', 'purpose', 'target_id', 'provider', 'reference', 'amount', 'currency', 'status', 'settled_at', 'created_at') })));
+// What the business itself paid MoranBuy for; customers' protected order payments show on the orders instead.
+merchantRouter.get('/payments', asyncHandler(async (req, res) => res.json({ payments: await db('payments').where({ merchant_id: req.merchant.id }).whereNot({ purpose: 'order' }).orderBy('created_at', 'desc').limit(50).select('id', 'purpose', 'target_id', 'provider', 'reference', 'amount', 'currency', 'status', 'settled_at', 'created_at') })));
 
 merchantRouter.post('/verification', validate({ body: z.object({ registrationNumber: z.string().max(80).nullable().optional(), taxId: z.string().max(80).nullable().optional(), documentUrls: z.array(z.string().url()).max(10).optional(), documentUploadIds: z.array(z.string().uuid()).max(10).optional(), notes: z.string().max(1000).nullable().optional() }) }), asyncHandler(async (req, res) => {
   const row = await submitVerification(db, req.merchant.id, { ...req.body, documentUrls: req.body.documentUrls || [], documentUploadIds: [...new Set(req.body.documentUploadIds || [])], ...actor(req) });
@@ -112,8 +116,8 @@ merchantRouter.delete('/locations/:id', validate({ params: idParams }), asyncHan
 
 // ---- orders and enquiries ----
 merchantRouter.get('/orders', asyncHandler(async (req, res) => {
-  const rows = await db('orders as o').leftJoin('listings as l', 'l.id', 'o.listing_id').leftJoin('customers as c', 'c.id', 'o.customer_id').where('o.merchant_id', req.merchant.id).orderBy('o.created_at', 'desc').limit(200)
-    .select('o.*', 'l.name as listing_name', 'c.channel as customer_channel', 'c.channel_ref as customer_ref', 'c.name as customer_name');
+  const rows = await db('orders as o').leftJoin('listings as l', 'l.id', 'o.listing_id').leftJoin('customers as c', 'c.id', 'o.customer_id').leftJoin('order_protection as p', 'p.order_id', 'o.id').where('o.merchant_id', req.merchant.id).orderBy('o.created_at', 'desc').limit(200)
+    .select('o.*', 'l.name as listing_name', 'c.channel as customer_channel', 'c.channel_ref as customer_ref', 'c.name as customer_name', 'p.state as protection_state', 'p.deliverer_phone', 'p.deliverer_name', 'p.release_due_at');
   res.json({ orders: rows.map((o) => ({ ...o, customer_ref: o.customer_channel === 'whatsapp' ? o.customer_ref : null })) });
 }));
 
@@ -123,7 +127,35 @@ merchantRouter.post('/orders/:id/status', validate({ params: idParams, body: z.o
   try {
     const out = await applyOrderStatus({ moran: shoppingDeps().moran, order, status: req.body.status, deliveryFee: req.body.deliveryFee ?? null, note: req.body.note || null, actor: { type: 'merchant', id: req.merchantUser.id, via: 'dashboard' } });
     res.json({ order: out.order, customerAlert: out.customerAlert, moranSync: out.moranSync });
-  } catch (err) { if (err.code === 'BAD_TRANSITION') throw new ApiError(409, 'BAD_TRANSITION', err.message); throw err; }
+  } catch (err) { if (['BAD_TRANSITION', 'PROTECTED_ORDER', 'DELIVERY_FEE_REQUIRED'].includes(err.code)) throw new ApiError(409, err.code, err.message); throw err; }
+}));
+
+// Names who delivers a paid order; only that number can confirm it with the customer's handover code.
+merchantRouter.post('/orders/:id/deliverer', validate({ params: idParams, body: z.object({ phone: z.string().min(9).max(20), name: z.string().max(120).optional() }) }), asyncHandler(async (req, res) => {
+  const order = await db('orders').where({ id: req.params.id, merchant_id: req.merchant.id }).first();
+  if (!order) throw notFound('ORDER_NOT_FOUND');
+  try {
+    const p = await assignDeliverer({ moran: shoppingDeps().moran, order, phone: req.body.phone, name: req.body.name || null, actor: { type: 'merchant', id: req.merchantUser.id, via: 'dashboard' } });
+    res.json({ state: p.state, delivererPhone: p.deliverer_phone, delivererName: p.deliverer_name });
+  } catch (err) { if (err.status) throw new ApiError(err.status, err.code, err.message); throw err; }
+}));
+
+// The latest receipt of an order as a PDF download.
+merchantRouter.get('/orders/:id/receipt.pdf', validate({ params: idParams }), asyncHandler(async (req, res) => {
+  const order = await db('orders').where({ id: req.params.id, merchant_id: req.merchant.id }).first();
+  const r = order ? await latestReceipt(db, order.id) : null;
+  if (!r?.pdf) throw notFound('RECEIPT_NOT_FOUND');
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="MoranBuy-${r.receiptNo}.pdf"`, 'Cache-Control': 'private, no-store' }).send(r.pdf);
+}));
+
+// The owner's name for receipts and the mobile money number protected payments are released to.
+merchantRouter.put('/payout', validate({ body: z.object({ ownerName: z.string().min(2).max(120), payoutPhone: z.string().min(9).max(20) }) }), asyncHandler(async (req, res) => {
+  const phone = toMsisdn(req.body.payoutPhone);
+  if (!isValidMsisdn(phone)) throw new ApiError(400, 'BAD_PHONE', 'That phone number is not valid.');
+  const before = { ownerName: req.merchant.owner_name, payoutPhone: req.merchant.payout_phone };
+  await db('merchants').where({ id: req.merchant.id }).update({ owner_name: req.body.ownerName, payout_phone: phone, updated_at: db.fn.now() });
+  await audit(db, { actorType: 'merchant', actorId: req.merchantUser.id, merchantId: req.merchant.id, action: 'merchant.payout_details_changed', targetType: 'merchant', targetId: req.merchant.id, before, after: { ownerName: req.body.ownerName, payoutPhone: phone } });
+  res.json({ ownerName: req.body.ownerName, payoutPhone: phone });
 }));
 
 // What customers ask MoranBuy for in this business's line, where they are, what sold; Muse explains it when it is on.

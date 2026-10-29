@@ -190,9 +190,14 @@
 
       <div x-show="tab === 'Orders'">
         <h3 class="font-semibold mb-3">Orders from MoranBuy customers</h3>
+        <div class="bg-white rounded-xl border p-4 mb-3 text-sm">
+          <div class="font-medium">Payment protection</div>
+          <p class="text-gray-600 mb-2">WhatsApp customers pay MoranBuy when you accept. The money is held until your delivery person sends the customer's handover code and a photo, then released to this number. Give your name for receipts and your mobile money number.</p>
+          <div class="flex flex-wrap gap-2 items-center"><input class="border rounded p-1" placeholder="Owner name (shown on receipts)" x-model="payout.ownerName"><input class="border rounded p-1" placeholder="Mobile money number, e.g. 0712345678" x-model="payout.payoutPhone"><button class="px-3 py-1 rounded bg-gray-900 text-white" @click="savePayout()">Save</button><span class="text-xs text-gray-500" x-text="payout.saved ? 'Saved' : ''"></span></div>
+        </div>
         <div class="bg-white rounded-xl border overflow-x-auto">
           <table class="w-full text-sm">
-            <thead class="bg-gray-100 text-left"><tr><th class="p-2">Ref</th><th class="p-2">Product</th><th class="p-2">Qty</th><th class="p-2">Known total</th><th class="p-2">Fulfilment</th><th class="p-2">Customer</th><th class="p-2">Status</th><th class="p-2"></th></tr></thead>
+            <thead class="bg-gray-100 text-left"><tr><th class="p-2">Ref</th><th class="p-2">Product</th><th class="p-2">Qty</th><th class="p-2">Known total</th><th class="p-2">Fulfilment</th><th class="p-2">Customer</th><th class="p-2">Status</th><th class="p-2">Protection</th><th class="p-2"></th></tr></thead>
             <tbody>
               <template x-for="o in orders" :key="o.id">
                 <tr class="border-t">
@@ -203,7 +208,12 @@
                   <td class="p-2" x-text="o.fulfilment"></td>
                   <td class="p-2" x-text="o.customer_ref || o.customer_name || 'web customer'"></td>
                   <td class="p-2" x-text="o.status"></td>
-                  <td class="p-2 whitespace-nowrap" x-show="o.status === 'pending_merchant'"><button class="underline mr-2" @click="orderStatus(o, 'accepted')">Accept</button><button class="underline text-red-700" @click="orderStatus(o, 'rejected')">Reject</button></td>
+                  <td class="p-2 text-xs"><span x-text="protectionLabel(o)"></span><div class="text-gray-500" x-show="o.deliverer_phone" x-text="'Deliverer: ' + (o.deliverer_name || '') + ' +' + o.deliverer_phone"></div><div class="text-gray-500" x-show="o.release_due_at && o.protection_state === 'delivered'" x-text="'Paid to you after ' + new Date(o.release_due_at).toLocaleString()"></div></td>
+                  <td class="p-2 whitespace-nowrap">
+                    <template x-if="o.status === 'pending_merchant'"><span><button class="underline mr-2" @click="orderStatus(o, 'accepted')">Accept</button><button class="underline text-red-700" @click="orderStatus(o, 'rejected')">Reject</button></span></template>
+                    <template x-if="['paid_held', 'deliverer_assigned'].includes(o.protection_state)"><button class="underline mr-2" @click="assignDeliverer(o)" x-text="o.deliverer_phone ? 'Change deliverer' : 'Assign deliverer'"></button></template>
+                    <template x-if="o.protection_state && o.protection_state !== 'awaiting_payment' && o.protection_state !== 'expired'"><button class="underline" @click="MoranBuy.download(`/api/merchant/orders/${o.id}/receipt.pdf`, `MoranBuy-${o.order_ref}.pdf`).catch((e) => alert(e.message))">Receipt</button></template>
+                  </td>
                 </tr>
               </template>
             </tbody>
@@ -311,7 +321,7 @@
         forms: { login: { email: '', password: '' }, register: { businessName: '', ownerName: '', email: '', password: '', phone: '', services: [] }, link: { email: '', password: '', twoFactorToken: null, twoFactorCode: '' } },
         async init() { if (this.registrationToken) this.tab = 'Follow-up'; if (MoranBuy.session.loggedIn()) await this.loadMe(); },
         async run(fn, ok) { this.error = ''; this.notice = ''; try { await fn(); if (ok) this.notice = ok; } catch (e) { this.error = e.details ? `${e.message} ${JSON.stringify(e.details)}` : e.message; } },
-        async loadMe() { this.me = await MoranBuy.api('/api/merchants/auth/me'); this.pricing = (await MoranBuy.api('/api/merchant/services/pricing')).pricing; await this.load(); },
+        async loadMe() { this.me = await MoranBuy.api('/api/merchants/auth/me'); const mm = this.me.merchant || {}; this.payout = { ownerName: mm.ownerName || '', payoutPhone: mm.payoutPhone || mm.contactPhone || '', saved: false }; this.pricing = (await MoranBuy.api('/api/merchant/services/pricing')).pricing; await this.load(); },
         // Starts a payment for a service; the service switches on only when the provider confirms the payment.
         payService(s) { return this.run(async () => { const d = await MoranBuy.api(`/api/merchant/services/${s}/pay`, { method: 'POST', body: {} }); this.lastPayment = d.payment; await this.loadMe(); }, 'Payment started. The service activates once the payment is verified.'); },
         settleSandbox() { return this.run(async () => { await MoranBuy.api(`/api/sandbox/payments/${this.lastPayment.reference}/settle`, { method: 'POST', body: { status: 'completed' } }); this.lastPayment = null; await this.loadMe(); if (this.registration) await this.loadRegistration(); }, 'Sandbox payment settled.'); },
@@ -382,6 +392,10 @@
         saveFollowupSettings() { return this.run(async () => { const s = this.followup.settings; await MoranBuy.api('/api/merchant/followup/settings', { method: 'PATCH', body: { scheduleHours: s.scheduleText.split(',').map((x) => Number(x.trim())).filter(Boolean), maxAttempts: Number(s.maxAttempts), paused: !!s.paused } }); await this.loadFollowup(); }, 'Saved.'); },
         stopLead(l) { return this.run(async () => { await MoranBuy.api(`/api/merchant/followup/leads/${l.id}/stop`, { method: 'POST', body: { reason: 'cancelled' } }); await this.loadFollowup(); }); },
         summarizeLeads() { return this.run(async () => { const d = await MoranBuy.api('/api/merchant/followup/leads/summary', { method: 'POST' }); this.followup.summary = d.summary || `Muse is ${d.museStatus}; no summary.`; }); },
+        payout: { ownerName: '', payoutPhone: '', saved: false },
+        protectionLabel(o) { return { awaiting_payment: 'Waiting for customer payment', paid_held: 'Paid, held: assign a deliverer', deliverer_assigned: 'On the way', delivered: 'Delivered (code confirmed)', released: 'Paid to you', rejection_pending: 'Refused at the door', refund_pending: 'Refunding customer', refunded: 'Refunded to customer', disputed: 'Dispute: admin reviewing', expired: 'Not paid, cancelled' }[o.protection_state] || (o.protection_state ? o.protection_state : '-'); },
+        assignDeliverer(o) { const phone = prompt('Delivery person\'s WhatsApp number (e.g. 0754000111):'); if (!phone) return; const name = prompt('Their name (optional):') || undefined; return this.run(async () => { await MoranBuy.api(`/api/merchant/orders/${o.id}/deliverer`, { method: 'POST', body: { phone, name } }); await this.load(); }); },
+        savePayout() { return this.run(async () => { const r = await MoranBuy.api('/api/merchant/payout', { method: 'PUT', body: { ownerName: this.payout.ownerName, payoutPhone: this.payout.payoutPhone } }); this.payout = { ...r, saved: true }; }); },
         orderStatus(o, status) { let deliveryFee; if (status === 'accepted' && !o.total_confirmed) { const f = prompt('Delivery fee to confirm for this order (TZS):'); if (f !== null && f !== '') deliveryFee = Number(f); } return this.run(async () => { await MoranBuy.api(`/api/merchant/orders/${o.id}/status`, { method: 'POST', body: { status, ...(deliveryFee !== undefined ? { deliveryFee } : {}) } }); await this.load(); }); },
       };
     }

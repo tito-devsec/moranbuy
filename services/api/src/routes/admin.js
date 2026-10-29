@@ -123,7 +123,8 @@ adminRouter.post('/summary', rateLimit({ windowMs: 60_000, max: 20 }), validate(
 adminRouter.get('/merchants/:id/uploads', validate({ params: idParams }), asyncHandler(async (req, res) => res.json({ uploads: (await db('uploads').where({ merchant_id: req.params.id }).orderBy('created_at', 'desc').limit(200)).map(publicUpload) })));
 // A verification document is opened for review only; every view is audited.
 adminRouter.get('/uploads/:id', validate({ params: idParams }), asyncHandler(async (req, res) => {
-  const row = await db('uploads').where({ id: req.params.id }).whereNot({ purpose: 'customer_photo' }).first();
+  // A customer's photo is shown only when it is evidence in a protected order's dispute.
+  const row = await db('uploads').where({ id: req.params.id }).where((q) => q.whereNot({ purpose: 'customer_photo' }).orWhereExists(db('delivery_events').select(db.raw('1')).whereRaw('delivery_events.upload_id = uploads.id'))).first();
   if (!row) throw notFound('UPLOAD_NOT_FOUND');
   await act(req, { merchantId: row.merchant_id, action: 'upload.viewed', targetType: 'upload', targetId: row.id, after: { purpose: row.purpose } });
   res.json({ upload: publicUpload(row), dataBase64: (await readUpload(row)).toString('base64') });

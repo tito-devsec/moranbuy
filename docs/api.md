@@ -47,6 +47,16 @@ last 15 minutes; refresh tokens rotate.
 - `POST /api/sandbox/payments/:reference/settle` (not in production)
 - A completed settlement of a payment with purpose `entitlement` activates that service for `periodDays` (default 30); nothing else activates a paid service automatically.
 
+## Payment protection
+
+- Customers on WhatsApp: `LIPA|PAY MB-…` (pay again), `NIMEPOKEA|RECEIVED MB-…` (release now), `TATIZO|PROBLEM MB-… <details>` (hidden defect, opens a dispute), `SIJAPOKEA MB-…` (refused once the code was used), `RISITI|RECEIPT [MB-…]`, `ODA ZANGU|MY ORDERS` (a list; each row `rcpt:<ref>` sends that receipt). Refusal confirmation buttons `cust:rej_yes:<ref>` and `cust:rej_no:<ref>`.
+- Business owners on WhatsApp: `MSAFIRISHAJI|DELIVERER MB-… <phone> [name]`.
+- Delivery person on WhatsApp: buttons `dlv:arrived|rejected|absent:<ref>`, then a photo, the customer's code, a shared location, or the refusal reason (text or voice).
+- `POST /api/merchant/orders/:id/deliverer` `{ phone, name? }` · `GET /api/merchant/orders/:id/receipt.pdf` · `PUT /api/merchant/payout` `{ ownerName, payoutPhone }`
+- `GET /r/:receiptNo?c=<check code>` public receipt check (404 unless the code matches).
+- Admin: `GET /api/admin/protection`, `GET /api/admin/protection/:orderId` (evidence timeline), `GET /api/admin/protection/:orderId/receipt` (base64 PDF), `POST /api/admin/disputes/:id/summarize` (Muse, advice only), `POST /api/admin/disputes/:id/resolve` `{ decision: release|refund, note }` (super admin), `POST /api/admin/protection/:orderId/payout/retry` `{ kind, reason }` (super admin), `PUT /api/admin/protection/settings` (super admin, audited).
+- Snippe payouts report on the same `/webhooks/payments` (`payout.completed|failed|reversed`).
+
 ## Moran channel (signed, `MORAN_SHARED_SECRET`)
 - `POST /internal/inbound` customer messages, button replies, locations, and photos or voice notes as raw bytes (`kind: "image" | "audio"`, `media: { base64, mime }`) from the MoranBuy number; a registered business's own number may send a product ("Bidhaa: ...") or ask "RIPOTI"
 - `POST /internal/inbound/status` `{ statuses: [{ id, status, errors? }] }` delivery receipts for messages MoranBuy sent

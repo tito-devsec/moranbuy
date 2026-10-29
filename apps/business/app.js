@@ -33,9 +33,20 @@
     return data.upload;
   }
 
+  // Downloads a file the API returns (a receipt PDF) with the signed-in session.
+  async function download(path, filename, retry = true) {
+    const res = await fetch(path, { headers: get(ACCESS) ? { Authorization: `Bearer ${get(ACCESS)}` } : {} });
+    if (res.status === 401 && retry && (await refresh())) return download(path, filename, false);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   window.MoranBuy = {
     api,
     upload,
+    download,
     session: { save: (d) => { set(ACCESS, d.accessToken); set(REFRESH, d.refreshToken); }, clear: () => { set(ACCESS, null); set(REFRESH, null); }, loggedIn: () => !!get(ACCESS) },
     money: (n, c = 'TZS') => (n === null || n === undefined ? 'not stated' : `${c === 'TZS' ? 'TSh' : c} ${Number(n).toLocaleString('en-US')}`),
     label: (s) => String(s || '').replace(/_/g, ' '),

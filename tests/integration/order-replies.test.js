@@ -59,7 +59,8 @@ test('a business without a dashboard is told to reply, accepts by WhatsApp with 
   assert.equal(updated.known_total, 315000);
   assert.equal(updated.total_confirmed, true);
   const toCustomer = moran.sent.filter((m) => m.to === '255700000001').at(-1);
-  assert.match(toCustomer.body, /imeikubali\. Jumla TSh 315,000/);
+  // A WhatsApp customer is asked to pay MoranBuy the confirmed total, which MoranBuy holds until delivery.
+  assert.match(toCustomer.body, /imekubaliwa\. Lipa TSh 315,000 kwa MoranBuy/);
   const toMerchant = moran.sent.filter((m) => m.to === '255712000111').at(-1);
   assert.match(toMerchant.body, /sasa: accepted, delivery TSh 15,000/);
   const twice = await send({ messageId: 'w3', from: '255712000111', text: `KUBALI ${order.order_ref}` });

@@ -114,7 +114,7 @@ function setupCard(state, onDone) {
 }
 
 // ---- the dashboard: the MoranBuy admin sections, read through the signed proxy ----
-const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Products', 'Locations', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Retention', 'Audit'];
+const SECTIONS = ['Overview', 'Insights', 'Merchants', 'Products', 'Locations', 'Verification', 'Ranking', 'Campaigns', 'Outreach', 'Templates', 'Follow-up', 'Orders', 'Payment Protection', 'Notifications', 'Billing', 'Muse Spark', 'Credentials', 'Integration Health', 'Retention', 'Audit'];
 
 function dashboard() {
   const body = h('div');
@@ -139,6 +139,7 @@ async function load(name) {
     case 'Templates': return mb.get('templates');
     case 'Follow-up': return mb.get('followup');
     case 'Orders': return mb.get('orders');
+    case 'Payment Protection': return mb.get('protection');
     case 'Notifications': return { ...(await mb.get('notifications/order-confirmed')), terms: await mb.get('notifications/terms'), reminder: await mb.get('notifications/schedule-reminder') };
     case 'Billing': return { pricing: await mb.get('pricing'), servicePricing: await mb.get('service-pricing'), payments: (await mb.get('payments')).payments };
     case 'Muse Spark': return { muse: await mb.get('muse'), cost: await mb.get('muse/cost', { days: 30 }), credentials: (await mb.get('credentials')).credentials };
@@ -308,6 +309,47 @@ function merchantDrawer(id) {
 
 // The terms question put to every new sender, with Accept and Reject buttons, before the agent answers.
 // The reminder a customer asked for ("nitanunua wiki ijayo"), sent from the MoranBuy number when it falls due.
+// Payment protection: money MoranBuy holds, open disputes with their evidence, payouts, strikes and the rules; only a super admin moves disputed money.
+const PROTECTION_STATES = { awaiting_payment: 'Awaiting payment', paid_held: 'Paid, held', deliverer_assigned: 'On the way', delivered: 'Delivered (code ok)', released: 'Paid to business', rejection_pending: 'Refused at door', refund_pending: 'Refunding', refunded: 'Refunded', disputed: 'Disputed', expired: 'Unpaid, cancelled' };
+
+async function protectionEvidence(orderId) {
+  try {
+    const ev = await mb.get(`protection/${orderId}`);
+    const rows = simpleTable([{ key: 'created_at', label: t('When'), render: (e) => formatDateTime(e.created_at) }, { key: 'actor', label: t('Who') }, { key: 'kind', label: t('What') }, { key: 'data_json', label: t('Details'), render: (e) => h('code', { class: 'fs-xs', text: JSON.stringify(e.data_json) }) }, { key: '_', label: '', render: (e) => (e.upload_id ? button(t('Photo'), { size: 'sm', variant: 'secondary', onClick: () => openUpload({ id: e.upload_id }) }) : null) }], ev.timeline);
+    const receipt = button(t('Latest receipt (PDF)'), { size: 'sm', onClick: async () => { try { const r = await mb.get(`protection/${orderId}/receipt`); const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0)); window.open(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), '_blank', 'noopener'); } catch (err) { toastError(err); } } });
+    drawer({ title: t('Evidence: {r}', { r: ev.order.order_ref }), width: 'mo-drawer-wide', body: h('div', {}, h('p', { class: 'fs-sm', text: `${t(PROTECTION_STATES[ev.protection.state] || ev.protection.state)} · ${money(ev.protection.amount, ev.protection.currency)} · ${t('codes tried')}: ${ev.protection.code_attempts}${ev.protection.code_ok ? ' (ok)' : ''}` }), receipt, h('div', { class: 'mt-3' }, rows)) });
+  } catch (err) { toastError(err); }
+}
+
+function protectionPage(d, reload) {
+  const totals = h('div', { class: 'row g-3 mb-3' }, h('div', { class: 'col-md-3' }, card({ title: t('Held now'), body: h('div', { class: 'fs-3 fw-bold', text: money(d.held, 'TZS') }) })),
+    ...d.totals.map((x) => h('div', { class: 'col-md-3' }, card({ title: t(PROTECTION_STATES[x.state] || x.state), body: h('div', { class: 'fs-5', text: `${x.orders} · ${money(x.amount, 'TZS')}` }) }))));
+  const decide = (dsp, decision) => confirmAction({ title: decision === 'release' ? t('Release the payment to the business for {r}?', { r: dsp.order_ref }) : t('Refund the customer for {r}?', { r: dsp.order_ref }), requireReason: true,
+    action: async (note) => { await mb.post(`disputes/${dsp.id}/resolve`, { decision, note }); toast(t('Decision recorded; both sides are told.')); reload(); } });
+  const disputes = card({ title: t('Open disputes (money held until a super admin decides)'), body: simpleTable([
+    { key: 'order_ref', label: t('Order') }, { key: 'category', label: t('Category') }, { key: 'opened_by', label: t('Opened by') }, { key: 'reason', label: t('Reason') },
+    { key: 'muse_json', label: t('Muse summary (advice only)'), render: (x) => (x.muse_json ? h('div', { class: 'fs-xs' }, h('div', { text: x.muse_json.summary }), h('em', { text: `${t('Suggests')}: ${x.muse_json.suggestion}. ${x.muse_json.why}` })) : button(t('Ask Muse'), { size: 'sm', variant: 'secondary', onClick: () => mb.post(`disputes/${x.id}/summarize`, {}).then(() => reload()).catch(toastError) })) },
+    { key: '_', label: '', render: (x) => h('div', { class: 'd-flex gap-1 flex-wrap' }, button(t('Evidence'), { size: 'sm', variant: 'secondary', onClick: () => protectionEvidence(x.order_id) }), button(t('Release'), { size: 'sm', onClick: () => decide(x, 'release') }), button(t('Refund'), { size: 'sm', variant: 'danger', onClick: () => decide(x, 'refund') })) },
+  ], d.disputes, { empty: t('No open disputes.') }) });
+  const orders = card({ cls: 'mt-3', title: t('Protected orders'), body: simpleTable([
+    { key: 'order_ref', label: t('Order') }, { key: 'business_name', label: t('Business') }, { key: 'product', label: t('Product') }, { key: 'amount', label: t('Amount'), align: 'end', render: (o) => money(o.amount, o.currency) },
+    { key: 'state', label: t('State'), render: (o) => badge(t(PROTECTION_STATES[o.state] || o.state)) }, { key: 'deliverer_phone', label: t('Deliverer') }, { key: 'code_attempts', label: t('Codes tried'), align: 'end', render: (o) => `${o.code_attempts}${o.code_ok ? ' ✓' : ''}` },
+  ], d.orders, { onRowClick: (o) => protectionEvidence(o.order_id), empty: t('No protected orders yet.') }) });
+  const money2 = h('div', { class: 'row g-3 mt-1' },
+    h('div', { class: 'col-lg-7' }, card({ title: t('Payouts and refunds'), body: simpleTable([{ key: 'kind', label: t('Kind') }, { key: 'amount', label: t('Amount'), align: 'end', render: (p) => money(p.amount, p.currency) }, { key: 'phone', label: t('To') }, { key: 'status', label: t('Status'), render: (p) => badge(p.status) }, { key: 'error', label: t('Error') }, { key: 'created_at', label: t('When'), render: (p) => formatDateTime(p.created_at) }], d.payouts, { empty: t('None yet.') }) })),
+    h('div', { class: 'col-lg-5' }, card({ title: t('Strikes, last 90 days'), body: simpleTable([{ key: 'subject_type', label: t('Who') }, { key: 'subject_id', label: t('Id'), render: (x) => x.subject_id.slice(0, 8) }, { key: 'n', label: t('Strikes'), align: 'end' }], d.strikes, { empty: t('No strikes.') }) })));
+  const s = d.settings;
+  const form = h('div', { class: 'row g-2 align-items-end' },
+    ...[['commissionPercent', t('Commission %')], ['releaseAfterHours', t('Release after (hours)')], ['paymentExpiryHours', t('Unpaid expires (hours)')], ['assignDeadlineHours', t('Deliverer deadline (hours)')], ['maxCodeAttempts', t('Code attempts')], ['maxReschedules', t('Reschedules')]]
+      .map(([k, label]) => h('div', { class: 'col-md-2' }, input({ name: k, label, type: 'number', value: s[k] }))),
+    h('div', { class: 'col-md-3' }, input({ name: 'delivererTemplateName', label: t('Approved deliverer template'), value: s.delivererTemplateName || '' })),
+    h('div', { class: 'col-md-3' }, select({ name: 'enabled', label: t('Protection'), value: s.enabled ? 'on' : 'off', options: [{ value: 'on', label: t('On for WhatsApp customers') }, { value: 'off', label: t('Off') }] })),
+    h('div', { class: 'col-md-6' }, input({ name: 'reason', label: t('Reason (audited)'), required: true })));
+  const save = button(t('Save rules'), { onClick: () => busy(save, async () => { const f = readForm(form); if (!f.reason) throw new Error(t('A reason is required.')); const body = { reason: f.reason, enabled: f.enabled === 'on', delivererTemplateName: f.delivererTemplateName || '' }; for (const k of ['commissionPercent', 'releaseAfterHours', 'paymentExpiryHours', 'assignDeadlineHours', 'maxCodeAttempts', 'maxReschedules']) body[k] = Number(f[k]); await mb.put('protection/settings', body); toast(t('Saved.')); reload(); }).catch(toastError) });
+  const rules = card({ cls: 'mt-3', title: t('Rules (super admin)'), body: h('div', {}, h('p', { class: 'fs-xs text-muted', text: t('Fixed rules move the money: release after the window, refund when nobody delivers, lock after wrong codes. Muse only reads photos, reasons and disputes.') }), form, h('div', { class: 'mt-2' }, save)) });
+  return h('div', {}, totals, disputes, orders, money2, rules);
+}
+
 function reminderCard(rem, reload) {
   const st = rem.settings;
   const form = h('div', { class: 'row g-2' },
@@ -374,6 +416,7 @@ function render(name, d, reload) {
     case 'Templates': return card({ title: t('Templates (status is what Meta told Moran)'), body: simpleTable([{ key: 'name', label: t('Name') }, { key: 'language', label: t('Language') }, { key: 'headerFormat', label: t('Header') }, { key: 'status', label: t('Status'), render: (x) => badge(x.status) }, { key: 'statusReason', label: t('Reason') }], d.templates) });
     case 'Follow-up': return h('div', { class: 'row g-3' }, h('div', { class: 'col-lg-6' }, card({ title: t('Leads'), body: simpleTable([{ key: 'business_name', label: t('Business') }, { key: 'phone', label: t('Customer') }, { key: 'state', label: t('State'), render: (l) => `${l.state}${l.stop_reason ? ` (${l.stop_reason})` : ''}` }, { key: 'attempts', label: t('Attempts'), render: (l) => `${l.attempts}/${l.max_attempts}` }], d.leads) })), h('div', { class: 'col-lg-6' }, card({ title: t('Tasks'), body: simpleTable([{ key: 'due_at', label: t('Due'), render: (x) => formatDateTime(x.due_at) }, { key: 'status', label: t('Status') }, { key: 'skip_reason', label: t('Reason') }, { key: 'dry_run', label: t('Dry run'), render: (x) => (x.dry_run ? t('yes') : t('no')) }], d.tasks) })));
     case 'Orders': return card({ title: t('Orders'), body: simpleTable([{ key: 'order_ref', label: t('Ref') }, { key: 'business_name', label: t('Business') }, { key: 'listing_name', label: t('Product') }, { key: 'known_total', label: t('Known total'), render: (o) => `${money(o.known_total, o.currency)}${o.total_confirmed ? '' : ` (${t('delivery not confirmed')})`}` }, { key: 'status', label: t('Status'), render: (o) => badge(o.status) }, { key: 'created_at', label: t('When'), render: (o) => formatDateTime(o.created_at) }], d.orders.orders) });
+    case 'Payment Protection': return protectionPage(d, reload);
     case 'Notifications': {
       const st = d.settings;
       const form = h('div', { class: 'row g-2' },

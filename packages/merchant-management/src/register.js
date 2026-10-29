@@ -39,6 +39,7 @@ export function publicMerchant(m) {
     id: m.id, registrationType: m.registration_type, businessName: m.business_name, slug: m.slug, industry: m.industry, description: m.description,
     country: m.country, currency: m.currency, contactPhone: m.contact_phone, contactEmail: m.contact_email, verificationStatus: m.verification_status,
     status: m.status, moranLinked: !!m.moran_tenant_id, moranTenantId: m.moran_tenant_id || null, moranServices: m.moran_services_json || [], productsSyncedAt: m.products_synced_at, createdAt: m.created_at,
+    ownerName: m.owner_name || null, payoutPhone: m.payout_phone || null,
   };
 }
 

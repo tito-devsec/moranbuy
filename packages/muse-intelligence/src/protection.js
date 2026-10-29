@@ -31,8 +31,9 @@ export async function museCheckDeliveryPhoto(muse, { imageUrl, ordered, merchant
 export function fallbackRejectionCategory(text) {
   const t = String(text || '').toLowerCase();
   if (/(imevunjika|imeharibika|broken|damaged|cracked|imechanika|torn)/.test(t)) return 'damaged';
+  if (/(sio |siyo |si hii|wrong item|not the|not what|aliyoagiza|nilichoagiza)/.test(t)) return 'wrong_item';
   if (/(size|saizi|rangi|colour|color|ukubwa|variant)/.test(t)) return 'wrong_size_or_variant';
-  if (/(sio|siyo|si hii|wrong|tofauti|different|not the)/.test(t)) return 'wrong_item';
+  if (/(wrong|tofauti|different)/.test(t)) return 'wrong_item';
   if (/(sikuagiza|didn.?t order|not ordered|sijaagiza)/.test(t)) return 'not_ordered';
   if (/(kuchelewa|late|imechelewa)/.test(t)) return 'late';
   if (/(bei|price|ghali|expensive)/.test(t)) return 'price_dispute';

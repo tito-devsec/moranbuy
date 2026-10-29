@@ -2,6 +2,15 @@
 
 All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
+## 1.2.0 (2026-10-29)
+
+- Payment protection: an accepted WhatsApp order is paid to MoranBuy through Snippe and held; a receipt and a private handover code go to the customer; the business names a delivery person, who gets Arrived / Refused / Customer not there buttons; a correct code plus a photo marks the order delivered; the payment is released 48 hours later or when the customer replies RECEIVED, and refunded on a confirmed refusal, an unassigned delivery or an administrator's decision. Three wrong codes lock the order; "not received" after a correct code is refused; strikes for the business or customer at fault.
+- Evidence: every step is on the order's timeline; Muse Spark and SAM 3.1 check delivery photos (evidence only), a fingerprint flags re-sent or catalogue photos, Muse sorts refusal reasons and summarises disputes; only a super admin settles a dispute.
+- Receipts: till-slip PDFs with business, owner, items, total, payment and status, and a QR code carrying the signed full summary; re-issued as the order moves; public check at /r/<number>; "oda zangu" lists orders for receipts on WhatsApp; downloads in the business app and admin.
+- Snippe payouts and the payout webhook; Snippe webhook amounts read from { value, currency }.
+- Admin Payment Protection page (standby admin and Super Admin), business app protection column, deliverer and payout forms.
+- New bilingual legal pages (Terms, Privacy, About, Developers, Contact, Copyrights) and "Open MoranBuy" opens a WhatsApp chat.
+
 ## 1.1.0 (2026-10-29)
 
 - Every model MoranBuy calls at runtime is now a Meta model (the hackathon rule). Spoken replies use Meta's MMS text-to-speech voices (`facebook/mms-tts-swh`, `mms-tts-eng`) instead of Azure Speech: exported to ONNX and quantized to 8 bits when the image is built (`scripts/tts/`), run in the API process with the ONNX runtime, numbers spelled the way Tanzanians say prices, written as an Ogg Opus voice note in-process. No key is needed; the voices load on first use and are let go after ten idle minutes. On WhatsApp the voice note is sent after Moran has the text answer, so speech never delays it.
