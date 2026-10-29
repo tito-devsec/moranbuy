@@ -2,6 +2,11 @@
 
 All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
+## Unreleased
+
+- Customers use MoranBuy on WhatsApp only, found by the username @moranbuy (MORANBUY_WHATSAPP_USERNAME, default moranbuy) instead of a phone number. The customer web chat and its /api/shop endpoints are removed; old /customer links open the WhatsApp chat. The legal pages moved to apps/site.
+- Try the demo: a sandbox page on the website with the customer, shop owner and rider phones and the server log.
+
 ## 1.2.0 (2026-10-29)
 
 - Payment protection: an accepted WhatsApp order is paid to MoranBuy through Snippe and held; a receipt and a private handover code go to the customer; the business names a delivery person, who gets Arrived / Refused / Customer not there buttons; a correct code plus a photo marks the order delivered; the payment is released 48 hours later or when the customer replies RECEIVED, and refunded on a confirmed refusal, an unassigned delivery or an administrator's decision. Three wrong codes lock the order; "not received" after a correct code is refused; strikes for the business or customer at fault.

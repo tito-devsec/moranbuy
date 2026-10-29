@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '@moranbuy/core';
 import { logger } from '@moranbuy/observability';
-import { healthRouter } from './routes/health.js';
+import { healthRouter, whatsappContact } from './routes/health.js';
 import { notFoundHandler, errorHandler } from './middleware/error.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -48,8 +48,9 @@ export function createApp({ routers = [] } = {}) {
   app.use(healthRouter);
   for (const r of routers) app.use(r.path, r.router);
 
-  // The three static apps are served from the same process.
-  app.use('/customer', express.static(path.join(appsDir, 'customer')));
+  // Customers use MoranBuy on WhatsApp only; old /customer links open the WhatsApp chat.
+  app.get(['/customer', '/customer/*'], (_req, res) => res.redirect(302, whatsappContact().link));
+  // The business and admin apps are served from the same process.
   app.use('/business', express.static(path.join(appsDir, 'business')));
   app.use('/admin', express.static(path.join(appsDir, 'admin')));
   // The public website: Home, How it works, For businesses and the demo; no sign-in anywhere on it.
@@ -57,7 +58,7 @@ export function createApp({ routers = [] } = {}) {
   const sitePages = { '/': 'index.html', '/how-it-works': 'how-it-works.html', '/for-business': 'for-business.html', '/demo': 'demo.html' };
   for (const [route, file] of Object.entries(sitePages)) app.get(route, (_req, res) => res.sendFile(path.join(appsDir, 'site', file)));
   // Terms, privacy and the company pages share one bilingual page (English first, Swahili on the switch).
-  for (const page of ['terms', 'privacy', 'about', 'developers', 'contact', 'copyright']) app.get(`/${page}`, (_req, res) => res.sendFile(path.join(appsDir, 'customer', 'legal.html')));
+  for (const page of ['terms', 'privacy', 'about', 'developers', 'contact', 'copyright']) app.get(`/${page}`, (_req, res) => res.sendFile(path.join(appsDir, 'site', 'legal.html')));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

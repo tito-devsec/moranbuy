@@ -68,19 +68,3 @@ test('a typed acceptance works too, and a new terms version asks everyone again'
   assert.equal(re.state, 'terms_prompted');
   assert.match(moran.sent.at(-1).footer, /2026-11-01/);
 });
-
-test('on the web the first message returns the terms, rejection returns nothing, acceptance proceeds', async () => {
-  const first = await post('/api/shop/messages', { text: 'I want a 3 seater sofa, budget 400k, I am in Sinza' });
-  assert.equal(first.body.state, 'terms_required');
-  assert.match(first.body.terms.text, /\/privacy/);
-  assert.equal(first.body.replies.length, 1);
-  const token = first.body.customerToken;
-  const no = await post('/api/shop/messages', { customerToken: token, rejectTerms: true });
-  assert.equal(no.body.state, 'terms_rejected');
-  const blocked = await post('/api/shop/messages', { customerToken: token, text: 'sofa please' });
-  assert.equal(blocked.body.state, 'terms_required');
-  const yes = await post('/api/shop/messages', { customerToken: token, acceptTerms: true });
-  assert.equal(yes.body.state, 'terms_accepted');
-  const shop = await post('/api/shop/messages', { customerToken: token, text: 'I want a 3 seater sofa, budget 400k, I am in Sinza' });
-  assert.equal(shop.body.state, 'presented');
-});

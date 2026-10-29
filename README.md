@@ -135,8 +135,8 @@ services/api/          Express API, middleware, workers, Knex migrations
 packages/*             core, reverse-marketplace, budget-matching, location-ranking, muse-intelligence,
                        product-catalog, merchant-management, campaign-engine, campaign-outreach,
                        followup-engine, consent-management, billing, authorization, integrations, observability
-apps/customer|business|admin   static web apps served by the API
-apps/site              public website (Home, How it works, For businesses, Try the demo)
+apps/business|admin    static web apps served by the API
+apps/site              public website (Home, How it works, For businesses, Try the demo, legal pages)
 integrations/          Moran-side drop-ins and the Hermes research agent configuration
 tests/unit|integration|security|end-to-end
 docs/                  architecture, assessment, ranking, Muse, workflows, API, deployment, testing, demo

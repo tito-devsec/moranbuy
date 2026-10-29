@@ -10,10 +10,10 @@ export const healthRouter = express.Router();
 
 // Liveness: the process is up.
 // What a public page needs to open MoranBuy on WhatsApp; nothing secret.
+export const whatsappContact = () => { const u = config().MORANBUY_WHATSAPP_USERNAME; return { username: `@${u}`, link: `https://wa.me/${encodeURIComponent(u)}` }; };
 healthRouter.get('/api/public/contact', (_req, res) => {
-  const digits = String(config().MORANBUY_WHATSAPP_NUMBER || '').replace(/\D/g, '');
   res.set('Cache-Control', 'public, max-age=300');
-  res.json({ whatsapp: digits.length >= 9 ? { number: `+${digits}`, link: `https://wa.me/${digits}` } : null, web: '/customer/' });
+  res.json({ whatsapp: whatsappContact() });
 });
 
 const escapeHtml = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

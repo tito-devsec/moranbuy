@@ -8,10 +8,8 @@ last 15 minutes; refresh tokens rotate.
 - `GET /health`, `GET /ready` (database and Redis state)
 
 ## Shopping (customers)
-- `POST /api/shop/messages` `{ customerToken?, text, imageUrl?, location?, language? }` → replies, session state, run id
-- `GET /api/shop/runs/:id` ranking evidence
-- `GET /api/shop/orders/:ref` order status
-- `POST /api/shop/uploads?customerToken=&kind=photo|voice` a photo (JPEG, PNG, WebP) or a voice recording (WAV or Ogg Opus) after accepting the terms; a voice upload returns what Muse heard (`transcript`); send the id as `photoUploadId` or `voiceUploadId` with the next message, whose response carries `voiceReply.dataUrl` when spoken replies are on
+Customers use MoranBuy on WhatsApp only (username `@moranbuy`); there is no customer web chat. `/customer` redirects to the WhatsApp chat.
+- `GET /api/public/contact` → `{ whatsapp: { username, link } }` for the website's "Open MoranBuy" buttons
 - `GET /media/:name` public product photos
 - `POST /internal/inbound` signed by Moran (`X-MoranBuy-Timestamp`, `X-MoranBuy-Signature`): `{ messageId, from, text, imageUrl?, location?, name? }`
 

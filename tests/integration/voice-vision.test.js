@@ -152,24 +152,6 @@ test('a voice note from someone who has not accepted the terms is neither opened
   assert.equal(Number((await db('uploads').count('id as n').first()).n), before);
 });
 
-test('a web customer records a WAV in the browser, sees what was heard, gets offers and a voice reply to play', async () => {
-  const t = (await api('/api/shop/messages', { method: 'POST', body: { text: '' } })).body.customerToken;
-  await api('/api/shop/messages', { method: 'POST', body: { customerToken: t, acceptTerms: true } });
-  const { wav } = await toSpeechWav(TONE);
-  const up = await api(`/api/shop/uploads?kind=voice&customerToken=${t}`, { method: 'POST', raw: wav, type: 'audio/wav' });
-  assert.equal(up.status, 201);
-  assert.equal(up.body.heard, true);
-  assert.equal(up.body.transcript, SPOKEN);
-  const msg = await api('/api/shop/messages', { method: 'POST', body: { customerToken: t, voiceUploadId: up.body.uploadId } });
-  assert.equal(msg.status, 200);
-  assert.equal(msg.body.state, 'presented');
-  assert.equal(msg.body.heard, SPOKEN);
-  assert.match(msg.body.voiceReply.dataUrl, /^data:audio\/ogg;base64,T2dnUw/);
-  // Typed messages get no voice in mirror mode.
-  const typed = await api('/api/shop/messages', { method: 'POST', body: { customerToken: t, text: 'sofa ya watu watatu laki nne nipo Sinza' } });
-  assert.equal(typed.body.voiceReply, null);
-});
-
 test('a business photographs several products: Muse lists them, SAM 3.1 finds each, and each cut-out becomes that listing\'s photo', async () => {
   // A 200 x 100 photo: a grey sofa on the left half, a black chair on the right half.
   const px = Buffer.alloc(200 * 100 * 4);

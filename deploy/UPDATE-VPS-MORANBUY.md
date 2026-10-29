@@ -80,7 +80,7 @@ products on MoranBuy** in their dashboard (the MoranBuy entry sits at the right 
 cd /opt/moranbuy
 cp deploy/env.production.example .env && chmod 600 .env && nano .env   # every CHANGE_ME, the shared secret, APP_URL; keep the dry-run flags true
 # MORAN_INTERNAL_BASE_URL=http://backend:3000: Moran's nginx closes /internal to the public, so the signed channel uses the Docker network
-# MORANBUY_WHATSAPP_NUMBER=2557XXXXXXXX: the connected MoranBuy number; "Open MoranBuy" on the website opens a WhatsApp chat with it
+# MORANBUY_WHATSAPP_USERNAME=moranbuy: the WhatsApp username; "Open MoranBuy" on the website opens wa.me/moranbuy
 docker network ls | grep moran-backend          # Moran's network; set MORAN_DOCKER_NETWORK in .env if it is not moran-backend_default
 # The first build also exports Meta's MMS voices (Swahili, English) to ONNX: it downloads about 1 GB of Python packages once,
 # takes several minutes, and leaves two 38 MB voices in the image; `docker builder prune` afterwards frees the build cache.
@@ -122,7 +122,7 @@ The site keeps `client_max_body_size 25m` for uploads and forwarded voice notes.
   URL in Snippe. Optional: Hermes base URL, key and the allowed shop domains.
 - **Billing** tab: set the WhatsApp provider rate per message to Meta's current marketing rate.
 - **Notifications** tab: the terms question every new sender must accept (buttons, links to
-  `https://buy.moranai.co.tz/terms` and `/privacy`; edit the policy pages in `apps/customer/` before
+  `https://buy.moranai.co.tz/terms` and `/privacy`; edit the policy pages in `apps/site/legal.html` before
   going live and bump the version to ask everyone again), and the message business owners get when an order is confirmed. On the
   MoranBuy business page in Super Admin → Templates, create `moranbuy_order_alert` (category
   UTILITY, Swahili, body with `{{1}}` order ref, `{{2}}` product, `{{3}}` quantity, `{{4}}` total,
@@ -147,8 +147,8 @@ and answer with `KUBALI MB-XXXX [ada ya delivery]` or `KATAA MB-XXXX`.
 ## 6. Smoke test
 
 1. Send "Nina laki tatu na nusu ya sofa ya watu watatu, nipo Sinza, delivery" to the MoranBuy
-   WhatsApp number. The reply comes from the MoranBuy number through Moran's outbound gate.
-2. Open `https://buy.moranai.co.tz/customer/` and send the same.
+   WhatsApp account (@moranbuy). The reply comes from MoranBuy through Moran's outbound gate.
+2. Open `https://buy.moranai.co.tz/customer/`: it must open the WhatsApp chat with @moranbuy.
 3. Register a standalone merchant at `/business/`, add a location and a product, search again.
 4. Link a Moran owner account at `/business/` and sync.
 5. Admin → Product Matching and Ranking: open the run evidence. Admin → Integration Health: Moran

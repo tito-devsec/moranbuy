@@ -38,7 +38,7 @@ moranbuy/
   packages/authorization/        merchant, customer and admin auth, entitlement checks
   packages/integrations/         Moran adapter, WhatsApp Cloud API, geocoding
   packages/observability/        logger, redaction, audit events
-  apps/customer/  apps/business/  apps/admin/
+  apps/site/  apps/business/  apps/admin/
   database/seeds/   tests/{unit,integration,security,end-to-end}   docs/   scripts/
 ```
 

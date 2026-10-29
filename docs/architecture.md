@@ -2,11 +2,10 @@
 
 ```
 Customer (WhatsApp) ─► Meta ─► Moran webhook ─► [MoranBuy tenant?] ─signed POST─► MoranBuy /internal/inbound
-Customer (web)      ─────────────────────────────────────────────────────────────► MoranBuy /api/shop/messages
                                                                                         │
                                ShoppingEngine: Muse reads ─► merge ─► clarify ─► discover ─► rank ─► present
                                                                                         │
-                       replies ─signed POST─► Moran /internal/moranbuy/send ─► outbound gate ─► MoranBuy number ─► customer
+                       replies ─signed POST─► Moran /internal/moranbuy/send ─► outbound gate ─► MoranBuy (@moranbuy) ─► customer
                                                                                         │
                                                      explicit YES ─► orders (pending_merchant) ─► merchant app
 Merchant (standalone) ─► business app ─► /api/merchant/* ─► listings, locations, orders, campaigns, follow-up

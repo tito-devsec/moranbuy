@@ -14,7 +14,7 @@ This file lists what is new in this repository and the evidence for it. It is up
 | Area | Status | Evidence |
 |---|---|---|
 | Repository, policies, CI, configuration validation, foundation schema | done | `.github/workflows/ci.yml`, `services/api/src/db/migrations/` |
-| Customer web chat and WhatsApp intake through Moran's forwarded webhook | done | `apps/customer/index.html`, `services/api/src/routes/shop.js`, `services/api/src/routes/internal-inbound.js` |
+| WhatsApp intake through Moran's forwarded webhook; customers find MoranBuy by its WhatsApp username @moranbuy | done | `services/api/src/routes/internal-inbound.js` |
 | Reverse-marketplace engine with budget-first, location-second ranking | done | `packages/budget-matching`, `packages/location-ranking`, `packages/reverse-marketplace`; `tests/unit/ranking.test.js` (cases A to G and more), `tests/integration/shopping-flow.test.js` |
 | Muse Spark integration (Meta Model API, `muse-spark-1.3`) with real telemetry | done (client, extraction, drafting, telemetry); live key still to be supplied by the owner | `packages/muse-intelligence`, `tests/integration/muse-client.test.js`, `docs/muse-integration.md` |
 | Merchant management, Moran product link and import without duplicates, locations, source-of-truth rules | done | `packages/merchant-management`, `packages/product-catalog`, `tests/integration/merchants.test.js`, `docs/merchant-registration.md` |
@@ -34,7 +34,7 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 | Opted-in Moran businesses appear automatically; order alerts answered by WhatsApp for businesses without a dashboard; customer status messages | done | `packages/product-catalog/src/moran-listings-sync.js`, `services/api/src/services/order-actions.js`, `tests/integration/moran-listings-pull.test.js`, `tests/integration/order-replies.test.js` |
 
-| Terms and privacy gate with reply buttons on WhatsApp and web, versioned, bilingual policy pages | done | `services/api/src/services/terms.js`, `apps/customer/legal.html`, `tests/integration/terms-gate.test.js` |
+| Terms and privacy gate with reply buttons on WhatsApp, versioned, bilingual policy pages | done | `services/api/src/services/terms.js`, `apps/site/legal.html`, `tests/integration/terms-gate.test.js` |
 
 ## Still open for the owner
 

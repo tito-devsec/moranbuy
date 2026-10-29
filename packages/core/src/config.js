@@ -26,8 +26,8 @@ const schema = z.object({
   ADMIN_BOOTSTRAP_PASSWORD: opt(),
 
   MORAN_BACKEND_BASE_URL: opt(),
-  // The MoranBuy WhatsApp number in international digits (2557XXXXXXXX); the site's "Open MoranBuy" buttons open a chat with it.
-  MORANBUY_WHATSAPP_NUMBER: opt(),
+  // MoranBuy's WhatsApp username, so anyone can find it without a phone number; the site's "Open MoranBuy" buttons open a chat with it.
+  MORANBUY_WHATSAPP_USERNAME: z.preprocess((v) => (v === '' || v === undefined ? 'moranbuy' : String(v).trim().replace(/^@/, '')), z.string().regex(/^[a-z0-9._]{3,35}$/i, 'MORANBUY_WHATSAPP_USERNAME must be a WhatsApp username such as moranbuy')),
   // The public demo sandbox: DEMO_MODE runs this process against its own demo database with recording stand-ins for WhatsApp and payments;
   // DEMO_API_URL is where the main site forwards /api/demo to.
   DEMO_MODE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),

@@ -69,7 +69,7 @@ audited action (Phase 10). Every matching run stores the policy that was in forc
 
 Each run writes `matching_runs` (request, policy, counts, exclusions, Muse status, duration) and one
 `matching_offers` row per ranked or over-budget offer with its cost, budget fit, suitability,
-location, trust and reasons. `GET /api/shop/runs/:id` returns it; the admin app renders it.
+location, trust and reasons. `GET /api/admin/ranking/runs/:id` returns it; the admin app renders it.
 
 ## Worked example (test Case A)
 

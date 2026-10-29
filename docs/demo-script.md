@@ -7,8 +7,8 @@ demo also runs with Muse disabled, and the run evidence shows which.
 
 | Time | Scene | What to show |
 |---|---|---|
-| 0:00 | Customer need | `/customer/`: "Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana." |
-| 0:25 | Budget first, location second | Three offers: the cheaper farther shop first, the nearer one second, the over-budget one set apart with the shortfall. Open `/api/shop/runs/<id>`: cost breakdown, unknown delivery fee disclosed, reasons |
+| 0:00 | Customer need | WhatsApp, chat with `@moranbuy`: "Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana." |
+| 0:25 | Budget first, location second | Three offers: the cheaper farther shop first, the nearer one second, the over-budget one set apart with the shortfall. Open the run in Admin (Ranking): cost breakdown, unknown delivery fee disclosed, reasons |
 | 0:55 | Choose and confirm | Reply "1", read-back of the known total, "ndio" creates an order `MB-…` pending with the merchant; `/business/` Orders tab shows it |
 | 1:15 | Standalone merchant | `/business/`: register, add a location (geocoded or pinned), add a product; it appears in the next search |
 | 1:35 | Registered Moran business | "Link Moran AI account", sync: existing products and locations appear with source Moran; price edit goes through Moran |

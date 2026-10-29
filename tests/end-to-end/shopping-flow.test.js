@@ -34,32 +34,43 @@ before(async () => {
 
 after(async () => { server.close(); await closeDatabase(); });
 
-const post = (path, body, headers = {}) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(path === '/api/shop/messages' && !body.customerToken ? { acceptTerms: true, ...body } : body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+// Customers reach MoranBuy only on WhatsApp: every message is a signed forward from Moran, and replies go back through Moran.
+let seq = 0;
+const send = async (event) => {
+  const raw = JSON.stringify({ messageId: `wamid.e2e.${seq += 1}`, ...event });
+  const { timestamp, signature } = signBody(process.env.MORAN_SHARED_SECRET, raw);
+  return fetch(`${base}/internal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': timestamp, 'X-MoranBuy-Signature': signature }, body: raw }).then(async (r) => ({ status: r.status, body: await r.json() }));
+};
+const lastTo = (to) => moran.sent.filter((m) => m.to === to).at(-1)?.body || '';
+const latestRun = (sessionId) => db('matching_runs').where({ session_id: sessionId }).orderBy('created_at', 'desc').first();
 
 test('a Swahili request with product, budget and place is matched budget-first and location-second', async () => {
-  const r = await post('/api/shop/messages', { text: 'Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana.' });
+  const from = '255712000101'; await acceptedCustomer(from);
+  const r = await send({ from, text: 'Nina TSh 350,000 ya sofa ya watu watatu. Nipo Sinza, Dar es Salaam. Nataka delivery ikiwezekana.' });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.state, 'presented');
-  assert.equal(r.body.museStatus, 'disabled');
-  const text = r.body.replies.at(-1).text;
+  const text = lastTo(from);
   assert.match(text, /1\. Sofa ya watu watatu grey - Duka la Mbali/);
   assert.match(text, /2\. Sofa 3 seater brown - Duka la Karibu/);
   assert.match(text, /3\. Sofa ya watu watatu leather - Duka Ghali.*inazidi bajeti kwa TSh 15,000/);
   assert.doesNotMatch(text, /Kiti cha ofisi/);
-  const run = await fetch(`${base}/api/shop/runs/${r.body.runId}`).then((x) => x.json());
-  assert.equal(run.run.candidates, 3);
-  assert.equal(run.offers[0].known_total, 305000);
-  assert.equal(run.offers[0].total_confirmed, true);
-  assert.ok(run.offers[0].evidence_json.reasons.includes('lowest_known_total_among_suitable'));
+  const run = await latestRun(r.body.sessionId);
+  assert.equal(run.muse_status, 'disabled');
+  assert.equal(run.candidates, 3);
+  const offers = await db('matching_offers').where({ run_id: run.id, group: 'ranked' }).orderBy('rank');
+  assert.equal(offers[0].known_total, 305000);
+  assert.equal(offers[0].total_confirmed, true);
+  assert.ok(offers[0].evidence_json.reasons.includes('lowest_known_total_among_suitable'));
 });
 
 test('a request missing the budget is asked one clarifying question and nothing is re-asked', async () => {
-  const first = await post('/api/shop/messages', { text: 'Nataka sofa ya watu watatu, nipo Sinza' });
+  const from = '255712000102'; await acceptedCustomer(from);
+  const first = await send({ from, text: 'Nataka sofa ya watu watatu, nipo Sinza' });
   assert.equal(first.body.state, 'clarifying');
-  assert.match(first.body.replies[0].text, /Bajeti yako/);
-  const second = await post('/api/shop/messages', { customerToken: first.body.customerToken, text: 'laki tatu' });
+  assert.match(lastTo(from), /Bajeti yako/);
+  const second = await send({ from, text: 'laki tatu' });
   assert.equal(second.body.state, 'presented');
-  assert.doesNotMatch(second.body.replies.at(-1).text, /Upo wapi/);
+  assert.doesNotMatch(lastTo(from), /Upo wapi/);
 });
 
 test('a forwarded WhatsApp message is verified, answered through Moran, de-duplicated, and an order needs an explicit yes', async () => {
@@ -74,15 +85,15 @@ test('a forwarded WhatsApp message is verified, answered through Moran, de-dupli
   const m1 = await send({ messageId: 'wamid.1', from: '255712345678', text: 'Nina laki tatu na nusu ya sofa ya watu watatu, nipo Sinza, delivery' });
   assert.equal(m1.status, 200, JSON.stringify(m1.body));
   assert.equal(m1.body.state, 'presented');
-  assert.equal(moran.sent.length, 1);
-  assert.equal(moran.sent[0].to, '255712345678');
+  const mine = () => moran.sent.filter((m) => m.to === '255712345678');
+  assert.equal(mine().length, 1);
   const again = await send({ messageId: 'wamid.1', from: '255712345678', text: 'Nina laki tatu na nusu ya sofa ya watu watatu, nipo Sinza, delivery' });
   assert.equal(again.body.duplicate, true);
-  assert.equal(moran.sent.length, 1);
+  assert.equal(mine().length, 1);
 
   const pick = await send({ messageId: 'wamid.2', from: '255712345678', text: '1' });
   assert.equal(pick.body.state, 'selected');
-  assert.match(moran.sent.at(-1).body, /Jumla inayojulikana: TSh 305,000/);
+  assert.match(lastTo('255712345678'), /Jumla inayojulikana: TSh 305,000/);
   assert.equal(await db('orders').count('id as n').first().then((r) => Number(r.n)), 0);
 
   const no = await send({ messageId: 'wamid.3', from: '255712345678', text: 'hapana' });
@@ -93,26 +104,26 @@ test('a forwarded WhatsApp message is verified, answered through Moran, de-dupli
   await send({ messageId: 'wamid.5', from: '255712345678', text: '2' });
   const yes = await send({ messageId: 'wamid.6', from: '255712345678', text: 'ndio' });
   assert.equal(yes.body.state, 'confirmed');
-  const order = await db('orders').first();
+  const order = await db('orders').orderBy('created_at', 'desc').first();
   assert.equal(order.status, 'pending_merchant');
   assert.equal(order.known_total, 330000);
   assert.equal(order.total_confirmed, true);
-  assert.match(moran.sent.at(-1).body, new RegExp(`Oda ${order.order_ref}`));
-  const status = await fetch(`${base}/api/shop/orders/${order.order_ref}`).then((r) => r.json());
-  assert.equal(status.order.status, 'pending_merchant');
+  assert.match(lastTo('255712345678'), new RegExp(`Oda ${order.order_ref}`));
 });
 
 test('when nothing fits the budget the reply says so and offers choices instead of inventing a discount', async () => {
-  const r = await post('/api/shop/messages', { text: 'I want a 3 seater sofa, budget 200k, I am in Sinza, pickup' });
+  const from = '255712000103'; await acceptedCustomer(from, { language: 'en' });
+  const r = await send({ from, text: 'I want a 3 seater sofa, budget 200k, I am in Sinza, pickup' });
   assert.equal(r.body.state, 'presented');
-  const text = r.body.replies.at(-1).text;
+  const text = lastTo(from);
   assert.match(text, /Nothing matched within TSh 200,000/);
   assert.match(text, /over budget by TSh 90,000/);
   assert.match(text, /cheaper alternatives/);
 });
 
 test('an image-only message without Muse configured is answered honestly with a clarification, not an invented product', async () => {
-  const r = await post('/api/shop/messages', { imageUrl: 'https://example.com/sofa.jpg' });
+  const from = '255712000104'; await acceptedCustomer(from);
+  const r = await send({ from, imageUrl: 'https://example.com/sofa.jpg' });
   assert.equal(r.body.state, 'clarifying');
-  assert.equal(r.body.museStatus, 'disabled');
+  assert.equal((await db('muse_requests').orderBy('id', 'desc').first())?.status ?? 'disabled', 'disabled');
 });

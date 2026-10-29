@@ -48,7 +48,7 @@ yes, an order. One call per inbound message: `ShoppingEngine.handleMessage`.
   to `POST /internal/inbound` signed with `MORAN_SHARED_SECRET`; MoranBuy answers through
   `MoranInternalClient.sendText/sendImage`, which reach Moran's outbound gate. Deliveries are
   de-duplicated by message id in `webhook_events`.
-- **Web** at `/customer/` through `POST /api/shop/messages` with a browser-held customer token.
+- There is no customer web chat: customers find MoranBuy on WhatsApp by its username, `@moranbuy`.
 
 ## What is never done
 

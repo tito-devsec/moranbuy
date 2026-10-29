@@ -7,17 +7,24 @@ import { closeDatabase } from '../helpers/db.js';
 
 after(async () => { await closeDatabase(); });
 
-test('the legal pages learn the MoranBuy WhatsApp number to open a chat, and fall back to the web chat without one', async (t) => {
-  setConfigForTests(loadConfig({ ...process.env, MORANBUY_WHATSAPP_NUMBER: '+255 712 000 999' }));
+test('MoranBuy is reached by its WhatsApp username, old web chat links open WhatsApp, and the web chat is gone', async (t) => {
+  setConfigForTests(loadConfig({ ...process.env, MORANBUY_WHATSAPP_USERNAME: '' }));
   const server = createApp({ routers }).listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   t.after(() => { setConfigForTests(null); server.close(); });
-  const contact = await (await fetch(`${base}/api/public/contact`)).json();
-  assert.deepEqual(contact.whatsapp, { number: '+255712000999', link: 'https://wa.me/255712000999' });
+  assert.deepEqual((await (await fetch(`${base}/api/public/contact`)).json()).whatsapp, { username: '@moranbuy', link: 'https://wa.me/moranbuy' });
+  setConfigForTests(loadConfig({ ...process.env, MORANBUY_WHATSAPP_USERNAME: '@MoranBuy.tz' }));
+  assert.deepEqual((await (await fetch(`${base}/api/public/contact`)).json()).whatsapp, { username: '@MoranBuy.tz', link: 'https://wa.me/MoranBuy.tz' });
+  for (const old of ['/customer', '/customer/', '/customer/index.html']) {
+    const r = await fetch(`${base}${old}`, { redirect: 'manual' });
+    assert.equal(r.status, 302, old);
+    assert.equal(r.headers.get('location'), 'https://wa.me/MoranBuy.tz');
+  }
+  assert.equal((await fetch(`${base}/api/shop/messages`, { method: 'POST' })).status, 404);
   const html = await (await fetch(`${base}/terms`)).text();
   assert.match(html, /fetch\('\/api\/public\/contact'\)/);
-  setConfigForTests(loadConfig({ ...process.env, MORANBUY_WHATSAPP_NUMBER: '' }));
-  assert.equal((await (await fetch(`${base}/api/public/contact`)).json()).whatsapp, null);
+  assert.doesNotMatch(html, /\/customer\//);
+  assert.throws(() => loadConfig({ ...process.env, MORANBUY_WHATSAPP_USERNAME: '2557 not a name!' }));
 });
 
 test('the public website serves its pages without any sign-in, and its numbers are real totals or left out', async (t) => {

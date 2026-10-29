@@ -9,7 +9,7 @@
     header.outerHTML = `<header class="site-header"><div class="wrap nav">
       <a class="brand" href="/" aria-label="MoranBuy home">${LOGO}MoranBuy</a>
       <nav class="nav-links" id="nav-links">${link('/how-it-works', 'How it works')}${link('/for-business', 'For businesses')}${link('/demo', 'Try the demo')}${link('/about', 'About')}</nav>
-      <div class="nav-cta"><a class="btn btn-ghost" href="/demo">Try the demo</a><a class="btn btn-primary" data-whatsapp href="/customer/"><span class="long">Open MoranBuy</span><span class="arrow">→</span></a><button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button></div>
+      <div class="nav-cta"><a class="btn btn-ghost" href="/demo">Try the demo</a><a class="btn btn-primary" data-whatsapp href="https://wa.me/moranbuy" target="_blank" rel="noopener"><span class="long">Open MoranBuy</span><span class="arrow">→</span></a><button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button></div>
     </div></header>`;
   }
   const footer = document.querySelector('[data-site-footer]');
@@ -100,7 +100,7 @@
     });
   }).catch(() => {});
 
-  // Every "Open MoranBuy" opens a WhatsApp chat with the MoranBuy number when it is set, the web chat otherwise.
+  // Every "Open MoranBuy" opens a WhatsApp chat with MoranBuy's username (@moranbuy), greeting already typed.
   fetch('/api/public/contact').then((r) => r.json()).then((c) => {
     if (!c.whatsapp?.link) return;
     document.querySelectorAll('[data-whatsapp]').forEach((a) => { a.href = `${c.whatsapp.link}?text=${encodeURIComponent('Hello MoranBuy')}`; a.target = '_blank'; a.rel = 'noopener'; });

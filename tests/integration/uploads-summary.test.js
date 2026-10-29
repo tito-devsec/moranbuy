@@ -8,11 +8,11 @@ import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setShoppingDepsForTests } from '../../services/api/src/services/shopping.js';
 import { purgeExpired } from '../../services/api/src/services/retention.js';
-import { uploadDir, sniff } from '../../services/api/src/services/uploads.js';
+import { uploadDir, sniff, publicUpload } from '../../services/api/src/services/uploads.js';
 import { adminSummary } from '../../services/api/src/services/admin-summary.js';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { MuseClient } from '@moranbuy/muse-intelligence';
-import { FakeGeocoder, FakeMoranInternalClient } from '@moranbuy/integrations';
+import { FakeGeocoder, FakeMoranInternalClient, signBody } from '@moranbuy/integrations';
 import { hashPassword, signAccessToken } from '@moranbuy/authorization';
 import { loadConfig } from '@moranbuy/core';
 
@@ -102,25 +102,22 @@ test('verification documents are private to their business and admins, and only 
   assert.equal((await json(`/api/admin/merchants/${shop.id}/uploads`, { token: rootTok })).body.uploads.length, 2);
 });
 
-test('a web customer sends a photo only after accepting the terms; it stays private and Muse reads it as data', async () => {
-  const first = await json('/api/shop/messages', { method: 'POST', body: { text: '' } });
-  const token = first.body.customerToken;
-  assert.equal((await send(`/api/shop/uploads?customerToken=${token}`, { body: JPG, type: 'image/jpeg' })).status, 403);
-  await json('/api/shop/messages', { method: 'POST', body: { customerToken: token, acceptTerms: true } });
-  const up = await send(`/api/shop/uploads?customerToken=${token}`, { body: JPG, type: 'image/jpeg' });
-  assert.equal(up.status, 201);
+test('a WhatsApp customer photo is opened only after the terms are accepted; it stays private and Muse reads it as data', async () => {
+  const wa = (from, event) => { const raw = JSON.stringify({ messageId: `wamid.up.${Math.random()}`, from, ...event }); const sig = signBody(process.env.MORAN_SHARED_SECRET, raw); return fetch(`${base}/internal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': sig.timestamp, 'X-MoranBuy-Signature': sig.signature }, body: raw }).then(async (r) => ({ status: r.status, body: await r.json() })); };
+  const media = { base64: JPG.toString('base64'), mime: 'image/jpeg' };
+  const before = Number((await db('uploads').where({ purpose: 'customer_photo' }).count('* as n').first()).n);
+  await wa('255712000201', { kind: 'image', text: 'hii', media });
+  assert.equal(Number((await db('uploads').where({ purpose: 'customer_photo' }).count('* as n').first()).n), before, 'nothing is stored before the terms are accepted');
+  await acceptedCustomer('255712000202');
   museSeen = [];
-  const msg = await json('/api/shop/messages', { method: 'POST', body: { customerToken: token, text: 'Nataka kama hii, nipo Sinza', photoUploadId: up.body.uploadId } });
+  const msg = await wa('255712000202', { kind: 'image', text: 'Nataka kama hii, nipo Sinza', media });
   assert.equal(msg.status, 200);
   const sentToMuse = museSeen.find((b) => JSON.stringify(b).includes('image_url'));
   assert.ok(sentToMuse, 'the photo went to Muse');
   assert.match(JSON.stringify(sentToMuse), /data:image\/jpeg;base64,/);
-  const stored = await db('session_messages').where({ content_type: 'image' }).orderBy('created_at', 'desc').first();
-  assert.equal(stored.content, `Nataka kama hii, nipo Sinza [image] upload:${up.body.uploadId}`);
-  // Someone else's photo id cannot be used.
-  const stranger = (await json('/api/shop/messages', { method: 'POST', body: { text: '' } })).body.customerToken;
-  await json('/api/shop/messages', { method: 'POST', body: { customerToken: stranger, acceptTerms: true } });
-  assert.equal((await json('/api/shop/messages', { method: 'POST', body: { customerToken: stranger, text: 'hii', photoUploadId: up.body.uploadId } })).status, 404);
+  const up = await db('uploads').where({ purpose: 'customer_photo' }).orderBy('created_at', 'desc').first();
+  assert.ok(up, 'the photo is kept');
+  assert.equal(publicUpload(up).url, null, 'a customer photo has no public address');
 });
 
 test('the retention purge deletes expired customer photos and unused product photos from disk and from the records', async () => {
