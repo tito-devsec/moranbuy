@@ -150,6 +150,8 @@ entered in MoranBuy Admin and take effect at once.
 
 ## Try the demo
 
+![The Try the demo page after a full run: the customer's chat on the left, the server log and walkthrough on the right](docs/images/try-demo.png)
+
 `/demo` on the website runs the whole story on a simulated phone (customer, shop owner, rider) next to
 the server log. It is served by a separate sandbox container (`moranbuy-demo`) running the same code
 with `DEMO_MODE=true`: its own database, a recording WhatsApp line, the sandbox payment provider and
