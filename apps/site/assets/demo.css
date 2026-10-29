@@ -1,16 +1,20 @@
 /* Try-the-demo page: a browser device-mode window, the phone on the left and the developer panel on the right; on a phone the page is the chat only. */
-.demo-page { background: #0a1528; }
+.demo-page { background: var(--ink); }
 .demo-page [hidden] { display: none !important; }
-.demo-page .site-header:not(.scrolled) .brand, .demo-page .site-header:not(.scrolled) .nav-links { color: #e8eef6; }
-.demo-page .site-header:not(.scrolled) .nav-links a { color: #c9d4e2; }
-.demo-hero { padding: 128px 0 30px; color: #e8eef6; background: radial-gradient(900px 420px at 78% -10%, rgba(34, 211, 238, .16), transparent 70%), radial-gradient(700px 380px at 8% 0%, rgba(15, 118, 110, .35), transparent 70%), #0a1528; }
-.demo-hero h1 { color: #fff; font-size: clamp(40px, 5vw, 66px); line-height: 1; margin-top: 14px; }
-.demo-hero .eyebrow { color: var(--cyan); }
-.demo-hero .lead { color: #a9b6c7; margin-top: 16px; max-width: 800px; }
-.demo-stage { background: #0a1528; padding: 10px 0 80px; }
+.demo-page .site-header:not(.scrolled) .brand { color: var(--paper); }
+.demo-page .site-header:not(.scrolled) .nav-links a { color: var(--paper); border-color: #444; }
+.demo-page .site-header:not(.scrolled) .nav-links a:hover, .demo-page .site-header:not(.scrolled) .nav-links a.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.demo-page .site-header:not(.scrolled) .btn-primary { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.demo-page .site-header:not(.scrolled) .btn-ghost { color: var(--paper); border-color: var(--paper); }
+.demo-page .site-header:not(.scrolled) .menu-btn { color: var(--paper); }
+.demo-hero { padding: 128px 0 30px; color: var(--paper); background: var(--ink); }
+.demo-hero h1 { color: var(--paper); font-size: clamp(56px, 8vw, 120px); margin-top: 18px; }
+.demo-hero .eyebrow { background: #262626; border-color: #3a3a3a; color: var(--paper); }
+.demo-hero .lead { color: #bdbab3; margin-top: 16px; max-width: 800px; }
+.demo-stage { background: var(--ink); padding: 10px 0 80px; }
 
 /* The window: device toolbar on top, viewport left, tools right. */
-.dt-window { --mono: Menlo, Consolas, "DejaVu Sans Mono", ui-monospace, monospace; width: min(1480px, calc(100% - 40px)); margin: 0 auto; border-radius: 8px; overflow: hidden; background: #242424; box-shadow: 0 0 0 1px #3a3a3a, 0 40px 90px -30px rgba(0, 0, 0, .9); font: 12px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; color: #bdc6cf; }
+.dt-window { border-radius: 4px; --mono: Menlo, Consolas, "DejaVu Sans Mono", ui-monospace, monospace; width: min(1480px, calc(100% - 40px)); margin: 0 auto; border-radius: 8px; overflow: hidden; background: #242424; box-shadow: 0 0 0 1px #3a3a3a; font: 12px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; color: #bdc6cf; }
 .dt-device-bar { height: 34px; display: flex; align-items: center; gap: 18px; padding: 0 12px; background: #2b2b2b; border-bottom: 1px solid #3a3a3a; }
 .dt-device { color: #e8eaed; display: flex; align-items: center; gap: 4px; }
 .dt-device i, .dt-dim i { font-size: 10px; color: #9aa0a6; }
@@ -162,16 +166,16 @@
 .dt-drawer-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
 .walk-now { padding: 12px 16px; overflow: auto; }
 .walk-who { font: 600 10.5px/1 var(--b); letter-spacing: .12em; text-transform: uppercase; color: #8ab4f8; }
-.walk-title { font: 500 16px/1.3 var(--h); color: #fff; margin-top: 6px; }
+.walk-title { font: 400 24px/1 var(--d); letter-spacing: .02em; text-transform: uppercase; color: #fff; margin-top: 6px; }
 .walk-desc { margin: 6px 0 12px; color: #bdc6cf; font: 13px/1.5 var(--b); max-width: 640px; }
 .walk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.walk-actions .btn { padding: 9px 16px; font-size: 13px; }
+.walk-actions .btn { padding: 9px 16px; font-size: 15px; }
 .walk-actions .btn[disabled] { opacity: .5; pointer-events: none; }
-.btn-quiet { background: #3c4043; color: #e8eaed; }
-.btn-quiet:hover { background: #4a4e52; }
+.btn-quiet { background: transparent; color: #e8eaed; border-color: #5f6368; }
+.btn-quiet:hover { background: #3c4043; }
 .guide-links { display: flex; gap: 6px; }
-.guide-links a { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; background: rgba(15, 118, 110, .35); color: #e8eef6; font: 500 13px/1 var(--b); }
-.guide-links a:hover { background: rgba(15, 118, 110, .55); }
+.guide-links a { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--green); color: var(--green); font: 400 15px/1 var(--d); letter-spacing: .06em; text-transform: uppercase; }
+.guide-links a:hover { background: var(--green); color: var(--ink); }
 .walk { list-style: none; margin: 0; padding: 8px 10px; overflow: auto; border-left: 1px solid #3a3a3a; font: 12px/1.3 var(--b); }
 .walk li { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 3px; color: #9aa0a6; }
 .walk li .n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; box-shadow: inset 0 0 0 1px #5f6368; }
@@ -179,8 +183,11 @@
 .walk li.done { color: #81868c; } .walk li.done .n { background: #0d9488; color: #fff; box-shadow: none; }
 .walk li.now { background: #3c4043; color: #fff; } .walk li.now .n { background: #8ab4f8; color: #202124; box-shadow: none; }
 
-.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
-.facts h3 { font-size: 22px; margin-bottom: 10px; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--ink); }
+.facts > div { padding: 26px 26px 30px 0; border-bottom: 1px solid var(--ink); border-right: 1px solid var(--line-2); }
+.facts > div + div { padding-left: 26px; }
+.facts > div:last-child { border-right: 0; }
+.facts h3 { font-size: 32px; margin-bottom: 12px; }
 .facts p { color: var(--muted); margin: 0; }
 .demo-menu { display: none; }
 
@@ -200,8 +207,9 @@
 /* On a phone the page is only the chat, under the site header; the walkthrough and roles are in the menu. */
 @media (max-width: 960px) {
   .demo-page { background: #efeae2; overflow: hidden; }
-  .demo-page .site-header, .demo-page .site-header.hidden { background: #fff; box-shadow: 0 1px 0 var(--line); transform: none; }
-  .demo-page .site-header .brand, .demo-page .site-header .nav-links, .demo-page .site-header .nav-links a { color: var(--ink) !important; }
+  .demo-page .site-header, .demo-page .site-header.hidden { background: var(--paper); box-shadow: 0 1px 0 var(--line); transform: none; }
+  .demo-page .site-header .brand, .demo-page .site-header .nav-links, .demo-page .site-header .nav-links a, .demo-page .site-header .menu-btn { color: var(--ink) !important; }
+  .demo-page .site-header .btn-primary { background: var(--ink) !important; color: var(--paper) !important; border-color: var(--ink) !important; }
   .demo-hero, .demo-facts, .demo-page .site-footer, .dt-device-bar, .dt-tools, .ph-speaker, .ph-cam, .ph-home, .statusbar { display: none !important; }
   .demo-stage { padding: 0; }
   .dt-window { width: 100%; border-radius: 0; box-shadow: none; background: none; }
@@ -212,14 +220,14 @@
   .dscreen { border-radius: 0; box-shadow: none; }
   .composer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .demo-menu { display: block; padding: 6px 0 4px; }
-  .demo-menu h5 { margin: 12px 0 6px; font: 600 11px/1 var(--b); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .demo-menu h5 { margin: 12px 0 6px; font: 400 13px/1 var(--d); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .demo-menu .roles-m { display: flex; gap: 6px; }
-  .demo-menu .roles-m button, .demo-menu .act { flex: 1; border: 0; border-radius: 12px; padding: 11px 10px; background: var(--soft); color: var(--ink); font: 500 14px/1 var(--b); cursor: pointer; }
-  .demo-menu .roles-m button.on { background: var(--teal); color: #fff; }
+  .demo-menu .roles-m button, .demo-menu .act { flex: 1; border: 1px solid var(--ink); border-radius: 4px; padding: 11px 10px; background: transparent; color: var(--ink); font: 400 16px/1 var(--d); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+  .demo-menu .roles-m button.on { background: var(--ink); color: var(--paper); }
   .demo-menu .roles-m .badge { margin-left: 4px; }
   .demo-menu .next { margin: 4px 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
   .demo-menu .next b { color: var(--ink); font-weight: 600; }
   .demo-menu .acts { display: flex; gap: 6px; }
-  .demo-menu .act.primary { background: var(--teal); color: #fff; }
+  .demo-menu .act.primary { background: var(--ink); color: var(--paper); }
 }
 @media (prefers-reduced-motion: reduce) { .msg, .wa-btns, .cursor, .row { animation: none; } }

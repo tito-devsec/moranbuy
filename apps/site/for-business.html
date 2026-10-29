@@ -6,31 +6,36 @@
 <title>MoranBuy for businesses</title>
 <meta name="description" content="Sell to customers who are already asking: list by one shelf photo on WhatsApp, receive ready-to-pay orders, get paid on confirmed delivery, and see what people near you want.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Sora:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/site/mark.svg">
+<link rel="icon" type="image/x-icon" href="/site/favicon.ico">
+<link rel="apple-touch-icon" href="/site/favicon-256.png">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="/site/site.css">
 <style>
 .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
-.feat { border-radius: 24px; padding: 30px 26px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); transition: transform .4s var(--ease), box-shadow .4s var(--ease); }
-.feat:hover { transform: translateY(-6px); box-shadow: inset 0 0 0 1px var(--teal-100), var(--shadow); }
-.ficon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 22px; color: #fff; background: linear-gradient(145deg, #12968a, #0f766e); box-shadow: 0 14px 28px -14px rgba(15, 118, 110, .9); margin-bottom: 26px; }
-.feat h3 { font-size: 21px; margin-bottom: 10px; }
+.feat-grid { gap: 0; border-top: 1px solid var(--ink); }
+.feat { padding: 30px 26px 34px; border-bottom: 1px solid var(--ink); border-right: 1px solid var(--line-2); transition: background .3s; }
+.feat:nth-child(3n) { border-right: 0; }
+.feat:hover { background: var(--paper-2); }
+.ficon { width: 52px; height: 52px; border-radius: 4px; display: grid; place-items: center; font-size: 22px; color: var(--green); background: var(--ink); margin-bottom: 26px; }
+.feat h3 { font-size: 30px; margin-bottom: 10px; }
 .feat p { margin: 0; color: var(--muted); font-size: 15px; }
-.order-card { background: #fff; border-radius: 22px; padding: 22px; box-shadow: var(--shadow); max-width: 420px; margin: 0 auto; }
+.order-card { background: #fff; border-radius: 4px; padding: 22px; border: 1px solid var(--ink); max-width: 420px; margin: 0 auto; }
 .order-card .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: 15px; }
 .order-card .row:last-child { border: 0; }
-.order-card .state { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--teal-50); color: var(--teal); font: 600 13px var(--b); }
-.order-card .state.done { background: #e9f9ef; color: #1e7f43; }
+.order-card .state { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 3px; background: var(--paper-2); color: var(--ink); font: 400 15px var(--d); letter-spacing: .06em; text-transform: uppercase; }
+.order-card .state.done { background: var(--green); color: var(--ink); }
 .timeline { list-style: none; margin: 18px 0 0; padding: 0; }
 .timeline li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; font-size: 14px; color: var(--muted); }
 .timeline li i { color: var(--teal); font-size: 16px; }
 .timeline li b { color: var(--ink); font-weight: 500; }
 .bars { display: grid; gap: 12px; margin-top: 10px; }
-.bars div { display: grid; grid-template-columns: 120px 1fr 54px; gap: 12px; align-items: center; font-size: 14px; color: #d6e0ea; }
-.bars span.bar { height: 10px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
-.bars span.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--teal-600), var(--cyan)); transition: width 1.6s var(--ease); }
+.bars div { display: grid; grid-template-columns: 120px 1fr 54px; gap: 12px; align-items: center; font-size: 14px; color: #bdbab3; }
+.bars span.bar { height: 10px; border-radius: 2px; background: #333; overflow: hidden; }
+.bars span.bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--green); transition: width 1.6s var(--ease); }
 .visible .bars span.bar i { width: var(--w); }
-@media (max-width: 960px) { .feat-grid { grid-template-columns: 1fr; } }
+@media (max-width: 960px) { .feat-grid { grid-template-columns: 1fr; } .feat { border-right: 0; } }
 </style>
 </head>
 <body>
@@ -71,7 +76,7 @@
         </ul>
       </div>
       <div class="order-card" data-reveal="right">
-        <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-family:var(--h);font-size:20px">MB-7K2Q9P</b><span class="state done"><i class="fi fi-rr-badge-check"></i>Paid to you</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-family:var(--d);font-size:26px;letter-spacing:.02em">MB-7K2Q9P</b><span class="state done"><i class="fi fi-rr-badge-check"></i>Paid to you</span></div>
         <div class="row" style="margin-top:10px"><span>Blender 1.5L × 1</span><b>TSh 85,000</b></div>
         <div class="row"><span>Delivery, Sinza</span><b>TSh 3,000</b></div>
         <div class="row"><span>Released to 0712 ••• 333</span><b>TSh 88,000</b></div>
@@ -89,12 +94,12 @@
   <section class="section dark">
     <div class="wrap split flip">
       <div>
-        <span class="eyebrow" style="color:var(--cyan)" data-reveal>Insights</span>
+        <span class="eyebrow" data-reveal>Insights</span>
         <h2 data-reveal>Stock what people are asking for.</h2>
         <p class="lead" data-reveal>MoranBuy records what customers ask for, in which area and at what budget. Your dashboard turns it into a short, plain explanation — written by Muse Spark, with every number taken from the data.</p>
       </div>
       <div class="panel" data-reveal="scale">
-        <div style="font:600 13px var(--b);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)">Most asked near you · example</div>
+        <div style="font:400 15px var(--d);letter-spacing:.1em;text-transform:uppercase;color:var(--green)">Most asked near you · example</div>
         <div class="bars" style="margin-top:20px">
           <div><span>Smartphones</span><span class="bar"><i style="--w:92%"></i></span><span>184</span></div>
           <div><span>Sofas</span><span class="bar"><i style="--w:64%"></i></span><span>128</span></div>
@@ -102,7 +107,7 @@
           <div><span>Gas cookers</span><span class="bar"><i style="--w:36%"></i></span><span>71</span></div>
           <div><span>Mattresses</span><span class="bar"><i style="--w:28%"></i></span><span>55</span></div>
         </div>
-        <p style="margin:22px 0 0;color:#a9b6c7;font-size:14px"><i class="fi fi-rr-sparkles" style="color:var(--cyan)"></i> "Most blender requests in Sinza are under TSh 90,000, and few shops nearby list one in that range."</p>
+        <p style="margin:22px 0 0;color:#bdbab3;font-size:14px"><i class="fi fi-rr-sparkles" style="color:var(--green)"></i> "Most blender requests in Sinza are under TSh 90,000, and few shops nearby list one in that range."</p>
       </div>
     </div>
   </section>

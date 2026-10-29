@@ -6,23 +6,28 @@
 <title>How MoranBuy works</title>
 <meta name="description" content="How MoranBuy turns one message into the best five local offers, how budget-first ranking works, how payment protection holds your money, and which Meta AI models do which job.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Sora:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/site/mark.svg">
+<link rel="icon" type="image/x-icon" href="/site/favicon.ico">
+<link rel="apple-touch-icon" href="/site/favicon-256.png">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="/site/site.css">
 <style>
-.rank { width: 100%; border-collapse: separate; border-spacing: 0 8px; font-size: 15px; }
-.rank th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px; padding: 0 14px; }
-.rank td { background: #fff; padding: 14px; }
-.rank td:first-child { border-radius: 14px 0 0 14px; font: 300 26px/1 var(--h); color: var(--teal); }
-.rank td:last-child { border-radius: 0 14px 14px 0; }
-.rank tr.over td { opacity: .55; }
-.tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--teal-50); color: var(--teal); }
-.tag.warn { background: #fff4e5; color: #9a5b00; }
+.rank { width: 100%; border-collapse: collapse; font-size: 15px; border-top: 1px solid var(--ink); }
+.rank th { text-align: left; color: var(--muted); font: 400 13px var(--d); letter-spacing: .08em; text-transform: uppercase; padding: 10px 14px; border-bottom: 1px solid var(--line-2); }
+.rank td { padding: 16px 14px; border-bottom: 1px solid var(--line-2); }
+.rank td:first-child { font: 400 34px/1 var(--d); color: var(--ink); }
+.rank tr.over td { opacity: .5; }
+.tag { display: inline-block; padding: 4px 10px; border-radius: 3px; font: 400 14px/1 var(--d); letter-spacing: .06em; text-transform: uppercase; background: var(--green); color: var(--ink); }
+.tag.warn { background: var(--amber); color: var(--ink); }
 .arch { width: 100%; height: auto; }
 .arch text { font-family: var(--b); }
-.faq details { border-bottom: 1px solid var(--line); padding: 20px 0; }
-.faq summary { cursor: pointer; font: 500 19px/1.3 var(--h); list-style: none; display: flex; justify-content: space-between; gap: 20px; }
-.faq summary::after { content: "+"; font-size: 26px; color: var(--teal); transition: transform .3s var(--ease); }
+.faq details { border-top: 1px solid var(--line-2); padding: 22px 0; counter-increment: faq; }
+.faq details:last-of-type { border-bottom: 1px solid var(--line-2); }
+.faq { counter-reset: faq; }
+.faq summary { cursor: pointer; font: 400 28px/1.1 var(--d); letter-spacing: .01em; text-transform: uppercase; list-style: none; display: flex; align-items: baseline; gap: 20px; }
+.faq summary::before { content: "(0" counter(faq) ")"; font-size: 16px; color: var(--muted); letter-spacing: .06em; min-width: 44px; }
+.faq summary::after { content: "+"; margin-left: auto; font-size: 30px; color: var(--ink); transition: transform .3s var(--ease); }
 .faq details[open] summary::after { transform: rotate(45deg); }
 .faq p { color: var(--muted); margin: 12px 0 0; max-width: 820px; }
 </style>
@@ -72,7 +77,7 @@
       <span class="eyebrow" data-reveal>2 · Rank</span>
       <h2 style="font-size:clamp(32px,4vw,52px);line-height:1.06;max-width:900px;margin:14px 0 18px" data-reveal>Budget first, location second. Always by rules, never by a model.</h2>
       <p class="lead" data-reveal>Every offer gets a known total: price plus known fees plus known delivery. Unknown delivery is shown as "not confirmed", never counted as zero. Then the ranking is fixed code you can read in the evidence of every search.</p>
-      <div class="panel" style="margin-top:36px;background:transparent;box-shadow:none;padding:0" data-reveal>
+      <div class="panel" style="margin-top:36px;background:transparent;border:0;padding:0" data-reveal>
         <table class="rank">
           <thead><tr><th>#</th><th>Offer</th><th>Known total</th><th>Distance</th><th>Why here</th></tr></thead>
           <tbody>
@@ -117,29 +122,29 @@
 
   <section class="section dark">
     <div class="wrap">
-      <span class="eyebrow" style="color:var(--cyan)" data-reveal>4 · The system</span>
+      <span class="eyebrow" data-reveal>4 · The system</span>
       <h2 style="font-size:clamp(32px,4vw,52px);line-height:1.06;max-width:900px;margin:14px 0 30px" data-reveal>Built on Moran AI's WhatsApp platform and Meta's models.</h2>
       <div class="panel" data-reveal="scale">
         <svg class="arch" viewBox="0 0 1100 420" role="img" aria-label="MoranBuy architecture">
-          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22d3ee"/></marker></defs>
-          <g font-size="14" fill="#e8eef6">
-            <rect x="20" y="160" width="160" height="90" rx="16" fill="#0f766e"/><text x="100" y="200" text-anchor="middle" font-weight="600">WhatsApp</text><text x="100" y="222" text-anchor="middle" font-size="12" fill="#cfeee9">customers · shops · riders</text>
-            <rect x="240" y="160" width="170" height="90" rx="16" fill="#1d3a63"/><text x="325" y="200" text-anchor="middle" font-weight="600">Moran AI</text><text x="325" y="222" text-anchor="middle" font-size="12" fill="#a9b6c7">signed channel · outbound gate</text>
-            <rect x="470" y="60" width="300" height="300" rx="20" fill="#12284a" stroke="#22d3ee" stroke-opacity=".4"/>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#00d17a"/></marker></defs>
+          <g font-size="14" fill="#ebe9e4">
+            <rect x="20" y="160" width="160" height="90" rx="4" fill="#0b4a3a"/><text x="100" y="200" text-anchor="middle" font-weight="600">WhatsApp</text><text x="100" y="222" text-anchor="middle" font-size="12" fill="#bdbab3">customers · shops · riders</text>
+            <rect x="240" y="160" width="170" height="90" rx="4" fill="#2a2a2a"/><text x="325" y="200" text-anchor="middle" font-weight="600">Moran AI</text><text x="325" y="222" text-anchor="middle" font-size="12" fill="#bdbab3">signed channel · outbound gate</text>
+            <rect x="470" y="60" width="300" height="300" rx="4" fill="#1b1b1b" stroke="#00d17a"/>
             <text x="620" y="94" text-anchor="middle" font-weight="600" font-size="16">MoranBuy</text>
-            <g font-size="13"><rect x="492" y="112" width="256" height="40" rx="10" fill="#1d3a63"/><text x="620" y="137" text-anchor="middle">Request understanding</text>
-            <rect x="492" y="160" width="256" height="40" rx="10" fill="#1d3a63"/><text x="620" y="185" text-anchor="middle">Budget-first ranking (rules)</text>
-            <rect x="492" y="208" width="256" height="40" rx="10" fill="#1d3a63"/><text x="620" y="233" text-anchor="middle">Payment protection (rules)</text>
-            <rect x="492" y="256" width="256" height="40" rx="10" fill="#1d3a63"/><text x="620" y="281" text-anchor="middle">Receipts · disputes · evidence</text>
-            <rect x="492" y="304" width="256" height="40" rx="10" fill="#1d3a63"/><text x="620" y="329" text-anchor="middle">MMS voice · Postgres · Redis</text></g>
-            <rect x="840" y="40" width="240" height="170" rx="16" fill="#0e3b4d"/><text x="960" y="72" text-anchor="middle" font-weight="600">Meta Model API</text>
-            <g font-size="12" fill="#cfeee9"><text x="960" y="100" text-anchor="middle">Muse Spark 1.3 · reads</text><text x="960" y="124" text-anchor="middle">Muse Spark 1.2 audio · hears</text><text x="960" y="148" text-anchor="middle">Voice Transcribe · hears</text><text x="960" y="172" text-anchor="middle">SAM 3.1 · sees</text></g>
-            <rect x="840" y="250" width="240" height="90" rx="16" fill="#1d3a63"/><text x="960" y="290" text-anchor="middle" font-weight="600">Snippe</text><text x="960" y="312" text-anchor="middle" font-size="12" fill="#a9b6c7">mobile money in · payouts out</text>
+            <g font-size="13"><rect x="492" y="112" width="256" height="40" rx="4" fill="#2a2a2a"/><text x="620" y="137" text-anchor="middle">Request understanding</text>
+            <rect x="492" y="160" width="256" height="40" rx="4" fill="#2a2a2a"/><text x="620" y="185" text-anchor="middle">Budget-first ranking (rules)</text>
+            <rect x="492" y="208" width="256" height="40" rx="4" fill="#2a2a2a"/><text x="620" y="233" text-anchor="middle">Payment protection (rules)</text>
+            <rect x="492" y="256" width="256" height="40" rx="4" fill="#2a2a2a"/><text x="620" y="281" text-anchor="middle">Receipts · disputes · evidence</text>
+            <rect x="492" y="304" width="256" height="40" rx="4" fill="#2a2a2a"/><text x="620" y="329" text-anchor="middle">MMS voice · Postgres · Redis</text></g>
+            <rect x="840" y="40" width="240" height="170" rx="4" fill="#0b4a3a"/><text x="960" y="72" text-anchor="middle" font-weight="600">Meta Model API</text>
+            <g font-size="12" fill="#bdbab3"><text x="960" y="100" text-anchor="middle">Muse Spark 1.3 · reads</text><text x="960" y="124" text-anchor="middle">Muse Spark 1.2 audio · hears</text><text x="960" y="148" text-anchor="middle">Voice Transcribe · hears</text><text x="960" y="172" text-anchor="middle">SAM 3.1 · sees</text></g>
+            <rect x="840" y="250" width="240" height="90" rx="4" fill="#2a2a2a"/><text x="960" y="290" text-anchor="middle" font-weight="600">Snippe</text><text x="960" y="312" text-anchor="middle" font-size="12" fill="#bdbab3">mobile money in · payouts out</text>
           </g>
-          <g stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#ah)"><path d="M180 205 H236"/><path d="M410 205 H466"/><path d="M770 150 H836"/><path d="M770 280 H836"/></g>
+          <g stroke="#00d17a" stroke-width="2" fill="none" marker-end="url(#ah)"><path d="M180 205 H236"/><path d="M410 205 H466"/><path d="M770 150 H836"/><path d="M770 280 H836"/></g>
         </svg>
       </div>
-      <div class="rule-bar" data-reveal><span>Models: understand, hear, see, speak, explain</span><span style="color:var(--cyan)">Rules and people: rank, charge, release, refund, decide</span></div>
+      <div class="rule-bar" data-reveal><span>Models: understand, hear, see, speak, explain</span><span style="color:var(--green)">Rules and people: rank, charge, release, refund, decide</span></div>
     </div>
   </section>
 
