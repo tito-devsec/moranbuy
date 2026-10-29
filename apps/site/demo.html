@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Try MoranBuy · live sandbox</title>
-<meta name="description" content="Use MoranBuy as a customer, a shop owner and a rider, on a simulated phone, while the server log shows what the real code does: parsing, ranking, held payment, handover code, receipt and payout. Sandbox only, no real money or numbers.">
+<meta name="description" content="Use MoranBuy as a customer, a shop owner and a rider, while the developer panel shows what the real code does: parsing, ranking, held payment, handover code, receipt and payout. Sandbox only, no real money or numbers.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-rounded/css/uicons-solid-rounded.css">
 <link rel="stylesheet" href="/site/site.css">
@@ -19,93 +19,104 @@
     <div class="wrap">
       <span class="eyebrow">Sandbox</span>
       <h1>Try MoranBuy.</h1>
-      <p class="lead">Play the customer, the shop owner and the rider on the phone. The log on the right is the server running the same code as production, against a sandbox database, a recording WhatsApp line and a sandbox payment provider. No real money, no real numbers.</p>
+      <p class="lead">Play the customer, the shop owner and the rider on the phone. The panel on the right shows what the server does, from the same code as production, on a sandbox database, a recording WhatsApp line and a sandbox payment provider. No real money, no real numbers.</p>
     </div>
   </section>
 
-  <section class="demo-stage" id="stage">
-    <div class="demo-grid">
-      <aside class="guide" aria-label="Guided walkthrough">
-        <div class="guide-head">
-          <span>Walkthrough</span>
-          <span class="guide-count" id="guide-count">0 / 12</span>
-        </div>
-        <ol class="walk" id="steps"></ol>
-        <div class="guide-actions">
-          <button class="btn btn-primary" id="do-step" type="button"><i class="fi fi-rr-play"></i><span>Do this step</span></button>
-          <button class="btn btn-quiet" id="run-all" type="button" title="Run the remaining steps one after another">Run all</button>
-        </div>
-        <div class="guide-links" id="guide-links" hidden>
-          <a href="#" id="open-receipt" target="_blank" rel="noopener"><i class="fi fi-rr-file-pdf"></i>Receipt PDF</a>
-          <a href="#" id="open-verify" target="_blank" rel="noopener"><i class="fi fi-rr-qrcode"></i>Check receipt (QR page)</a>
-        </div>
-        <button class="reset" id="reset" type="button"><i class="fi fi-rr-rotate-right"></i>New session</button>
-      </aside>
+  <section class="demo-stage">
+    <div class="dt-window">
+      <div class="dt-device-bar">
+        <span class="dt-device">WhatsApp · MoranBuy <i class="fi fi-rr-caret-down"></i></span>
+        <span class="dt-roles" role="tablist" aria-label="Whose phone">
+          <button role="tab" data-role="customer" class="on">Customer<b class="badge" hidden></b></button>
+          <button role="tab" data-role="owner">Shop owner<b class="badge" hidden></b></button>
+          <button role="tab" data-role="rider">Rider<b class="badge" hidden></b></button>
+        </span>
+        <span class="dt-dim">346 <span>×</span> 616</span>
+        <span class="dt-dim">100% <i class="fi fi-rr-caret-down"></i></span>
+        <button class="dt-icon" id="reset" type="button" title="New session"><i class="fi fi-rr-rotate-right"></i></button>
+      </div>
 
-      <div class="phone-col">
-        <div class="roles" role="tablist" aria-label="Whose phone">
-          <button role="tab" data-role="customer" class="on"><i class="fi fi-rr-user"></i><span>Customer</span><b class="badge" hidden></b></button>
-          <button role="tab" data-role="owner"><i class="fi fi-rr-store-alt"></i><span>Shop owner</span><b class="badge" hidden></b></button>
-          <button role="tab" data-role="rider"><i class="fi fi-rr-moped"></i><span>Rider</span><b class="badge" hidden></b></button>
-        </div>
-        <div class="phone-scene" id="scene">
-          <div class="phone" id="phone">
-            <div class="phone-side"></div>
-            <span class="hw hw-action"></span><span class="hw hw-vol1"></span><span class="hw hw-vol2"></span><span class="hw hw-power"></span>
-            <div class="phone-body">
-              <div class="screen">
-                <div class="island"></div>
-                <div class="statusbar"><span id="clock">9:41</span><span class="sb-icons"><i class="fi fi-sr-signal-alt-2"></i><i class="fi fi-sr-wifi"></i><i class="fi fi-sr-battery-three-quarters"></i></span></div>
-                <header class="wa-head">
-                  <i class="fi fi-rr-angle-small-left"></i>
-                  <span class="wa-avatar"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 11h16l-1.6 10.2a2 2 0 0 1-2 1.8h-8.8a2 2 0 0 1-2-1.8z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M12.5 11V9.5a3.5 3.5 0 0 1 7 0V11" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-                  <span class="wa-title"><b>MoranBuy <i class="fi fi-sr-badge-check"></i></b><small id="wa-sub">business account</small></span>
-                  <span class="wa-tools"><i class="fi fi-rr-video-camera-alt"></i><i class="fi fi-rr-phone-call"></i><i class="fi fi-rr-menu-dots-vertical"></i></span>
-                </header>
-                <div class="chat" id="chat" aria-live="polite"></div>
-                <div class="sheet" id="sheet" hidden>
-                  <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-title" id="sheet-title"></div><div class="sheet-rows" id="sheet-rows"></div><button class="sheet-close" id="sheet-close" type="button">Close</button></div>
-                </div>
-                <div class="paybox" id="paybox" hidden>
-                  <div class="pay-card">
-                    <div class="pay-brand"><i class="fi fi-rr-mobile-notch"></i>Mobile money · sandbox</div>
-                    <p id="pay-text">MoranBuy is requesting a payment.</p>
-                    <div class="pin"><span></span><span></span><span></span><span></span></div>
-                    <div class="pay-actions"><button type="button" id="pay-cancel">Cancel</button><button type="button" id="pay-ok">Send</button></div>
-                  </div>
-                </div>
-                <div class="toast" id="toast" hidden></div>
-                <form class="composer" id="composer" autocomplete="off">
-                  <div class="field"><i class="fi fi-rr-smile"></i><input id="msg" maxlength="500" placeholder="Message" aria-label="Message"><label class="clip" title="Send a photo"><i class="fi fi-rr-camera"></i><input type="file" id="file" accept="image/jpeg,image/png" hidden></label></div>
-                  <button class="send" id="send" type="submit" aria-label="Send"><i class="fi fi-sr-microphone" id="send-icon"></i></button>
-                </form>
-                <div class="home-bar"></div>
+      <div class="dt-main">
+        <div class="dt-viewport">
+          <div class="dphone" id="phone">
+            <span class="ph-speaker"></span><span class="ph-cam"></span>
+            <div class="dscreen">
+              <div class="statusbar"><span class="sb-carrier"><i class="fi fi-sr-signal-alt-2"></i> Sandbox <i class="fi fi-sr-wifi"></i></span><span id="clock">9:41</span><span class="sb-batt">86% <i class="fi fi-sr-battery-three-quarters"></i></span></div>
+              <header class="wa-head">
+                <i class="fi fi-rr-angle-small-left"></i>
+                <span class="wa-avatar"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 11h16l-1.6 10.2a2 2 0 0 1-2 1.8h-8.8a2 2 0 0 1-2-1.8z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M12.5 11V9.5a3.5 3.5 0 0 1 7 0V11" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+                <span class="wa-title"><b>MoranBuy <i class="fi fi-sr-badge-check"></i></b><small id="wa-sub">business account</small></span>
+                <span class="wa-tools"><i class="fi fi-rr-video-camera-alt"></i><i class="fi fi-rr-phone-call"></i></span>
+              </header>
+              <div class="dchat" id="chat" aria-live="polite"></div>
+              <div class="sheet" id="sheet" hidden>
+                <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-title" id="sheet-title"></div><div class="sheet-rows" id="sheet-rows"></div><button class="sheet-close" id="sheet-close" type="button">Close</button></div>
               </div>
+              <div class="paybox" id="paybox" hidden>
+                <div class="pay-card">
+                  <div class="pay-brand"><i class="fi fi-rr-mobile-notch"></i>Mobile money · sandbox</div>
+                  <p id="pay-text">MoranBuy is requesting a payment.</p>
+                  <div class="pin"><span></span><span></span><span></span><span></span></div>
+                  <div class="pay-actions"><button type="button" id="pay-cancel">Cancel</button><button type="button" id="pay-ok">Send</button></div>
+                </div>
+              </div>
+              <div class="toast" id="toast" hidden></div>
+              <form class="composer" id="composer" autocomplete="off">
+                <div class="field"><i class="fi fi-rr-smile"></i><input id="msg" maxlength="500" placeholder="Message" aria-label="Message"><label class="clip" title="Send a photo"><i class="fi fi-rr-camera"></i><input type="file" id="file" accept="image/jpeg,image/png" hidden></label></div>
+                <button class="send" id="send" type="submit" aria-label="Send"><i class="fi fi-sr-microphone" id="send-icon"></i></button>
+              </form>
+            </div>
+            <span class="ph-home"></span>
+          </div>
+        </div>
+
+        <div class="dt-tools">
+          <div class="dt-tabs" role="tablist">
+            <span class="dt-ico"><i class="fi fi-rr-cursor"></i></span><span class="dt-ico on"><i class="fi fi-rr-mobile-notch"></i></span>
+            <button type="button" class="on" data-tab="console">Console</button>
+            <button type="button" data-tab="network">Network</button>
+            <button type="button" data-tab="models">Meta models</button>
+            <button type="button" data-tab="money">Payments</button>
+            <span class="dt-spacer"></span>
+            <span class="dt-errs" id="dt-errs" hidden><i class="fi fi-sr-triangle-warning"></i><b id="dt-warn-n">0</b></span>
+          </div>
+          <div class="dt-filter">
+            <button type="button" class="dt-icon" id="term-clear" title="Clear console"><i class="fi fi-rr-ban"></i></button>
+            <i class="fi fi-rr-filter dt-filter-ic"></i>
+            <input id="dt-q" placeholder="Filter" aria-label="Filter log">
+            <select id="dt-level" aria-label="Log levels"><option value="all">All levels</option><option value="info">Info</option><option value="warn">Warnings</option><option value="debug">Verbose</option></select>
+            <label class="dt-check"><input type="checkbox" id="dt-preserve"> Preserve log</label>
+            <span class="dt-spacer"></span>
+            <span class="dt-env" id="st-info">connecting</span>
+          </div>
+          <div class="dt-panel" id="term-body" tabindex="0" aria-label="Server log"><div id="term-out"></div><div class="dt-prompt"><i class="fi fi-rr-angle-small-right"></i><span class="cursor"></span></div></div>
+          <div class="dt-panel dt-net" id="net" hidden>
+            <table><thead><tr><th>Name</th><th>Method</th><th>Status</th><th>Type</th><th>Size</th><th>Time</th></tr></thead><tbody id="net-rows"></tbody></table>
+          </div>
+
+          <div class="dt-drawer">
+            <div class="dt-drawer-tabs"><i class="fi fi-rr-menu-dots-vertical"></i><span class="on">Walkthrough</span><span class="dt-spacer"></span><span class="guide-count" id="guide-count">0 / 12</span></div>
+            <div class="dt-drawer-body">
+              <div class="walk-now">
+                <div class="walk-who" id="step-who">Customer</div>
+                <div class="walk-title" id="step-title">Starting the sandbox</div>
+                <p class="walk-desc" id="step-desc"></p>
+                <div class="walk-actions">
+                  <button class="btn btn-primary" id="do-step" type="button"><i class="fi fi-rr-play"></i><span>Do this step</span></button>
+                  <button class="btn btn-quiet" id="run-all" type="button">Run all</button>
+                  <span class="guide-links" id="guide-links" hidden><a href="#" id="open-receipt" target="_blank" rel="noopener"><i class="fi fi-rr-file-pdf"></i>Receipt PDF</a><a href="#" id="open-verify" target="_blank" rel="noopener"><i class="fi fi-rr-qrcode"></i>Check receipt</a></span>
+                </div>
+              </div>
+              <ol class="walk" id="steps"></ol>
             </div>
           </div>
         </div>
-        <p class="phone-note" id="phone-note">Tap the reply buttons, type in Swahili or English, send a photo, or hold the walkthrough on the left.</p>
-      </div>
-
-      <div class="term-col">
-        <div class="term" id="term">
-          <div class="term-bar">
-            <span class="dots"><i></i><i></i><i></i></span>
-            <span class="term-title">moranbuy@sandbox: ~/moranbuy</span>
-            <span class="term-tools"><button type="button" id="term-clear" title="Clear screen">clear</button></span>
-          </div>
-          <div class="term-body" id="term-body" tabindex="0" aria-label="Server log"><pre id="term-out"></pre><span class="cursor" id="cursor"></span></div>
-          <div class="term-status" id="term-status"><span class="st-sess">[sandbox] 0:logs*</span><span id="st-info">connecting</span><span id="st-clock"></span></div>
-        </div>
-        <div class="legend">
-          <span><b class="lv-info">INFO</b> what the code did</span><span><b class="lv-warn">WARN</b> a fallback or a refusal</span><span><b class="lv-debug">DEBUG</b> ranking detail</span>
-          <span class="legend-note">Phone numbers are masked. Handover codes are never logged.</span>
-        </div>
       </div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section demo-facts">
     <div class="wrap facts">
       <div><h3>What is real here</h3><p>The request parser, ranking, order flow, payment protection, handover code check, photo fingerprinting, receipts and payouts are the production code. Every log line is read back from the rows and messages that code just wrote.</p></div>
       <div><h3>What is simulated</h3><p>WhatsApp is a recording line that shows replies on this phone instead of sending them. Payments go to a sandbox provider. The five shops and their owners are sample data with reserved numbers.</p></div>

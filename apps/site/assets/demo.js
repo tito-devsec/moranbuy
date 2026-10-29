@@ -12,7 +12,7 @@
   let st;
   const fresh = () => ({ id: null, info: null, role: 'customer', order: null, ownerShop: null, busy: false, payDismissed: false,
     timeline: { customer: [], owner: [], rider: [] }, rendered: { customer: 0, owner: 0, rider: 0 }, unread: { customer: 0, owner: 0, rider: 0 },
-    seen: new Set(), flags: {}, queue: [] });
+    seen: new Set(), flags: {}, queue: [], all: [], warns: 0 });
 
   // WhatsApp text formatting: *bold*, _italic_, ~strike~, links and line breaks.
   function fmt(text) {
@@ -21,42 +21,86 @@
       .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, '<br>');
   }
 
-  // ---------- Terminal ----------
+  // ---------- Developer panel: console rows, network table, filters ----------
   const out = $('term-out');
   const body = $('term-body');
-  const nearBottom = () => body.scrollHeight - body.scrollTop - body.clientHeight < 60;
-  function termWrite(html) {
-    const stick = nearBottom();
-    const span = document.createElement('span'); span.className = 'ln'; span.innerHTML = html;
-    out.appendChild(span);
+  const net = $('net');
+  const netRows = $('net-rows');
+  const view = { tab: 'console', level: 'all', q: '' };
+  const TABS = {
+    console: () => true,
+    models: (l) => ['muse', 'parse', 'rank'].includes(l.svc) || /mms|meta model/i.test(l.msg),
+    money: (l) => ['payment', 'webhook', 'protect', 'payout', 'receipt'].includes(l.svc) || /payments\//.test(l.msg),
+  };
+  const LEVEL = { all: () => true, info: (l) => l.level === 'INFO', warn: (l) => ['WARN', 'ERROR'].includes(l.level), debug: (l) => l.level === 'DEBUG' };
+  const shown = (l) => (l.cmd || ((TABS[view.tab] || TABS.console)(l) && LEVEL[view.level](l))) && (!view.q || `${l.svc} ${l.msg}`.toLowerCase().includes(view.q));
+  const nearBottom = (el) => el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  const time = (at) => { const d = new Date(at); const p = (n, w = 2) => String(n).padStart(w, '0'); return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`; };
+  function rowEl(l) {
+    const el = document.createElement('div');
+    if (l.cmd) { el.className = 'row cmd'; el.innerHTML = `<span class="m">${esc(l.msg)}</span>`; return el; }
+    const lv = String(l.level || 'INFO').toLowerCase();
+    el.className = `row ${lv === 'info' ? '' : lv}`;
+    const msg = esc(l.msg).replace(/(^|\s)([a-z_.]+)=/g, '$1<span class="k">$2=</span>');
+    el.innerHTML = `<span class="m"><span class="tag">[${esc(l.svc)}]</span> ${msg}</span><span class="src">${time(l.at)}</span>`;
+    return el;
+  }
+  // One Network row per request the server made or received; WhatsApp sends are recorded, not delivered, and say so.
+  function netRow(l) {
+    let m;
+    if (l.svc === 'inbound' && (m = /^POST (\S+) (\d+) (\d+)ms .*kind=(\S+)/.exec(l.msg))) return [m[1], 'POST', m[2], `whatsapp ${m[4]}`, '', `${m[3]} ms`];
+    if (l.svc === 'muse' && (m = /^POST (\S+) model=(\S+) feature=(\S+) (\S+) (\S+)ms/.exec(l.msg))) return [m[1], 'POST', m[4], `${m[2]} · ${m[3]}`, '', `${m[5]} ms`, m[4] !== '200'];
+    if (l.svc === 'muse' && (m = /^feature=(\S+) model=(\S+) status=(\S+)/.exec(l.msg))) return [`${m[2]} · ${m[1]}`, 'POST', `(${m[3]})`, 'meta model', '', '', false, true];
+    if (l.svc === 'sandbox' && (m = /-> POST (\S+) (\d+) (\d+)ms/.exec(l.msg))) return [m[1], 'POST', m[2], 'mobile money', '', `${m[3]} ms`];
+    if (l.svc === 'webhook' && (m = /^(\S+) ref=(\S+)/.exec(l.msg))) return ['/api/payments/webhook', 'POST', '200', m[1], '', ''];
+    if (l.svc === 'outbound' && (m = /^(.+?) -> (\S+)(?: (\d+\w*B))?/.exec(l.msg))) return ['/internal/moranbuy/send', 'POST', 'recorded', m[1], m[3] || '', '', false, true];
+    if (l.svc === 'payout' && (m = /provider=(\S+) .*status=(\S+)/.exec(l.msg))) return ['payout', 'POST', m[2], m[1], '', ''];
+    return null;
+  }
+  function addNet(l) {
+    const r = netRow(l); if (!r) return;
+    const stick = nearBottom(net);
+    const tr = document.createElement('tr');
+    tr.innerHTML = r.slice(0, 6).map((v, k) => `<td class="${k === 2 && r[6] ? 'bad' : r[7] && k === 2 ? 'dim' : ''}" title="${esc(v)}">${esc(v)}</td>`).join('');
+    netRows.appendChild(tr);
+    if (stick) net.scrollTop = net.scrollHeight;
+  }
+  function write(l) {
+    st.all.push(l); if (st.all.length > 3000) st.all.shift();
+    if (l.level === 'WARN' || l.level === 'ERROR') { st.warns += 1; $('dt-warn-n').textContent = st.warns; $('dt-errs').hidden = false; }
+    addNet(l);
+    if (!shown(l)) return;
+    const stick = nearBottom(body);
+    out.appendChild(rowEl(l));
     while (out.childNodes.length > 1500) out.removeChild(out.firstChild);
     if (stick) body.scrollTop = body.scrollHeight;
   }
-  const prompt = (cmd) => termWrite(`<span class="ps">moranbuy@sandbox</span>:<span class="ps"><b>~/moranbuy</b></span>$ ${esc(cmd)}`);
-  function stamp(at) {
-    const d = new Date(at);
-    const p = (n, w = 2) => String(n).padStart(w, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
-  }
-  function renderLine(l) {
-    const lv = String(l.level || 'INFO').toUpperCase();
-    const msg = esc(l.msg).replace(/(^|\s)([a-z_.]+)=/g, '$1<span class="k">$2=</span>');
-    const cls = lv === 'DEBUG' ? ' class="debug-row"' : '';
-    return `<span class="ts">${stamp(l.at)}</span> <span class="lv-${lv.toLowerCase()}">${lv.padEnd(5)}</span> <span class="svc">${esc(String(l.svc).padEnd(8))}</span> <span${cls}>${msg}</span>`;
+  function redraw() {
+    out.textContent = '';
+    const frag = document.createDocumentFragment();
+    for (const l of st.all.filter(shown).slice(-1500)) frag.appendChild(rowEl(l));
+    out.appendChild(frag); body.scrollTop = body.scrollHeight;
   }
   let pumping = false;
   async function pump() {
     if (pumping) return; pumping = true;
     while (st.queue.length) {
       const batch = st.queue.length > 30 ? 4 : 1;
-      for (const l of st.queue.splice(0, batch)) termWrite(renderLine(l));
+      for (const l of st.queue.splice(0, batch)) write(l);
       await sleep(st.queue.length > 30 ? 8 : 26);
     }
     pumping = false;
   }
   const log = (lines) => { st.queue.push(...lines); pump(); };
-  $('term-clear').addEventListener('click', () => { out.textContent = ''; prompt('clear'); });
-  setInterval(() => { $('st-clock').textContent = new Date().toLocaleTimeString([], { hour12: false }); }, 1000);
+  $('term-clear').addEventListener('click', () => { st.all = []; out.textContent = ''; netRows.textContent = ''; st.warns = 0; $('dt-errs').hidden = true; });
+  document.querySelectorAll('.dt-tabs button').forEach((b) => b.addEventListener('click', () => {
+    view.tab = b.dataset.tab;
+    document.querySelectorAll('.dt-tabs button').forEach((x) => x.classList.toggle('on', x === b));
+    body.hidden = view.tab === 'network'; net.hidden = view.tab !== 'network';
+    if (view.tab === 'network') net.scrollTop = net.scrollHeight; else redraw();
+  }));
+  $('dt-level').addEventListener('change', (e) => { view.level = e.target.value; redraw(); });
+  $('dt-q').addEventListener('input', (e) => { view.q = e.target.value.trim().toLowerCase(); redraw(); });
 
   // ---------- Phone ----------
   const chat = $('chat');
@@ -71,7 +115,7 @@
     if (item.kind === 'sys') { wrap.innerHTML = `<div class="sys">${esc(item.text)}</div>`; return wrap; }
     if (item.kind === 'out') {
       if (item.type === 'image') wrap.innerHTML = `<div class="msg out photo-msg"><img src="${item.src}" alt="Photo sent"><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
-      else if (item.type === 'voice') wrap.innerHTML = `<div class="msg out"><div class="voice"><span class="avatar"><i class="fi fi-sr-microphone"></i></span><button type="button" disabled><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(item.seed || 3, 1)}</span></div><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
+      else if (item.type === 'voice') wrap.innerHTML = `<div class="msg out"><div class="dvoice"><span class="avatar"><i class="fi fi-sr-microphone"></i></span><button type="button" disabled><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(item.seed || 3, 1)}</span></div><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
       else wrap.innerHTML = `<div class="msg out">${fmt(item.text)}<span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
       return wrap;
     }
@@ -80,7 +124,7 @@
     if (m.type === 'document') {
       wrap.innerHTML = `<div class="msg in"><a class="doc" href="${receiptUrl()}" target="_blank" rel="noopener"><span class="ic">PDF</span><span><b>${esc(m.filename || 'receipt.pdf')}</b><small>PDF · tap to open</small></span></a>${text ? fmt(text) : ''}${meta}</div>`;
     } else if (m.audio) {
-      wrap.innerHTML = `<div class="msg in"><div class="voice"><button type="button" aria-label="Play"><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(m.seq, 0)}</span><span class="avatar"><i class="fi fi-sr-microphone"></i></span></div>${meta}</div>`;
+      wrap.innerHTML = `<div class="msg in"><div class="dvoice"><button type="button" aria-label="Play"><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(m.seq, 0)}</span><span class="avatar"><i class="fi fi-sr-microphone"></i></span></div>${meta}</div>`;
       wireVoice(wrap, m.seq);
     } else if (m.type === 'list') {
       wrap.innerHTML = `<div class="msg in">${fmt(text)}${m.footer ? `<span class="foot">${esc(m.footer)}</span>` : ''}${meta}<div class="list-btn"><i class="fi fi-rr-list"></i>${esc(m.button || 'Chagua')}</div></div>`;
@@ -105,7 +149,7 @@
     return bars.join('');
   }
   function wireVoice(wrap, seq) {
-    const btn = wrap.querySelector('.voice button'); let audio;
+    const btn = wrap.querySelector('.dvoice button'); let audio;
     btn.addEventListener('click', () => {
       if (!audio) {
         audio = new Audio(`${API}/session/${st.id}/audio/${seq}`);
@@ -149,17 +193,14 @@
   }
   function setRole(role) {
     st.role = role; st.unread[role] = 0;
-    document.querySelectorAll('.roles button').forEach((b) => b.classList.toggle('on', b.dataset.role === role));
+    document.querySelectorAll('[data-role]').forEach((b) => b.classList.toggle('on', b.dataset.role === role));
     $('wa-sub').textContent = role === 'owner' ? `${st.ownerShop || 'Shop owner'} · business account` : role === 'rider' ? 'Rider · business account' : 'business account';
-    $('phone-note').textContent = role === 'customer' ? `You are the customer${st.info ? ` (${st.info.customer})` : ''}. Type a request in Swahili or English, or tap a reply button.`
-      : role === 'owner' ? `You are the owner of ${st.ownerShop || 'the shop the customer orders from'}. Accept orders and name the rider by WhatsApp.`
-        : `You are the rider${st.info ? ` (${st.info.rider})` : ''}. Tap Arrived, send a photo at the door, then type the customer's code.`;
     badges(); renderChat(true); maybePay();
   }
   function badges() {
-    document.querySelectorAll('.roles button').forEach((b) => { const n = st.unread[b.dataset.role]; const el = b.querySelector('.badge'); el.hidden = !n; el.textContent = n; });
+    document.querySelectorAll('[data-role]').forEach((b) => { const n = st.unread[b.dataset.role]; const el = b.querySelector('.badge'); if (el) { el.hidden = !n; el.textContent = n; } });
   }
-  document.querySelectorAll('.roles button').forEach((b) => b.addEventListener('click', () => setRole(b.dataset.role)));
+  document.querySelectorAll('[data-role]').forEach((b) => b.addEventListener('click', () => setRole(b.dataset.role)));
 
   // ---------- Talking to the sandbox ----------
   async function call(path, opts = {}) {
@@ -283,7 +324,7 @@
   const handoverCode = () => { for (const i of [...st.timeline.customer].reverse()) { const k = /(?:makabidhiano|handover code):\s*([A-Z0-9]{6})/.exec(i.m?.body || ''); if (k) return k[1]; } return null; };
   async function typeAndSend(role, text) {
     if (st.role !== role) { setRole(role); await sleep(450); }
-    input.focus();
+    input.focus({ preventScroll: true });
     const step = Math.max(8, Math.min(28, 1100 / text.length));
     for (let i = 1; i <= text.length; i += 1) { input.value = text.slice(0, i); await sleep(step); }
     input.dispatchEvent(new Event('input')); await sleep(250);
@@ -330,13 +371,19 @@
   const current = () => STEPS.findIndex((s) => !s.done());
   function steps() {
     const now = current();
-    $('steps').innerHTML = STEPS.map((s, i) => `<li class="${s.done() ? 'done' : i === now ? 'now' : ''}"><span class="n">${s.done() ? '<i class="fi fi-rr-check"></i>' : i + 1}</span><span><span class="t">${esc(s.t)}</span><span class="who">${WHO[s.who]}</span><span class="d">${esc(s.d())}</span></span></li>`).join('');
+    $('steps').innerHTML = STEPS.map((s, i) => `<li class="${s.done() ? 'done' : i === now ? 'now' : ''}"><span class="n">${s.done() ? '&#10003;' : i + 1}</span><span>${esc(s.t)}</span><span class="w">${WHO[s.who]}</span></li>`).join('');
+    const step = STEPS[now];
+    $('step-who').textContent = step ? `Step ${now + 1} · ${WHO[step.who]}` : 'Done';
+    $('step-title').textContent = step ? step.t : 'The order is complete and the shop is paid.';
+    $('step-desc').textContent = step ? step.d() : 'Open the receipt, scan or open its check page, or start a new session and try a refusal: as the rider, report the product as refused instead of entering the code.';
+    const next = document.querySelector('.demo-menu .next');
+    if (next) next.innerHTML = step ? `Next: <b>${esc(step.t)}</b> (${WHO[step.who]})` : '<b>Order complete.</b> The shop is paid.';
     const done = STEPS.filter((s) => s.done()).length;
     $('guide-count').textContent = `${done} / ${STEPS.length}`;
     $('do-step').disabled = now < 0; $('run-all').disabled = now < 0;
     $('do-step').querySelector('span').textContent = now < 0 ? 'Complete' : 'Do this step';
     const list = $('steps'); const el = list.querySelector('.now');
-    if (el) { list.scrollTop = el.offsetTop - list.offsetTop - 40; list.scrollLeft = el.offsetLeft - list.offsetLeft - 20; }
+    if (el) list.scrollTop = el.offsetTop - list.offsetTop - 40;
   }
   let running = false;
   async function doStep() {
@@ -352,23 +399,33 @@
     running = false; $('run-all').textContent = 'Run all';
   });
 
-  // ---------- 3D phone: follows the pointer, turns flat while you use it ----------
+  // ---------- On a phone: roles and the walkthrough live in the site menu ----------
+  const navLinks = document.getElementById('nav-links');
+  if (navLinks) {
+    navLinks.insertAdjacentHTML('beforeend', `<div class="demo-menu"><h5>Whose phone</h5><div class="roles-m"><button type="button" data-role="customer" class="on">Customer<b class="badge" hidden></b></button><button type="button" data-role="owner">Shop<b class="badge" hidden></b></button><button type="button" data-role="rider">Rider<b class="badge" hidden></b></button></div><h5>Walkthrough</h5><p class="next"></p><div class="acts"><button type="button" class="act primary" data-act="step">Do next step</button><button type="button" class="act" data-act="all">Run all</button><button type="button" class="act" data-act="new">New</button></div></div>`);
+    const close = () => { navLinks.classList.remove('open'); document.querySelector('.menu-btn')?.setAttribute('aria-expanded', 'false'); };
+    navLinks.querySelectorAll('.demo-menu [data-role]').forEach((b) => b.addEventListener('click', () => { setRole(b.dataset.role); close(); }));
+    navLinks.querySelector('[data-act=step]').addEventListener('click', () => { close(); doStep(); });
+    navLinks.querySelector('[data-act=all]').addEventListener('click', () => { close(); $('run-all').click(); });
+    navLinks.querySelector('[data-act=new]').addEventListener('click', () => { close(); running = false; start(); });
+  }
+  // On a desktop the phone is scaled to fit the window; on a phone the chat fills the screen.
   const phone = $('phone');
-  window.addEventListener('pointermove', (e) => {
-    const r = phone.getBoundingClientRect();
-    if (e.clientX > r.left - 30 && e.clientX < r.right + 30 && e.clientY > r.top - 30 && e.clientY < r.bottom + 30) { phone.style.setProperty('--rx', '0deg'); phone.style.setProperty('--ry', '0deg'); return; }
-    const x = (e.clientX - (r.left + r.width / 2)) / window.innerWidth; const y = (e.clientY - (r.top + r.height / 2)) / window.innerHeight;
-    phone.style.setProperty('--ry', `${Math.max(-16, Math.min(16, x * 26)).toFixed(2)}deg`);
-    phone.style.setProperty('--rx', `${Math.max(-8, Math.min(8, -y * 12)).toFixed(2)}deg`);
-  }, { passive: true });
+  function fit() {
+    if (window.innerWidth <= 960) { phone.style.transform = ''; return; }
+    const box = phone.parentElement;
+    const k = Math.min(1, (box.clientHeight - 36) / 800, (box.clientWidth - 36) / 390);
+    phone.style.transform = `scale(${k.toFixed(3)})`;
+  }
+  window.addEventListener('resize', fit); fit();
   setInterval(() => { $('clock').textContent = hhmm(); }, 10000); $('clock').textContent = hhmm();
 
   // ---------- Session ----------
   async function start() {
+    const keep = $('dt-preserve').checked && st;
     const old = st?.queue || [];
     st = fresh(); st.queue = old;
-    out.textContent = '';
-    prompt('docker compose -p moranbuy logs -f --no-log-prefix --tail=0 moranbuy-demo');
+    if (keep) { st.all = keep.all; st.warns = keep.warns; } else { out.textContent = ''; netRows.textContent = ''; $('dt-errs').hidden = true; }
     $('st-info').textContent = 'connecting';
     for (let attempt = 1; ; attempt += 1) {
       try {
