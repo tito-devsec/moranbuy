@@ -27,6 +27,21 @@ healthRouter.get('/r/:no', asyncHandler(async (req, res) => {
   res.status(r ? 200 : 404).set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>MoranBuy receipt check</title><style>body{margin:0;background:#f4f8f8;color:#1f2933;font:16px/1.6 system-ui,sans-serif}main{max-width:560px;margin:0 auto;padding:24px 16px}h1{font-size:24px}.ok{color:#0f766e;font-weight:600}.bad{color:#b42318}pre{background:#fff;border:1px solid #e3e8ec;border-radius:10px;padding:14px;white-space:pre-wrap;font:14px/1.5 ui-monospace,Menlo,monospace}footer{color:#5f6b76;font-size:13px;margin-top:24px}</style></head><body><main>${body}<footer>Powered by MoranBuy · <a href="/terms">Terms</a></footer></main></body></html>`);
 }));
 
+// Real totals for the website's numbers; a total that is still zero comes back as null so the site leaves it out.
+let statsCache = { at: 0, value: null };
+healthRouter.get('/api/public/stats', asyncHandler(async (_req, res) => {
+  if (!statsCache.value || Date.now() - statsCache.at > 60000) {
+    const n = async (q) => Number((await q).n || 0);
+    const shops = await n(db('merchants as m').where('m.status', 'active').whereExists(db('listings as l').select(db.raw('1')).whereRaw('l.merchant_id = m.id').where('l.status', 'active').whereNull('l.deleted_at')).count('m.id as n').first());
+    const products = await n(db('listings').where({ status: 'active' }).whereNull('deleted_at').whereNull('admin_hidden_at').count('id as n').first());
+    const requests = await n(db('matching_runs').count('id as n').first());
+    const within = await n(db('matching_runs').where({ none_within_budget: false }).count('id as n').first());
+    const nz = (v) => (v > 0 ? v : null);
+    statsCache = { at: Date.now(), value: { shops: nz(shops), products: nz(products), requests: nz(requests), withinBudgetPct: requests ? Math.round((within / requests) * 100) : null } };
+  }
+  res.set('Cache-Control', 'public, max-age=60').json(statsCache.value);
+}));
+
 healthRouter.get('/health', (_req, res) => res.json({ ok: true, service: 'moranbuy-api', time: new Date().toISOString() }));
 
 // Readiness: the database and Redis answer; failures are reported, not hidden.

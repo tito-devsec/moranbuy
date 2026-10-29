@@ -19,3 +19,18 @@ test('the legal pages learn the MoranBuy WhatsApp number to open a chat, and fal
   setConfigForTests(loadConfig({ ...process.env, MORANBUY_WHATSAPP_NUMBER: '' }));
   assert.equal((await (await fetch(`${base}/api/public/contact`)).json()).whatsapp, null);
 });
+
+test('the public website serves its pages without any sign-in, and its numbers are real totals or left out', async (t) => {
+  const server = createApp({ routers }).listen(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => server.close());
+  for (const [path, text] of [['/', 'Tell it once.'], ['/how-it-works', 'Budget first, location second'], ['/for-business', 'Sell to people who are already asking']]) {
+    const r = await fetch(`${base}${path}`);
+    assert.equal(r.status, 200, path);
+    assert.match(await r.text(), new RegExp(text));
+  }
+  assert.equal((await fetch(`${base}/site/site.css`)).status, 200);
+  const stats = await (await fetch(`${base}/api/public/stats`)).json();
+  assert.deepEqual(Object.keys(stats).sort(), ['products', 'requests', 'shops', 'withinBudgetPct']);
+  for (const v of Object.values(stats)) assert.ok(v === null || (Number.isInteger(v) && v > 0));
+});

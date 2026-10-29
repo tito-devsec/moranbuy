@@ -38,7 +38,10 @@ export function createApp({ routers = [] } = {}) {
   app.use('/customer', express.static(path.join(appsDir, 'customer')));
   app.use('/business', express.static(path.join(appsDir, 'business')));
   app.use('/admin', express.static(path.join(appsDir, 'admin')));
-  app.get('/', (_req, res) => res.redirect('/customer/'));
+  // The public website: Home, How it works, For businesses and the demo; no sign-in anywhere on it.
+  app.use('/site', express.static(path.join(appsDir, 'site', 'assets'), { maxAge: '1h' }));
+  const sitePages = { '/': 'index.html', '/how-it-works': 'how-it-works.html', '/for-business': 'for-business.html', '/demo': 'demo.html' };
+  for (const [route, file] of Object.entries(sitePages)) app.get(route, (_req, res) => res.sendFile(path.join(appsDir, 'site', file)));
   // Terms, privacy and the company pages share one bilingual page (English first, Swahili on the switch).
   for (const page of ['terms', 'privacy', 'about', 'developers', 'contact', 'copyright']) app.get(`/${page}`, (_req, res) => res.sendFile(path.join(appsDir, 'customer', 'legal.html')));
 
