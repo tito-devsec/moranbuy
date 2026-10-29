@@ -25,7 +25,9 @@ services:
   api:
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
       REDIS_URL: redis://redis:6379
@@ -40,7 +42,9 @@ services:
   worker:
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy
       REDIS_URL: redis://redis:6379
@@ -49,6 +53,26 @@ services:
       - uploads:/app/data/uploads
     depends_on:
       api: { condition: service_started }
+
+  # The "Try the demo" sandbox, runnable with no Moran AI and no keys: http://localhost:4001/demo
+  # Its own database (moranbuy_demo), a recording WhatsApp stand-in, sandbox payments and five sample shops.
+  demo:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      APP_URL: http://localhost:4001
+      DATABASE_URL: postgres://moranbuy:${DB_PASSWORD:-moranbuy}@postgres:5432/moranbuy_demo
+      REDIS_URL: redis://redis:6379/1
+      MUSE_PROVIDER: ${DEMO_MUSE_PROVIDER:-disabled}
+      MUSE_API_KEY: ${DEMO_MUSE_API_KEY:-}
+    command: ["node", "services/api/src/demo/start.js"]
+    volumes:
+      - demodata:/app/data/demo
+    ports: ["4001:4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
 
   # Hermes Agent with web and browser toolsets for product research; see integrations/hermes/README.md.
   hermes:
@@ -64,6 +88,7 @@ services:
     expose: ["8642"]
 
 volumes:
+  demodata:
   uploads:
   pgdata:
   redisdata:

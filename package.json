@@ -11,6 +11,7 @@
     "start": "node services/api/src/server.js",
     "dev": "node --watch services/api/src/server.js",
     "worker": "node services/api/src/workers/main.js",
+    "demo": "node services/api/src/demo/start.js",
     "migrate": "knex migrate:latest --knexfile services/api/src/db/knexfile.js",
     "migrate:rollback": "knex migrate:rollback --knexfile services/api/src/db/knexfile.js",
     "migrate:make": "knex migrate:make --knexfile services/api/src/db/knexfile.js",

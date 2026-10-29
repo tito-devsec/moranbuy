@@ -7,7 +7,13 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const stateDir = process.env.DEMO_STATE_DIR || '/app/data/demo';
+// In Docker the state lives on the demo volume; run from a checkout (npm run demo) it lives in ./data/demo, with local Postgres and Redis.
+const inDocker = fs.existsSync('/app/services');
+const stateDir = process.env.DEMO_STATE_DIR || (inDocker ? '/app/data/demo' : path.join(here, '../../../../data/demo'));
+if (!process.env.DATABASE_URL) process.env.DATABASE_URL = 'postgres://moranbuy:moranbuy@127.0.0.1:5432/moranbuy_demo';
+if (!process.env.REDIS_URL) process.env.REDIS_URL = 'redis://127.0.0.1:6379/1';
+if (!process.env.PORT) process.env.PORT = '4001';
+if (!process.env.APP_URL) process.env.APP_URL = `http://localhost:${process.env.PORT}`;
 
 // The sandbox never holds production keys: anything that could reach a real provider or Moran is removed before the app reads its config.
 const NEVER = ['SNIPPE_API_KEY', 'SNIPPE_WEBHOOK_SECRET', 'MORAN_INTERNAL_BASE_URL', 'MORAN_BACKEND_BASE_URL', 'WHATSAPP_APP_SECRET', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN', 'HERMES_API_KEY', 'HERMES_BASE_URL', 'DEMO_API_URL'];

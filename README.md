@@ -4,7 +4,7 @@ MoranBuy is an AI-powered reverse marketplace. Customers describe the product th
 budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
 matches to the customer, prioritizing budget fit and total cost before location convenience.
 
-> Build status: complete and tested for customers (WhatsApp and web, text, photos and voice), standalone and
+> Build status: complete and tested for customers (WhatsApp, found by the username @moranbuy; text, photos and voice), standalone and
 > Moran-registered businesses, and administrators in Moran's Super Admin. Live services (WhatsApp, the Meta
 > Model API, Snippe) run once their keys are entered; every model it calls at runtime is a Meta model; `HACKATHON_CHANGES.md` lists what is new.
 
@@ -107,6 +107,36 @@ Moran AI campaign-engine features. A campaign dispatches only after consent, sen
 template approval, payment verification, rate limits and an explicit confirmation are all verified.
 Follow-up is optional, activated only after the merchant explicitly accepts it.
 
+## What was built at the event, and what already existed
+
+Everything in this repository was written during the hackathon (first commit 27 October 2026). It holds
+no code or git history from Moran AI.
+
+**Moran AI** (moranai.co.tz) is our earlier product, a WhatsApp business assistant platform. It is a
+separate, private codebase and is not judged. In production, MoranBuy uses it as a service: Moran AI
+holds MoranBuy's WhatsApp Business connection, forwards customer messages to MoranBuy, and sends
+MoranBuy's replies. The few changes Moran AI needs for that were also written at the event, and are
+kept here as new files plus a small patch under `integrations/moran-backend/` for the Moran AI owner to
+apply. The patch has no copied Moran AI code beyond the three lines it replaces.
+
+**You do not need Moran AI to run or judge MoranBuy.** The sandbox below runs the full story with mock
+stand-ins: a recording WhatsApp line instead of Moran AI, a sandbox payment provider instead of Snippe,
+and five sample shops. The Meta model calls fall back to rules when no key is set. The tests use the
+same mocks.
+
+```bash
+# With Docker (nothing else needed):
+docker compose up demo          # then open http://localhost:4001/demo
+
+# Or from a checkout, with local Postgres 16 and Redis running
+# (Postgres user moranbuy / password moranbuy, allowed to create databases):
+npm install
+npm run demo                    # creates the moranbuy_demo database itself; open http://localhost:4001/demo
+```
+
+To use Meta's models live in the sandbox, set `DEMO_MUSE_PROVIDER=meta` and `DEMO_MUSE_API_KEY` (Docker),
+or `MUSE_PROVIDER=meta` and `MUSE_API_KEY` (npm). Spoken replies need the MMS voices (see Install and run).
+
 ## Existing Moran AI integration boundaries
 
 MoranBuy keeps its own database and never reads Moran AI's. It talks to Moran AI through:
@@ -116,8 +146,8 @@ MoranBuy keeps its own database and never reads Moran AI's. It talks to Moran AI
   forwarded from Moran, outbound replies through Moran's outbound gate, listings of businesses
   that opted in, admin-provided knowledge, merchant campaign sends from the merchant's own number).
 
-MoranBuy itself is registered from Moran AI's Super Admin like any business, its WhatsApp number is
-connected there with Meta's Embedded Signup, and it is managed only by administrators: Super Admin
+MoranBuy itself is registered from Moran AI's Super Admin like any business, its WhatsApp account (username
+@moranbuy) is connected there with Meta's Embedded Signup, and it is managed only by administrators: Super Admin
 calls MoranBuy's admin API through a signed proxy that carries the admin's identity, so there is
 one login and one audit trail. Its sales agent is limited to shopping, reads only the
 products of businesses that opted in, answers policy questions only from admin-written knowledge,
@@ -156,7 +186,8 @@ entered in MoranBuy Admin and take effect at once.
 the server log. It is served by a separate sandbox container (`moranbuy-demo`) running the same code
 with `DEMO_MODE=true`: its own database, a recording WhatsApp line, the sandbox payment provider and
 five sample shops on reserved numbers. It gets no production keys; the main API only passes `/api/demo`
-calls through to it. Demo sessions are deleted after a day.
+calls through to it. Demo sessions are deleted after a day. Run it yourself with `docker compose up demo` or
+`npm run demo` (see above).
 
 ## Install and run
 
@@ -168,7 +199,7 @@ npm run migrate
 npm run dev              # http://localhost:4000/health
 ```
 
-Or `docker compose up` for Postgres, Redis, the API and the workers. The Docker image exports Meta's MMS voices itself;
+Or `docker compose up` for Postgres, Redis, the API, the workers and the demo sandbox (port 4001). The Docker image exports Meta's MMS voices itself;
 to hear spoken replies outside Docker, run once `pip install -r scripts/tts/requirements.txt && python scripts/tts/export-mms-tts.py models/tts`.
 
 ## Tests
