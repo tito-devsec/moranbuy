@@ -30,10 +30,10 @@ CI (`.github/workflows/ci.yml`) runs the same on every push: https://github.com/
 ## Moran AI side
 
 The patch in `integrations/moran-backend/` was applied to a clean checkout of `moran-backend` `main`
-(commit `680d6f5`, the commit on the production VPS) with its dependencies installed, and the result matches
+(commit `537583d`, the commit on the production VPS) with its dependencies installed, and the result matches
 `patches/0001-moranbuy-integration.sha256` file for file. Every patched and new file passes `node --check`.
-Moran's own unit suite (`npm test`, 1,668 tests) was run on the patched tree: 1,666 passed, 1 is skipped as todo, and the
-one failure is Moran's own `sales-camera-ngapi-not-price`, marked `TODO known fault` in its source and failing on `main` too.
+Moran's own unit suite (`npm test`, 1,701 tests) was run on the patched tree with a migrated database: 1,700 passed and the
+only other result is Moran's own `sales-camera-ngapi-not-price`, marked `TODO known fault` in its source.
 Moran's database-backed schema check passed against a database migrated from empty to `20260101000103_moranbuy.js`, and the
 MoranBuy migration rolls down and up again. The admin API reference was regenerated with Moran's own `npm run docs:admin-api`.
 Not run here: anything against a live Meta number, and the Super Admin MoranBuy page in a browser.

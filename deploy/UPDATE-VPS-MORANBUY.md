@@ -32,15 +32,15 @@ Add an A record `buy.moranai.co.tz` → the VPS IP. Wait until `dig +short buy.m
 
 ## 2. Moran AI side (once)
 
-The patch is a zero-context diff made against Moran `main` at `680d6f5`; zero-context hunks are placed by line number, so apply it only on that exact commit.
+The patch is a zero-context diff made against Moran `main` at `537583d`; zero-context hunks are placed by line number, so apply it only on that exact commit.
 
 Run Moran's tests first in a separate worktree, so they never load the production `.env`:
 
 ```bash
 git clone https://github.com/tito-devsec/moranbuy /opt/moranbuy
 cd $MORAN_DIR && git fetch origin main
-test "$(git rev-parse HEAD)" = "$(git rev-parse 680d6f5)" || git checkout 680d6f5   # stop and regenerate the patch if main has moved past it
-git worktree add /tmp/moran-check 680d6f5 && cd /tmp/moran-check
+test "$(git rev-parse HEAD)" = "$(git rev-parse 537583d)" || git checkout 537583d   # stop and regenerate the patch if main has moved past it
+git worktree add /tmp/moran-check 537583d && cd /tmp/moran-check
 # copy the eight files and apply the patch exactly as /opt/moranbuy/integrations/moran-backend/README.md says, then:
 sha256sum -c /opt/moranbuy/integrations/moran-backend/patches/0001-moranbuy-integration.sha256
 npm ci && npm test

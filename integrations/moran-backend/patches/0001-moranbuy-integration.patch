@@ -37,15 +37,15 @@ index cae1e3f..b1c6bdc 100644
 -    add_header Content-Security-Policy      "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz; connect-src 'self' https://api.moranai.co.tz; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
 +    add_header Content-Security-Policy      "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.moranai.co.tz https://www.facebook.com; connect-src 'self' https://api.moranai.co.tz https://connect.facebook.net https://graph.facebook.com https://www.facebook.com; frame-src https://www.facebook.com https://web.facebook.com https://*.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'" always;
 diff --git a/docs/admin-api-reference.md b/docs/admin-api-reference.md
-index 7c8baaf..90a29cc 100644
+index 5315183..395feb8 100644
 --- a/docs/admin-api-reference.md
 +++ b/docs/admin-api-reference.md
 @@ -10 +10 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
--299 routes.
-+305 routes.
+-302 routes.
++308 routes.
 @@ -30,0 +31 @@ metric definitions and error codes are in [admin-api.md](./admin-api.md); exampl
 +- [moranbuy](#moranbuy)
-@@ -1588,0 +1590,53 @@ Other parameters are read by the service: `days`, list parameters (`page`, `page
+@@ -1605,0 +1607,53 @@ Other parameters are read by the service: `days`, list parameters (`page`, `page
 +## moranbuy
 +
 +### `GET /api/admin/moranbuy`
@@ -151,15 +151,15 @@ index e44d3cf..0553144 100644
 +        return res.status(403).json({ error: 'ADMIN_MANAGED', message: 'This account is managed by Moran AI administrators.' });
 +      }
 diff --git a/src/api/routes/whatsapp-webhook.routes.js b/src/api/routes/whatsapp-webhook.routes.js
-index 74be456..fb0d7bc 100644
+index b085df8..b745b8b 100644
 --- a/src/api/routes/whatsapp-webhook.routes.js
 +++ b/src/api/routes/whatsapp-webhook.routes.js
 @@ -8,0 +9 @@ import { handleMediaTrustMessage } from '../../agents/media-trust/mediaTrustAgen
 +import { isMoranBuyTenant, forwardInboundToMoranBuy, forwardStatusesToMoranBuy, isMoranBuyMedia, downloadMoranBuyMedia } from '../../services/moranbuy.service.js';
-@@ -470,0 +472,2 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+@@ -506,0 +508,2 @@ async function handleWebhookChange({ entry, change: changeObj, payload }, receiv
 +      // And for what MoranBuy sent (docs/moranbuy.md): its campaign and order alerts keep their own delivery ledger.
 +      forwardStatusesToMoranBuy(change.statuses).catch(() => {});
-@@ -534,0 +538,11 @@ whatsappWebhookRouter.post('/', async (req, res) => {
+@@ -570,0 +574,11 @@ async function handleWebhookChange({ entry, change: changeObj, payload }, receiv
 +    /*
 +     * MoranBuy's number (docs/moranbuy.md): MoranBuy reads voice notes and photos itself with Meta's models, so Moran only downloads the
 +     * raw bytes and forwards them; nothing here transcribes or describes them. Text, taps and locations are resolved as usual.
@@ -172,7 +172,7 @@ index 74be456..fb0d7bc 100644
 +    }
 +
 diff --git a/src/config/index.js b/src/config/index.js
-index a322a44..c23518f 100644
+index f2118f4..e8760ef 100644
 --- a/src/config/index.js
 +++ b/src/config/index.js
 @@ -105,0 +106,7 @@ export const config = {
@@ -184,15 +184,15 @@ index a322a44..c23518f 100644
 +  },
 +
 diff --git a/src/server.js b/src/server.js
-index 19d43c7..75572a6 100644
+index c7dd237..11ce8c5 100644
 --- a/src/server.js
 +++ b/src/server.js
 @@ -58,0 +59,2 @@ import { webhookEventsRouter } from './api/routes/webhook-events.routes.js';
 +import { moranbuyInternalRouter } from './api/routes/moranbuy-internal.routes.js';
 +import { moranbuyOwnerRouter } from './api/routes/moranbuy-owner.routes.js';
-@@ -90,0 +93,2 @@ app.use('/webhook/flows', express.raw({ type: () => true, limit: '1mb' }));
+@@ -91,0 +94,2 @@ app.use('/webhook/flows', express.raw({ type: () => true, limit: '1mb' }));
 +// MoranBuy's signed internal channel (docs/moranbuy.md): signed over the raw body like the webhooks.
 +app.use('/internal/moranbuy', express.raw({ type: () => true, limit: '4mb' }));
-@@ -313,0 +318,2 @@ app.use('/api/tenant', tenantRouter);
+@@ -314,0 +319,2 @@ app.use('/api/tenant', tenantRouter);
 +app.use('/api/moranbuy', moranbuyOwnerRouter);
 +app.use('/internal/moranbuy', moranbuyInternalRouter);
