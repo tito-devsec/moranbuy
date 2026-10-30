@@ -18,6 +18,7 @@
 .rank td { padding: 16px 14px; border-bottom: 1px solid var(--line-2); }
 .rank td:first-child { font: 400 34px/1 var(--d); color: var(--ink); }
 .rank tr.over td { opacity: .5; }
+@media (max-width: 700px) { .rank { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; } .rank th, .rank td { white-space: nowrap; } }
 .tag { display: inline-block; padding: 4px 10px; border-radius: 3px; font: 400 14px/1 var(--d); letter-spacing: .06em; text-transform: uppercase; background: var(--green); color: var(--ink); }
 .tag.warn { background: var(--amber); color: var(--ink); }
 .arch { width: 100%; height: auto; }
