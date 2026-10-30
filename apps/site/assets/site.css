@@ -175,7 +175,7 @@ h3 { line-height: 1; }
 .cta .btn-primary:hover { background: var(--green); border-color: var(--green); color: var(--ink); }
 .cta .btn-ghost { color: var(--paper); border-color: var(--paper); }
 .cta .btn-ghost:hover { background: var(--paper); color: var(--ink); }
-.site-footer { padding: 40px 0 36px; color: var(--muted); font-size: 14px; }
+.site-footer { padding: 40px 0 36px; color: var(--muted); font-size: 14px; background: var(--paper); }
 .foot-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
 .foot-grid > div { border-top: 1px solid var(--line-2); padding-top: 22px; }
 .foot-grid h4 { font: 400 15px var(--d); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }

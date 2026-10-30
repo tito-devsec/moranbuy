@@ -183,6 +183,8 @@
 .walk li.done { color: #81868c; } .walk li.done .n { background: #0d9488; color: #fff; box-shadow: none; }
 .walk li.now { background: #3c4043; color: #fff; } .walk li.now .n { background: #8ab4f8; color: #202124; box-shadow: none; }
 
+/* The facts and the footer sit on paper, below the dark demo stage. */
+.demo-facts { background: var(--paper); color: var(--ink); border-top: 0; }
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--ink); }
 .facts > div { padding: 26px 26px 30px 0; border-bottom: 1px solid var(--ink); border-right: 1px solid var(--line-2); }
 .facts > div + div { padding-left: 26px; }
