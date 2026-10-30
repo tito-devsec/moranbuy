@@ -22,6 +22,8 @@ export function parseShillings(text) {
     if (!mm) continue;
     let n = Number(mm[1]);
     const unit = mm[2];
+    // A number that is already a full amount keeps its value: "350000 laki" or "90000 elfu" is a slip of the tongue, not 35 billion.
+    if (unit && n >= 1000) { if (best === null || n > best) best = Math.round(n); continue; }
     if (unit === 'laki') n *= 100000;
     else if (unit === 'k' || unit === 'elfu') n *= 1000;
     else if (unit) n *= 1000000;
@@ -34,6 +36,8 @@ export function parseShillings(text) {
   for (const mm of t.matchAll(new RegExp(`\\b(laki|elfu|milioni)\\s+(${COUNT})(\\s+na\\s+nusu)?(?:\\s+na\\s+(laki|elfu)\\s+(${COUNT}))?`, 'g'))) {
     const count = countOf(mm[2]);
     if (count === null) continue;
+    // "laki 350000" names the whole amount after the word: keep 350,000.
+    if (count >= 1000) { if (best === null || count > best) best = Math.round(count); continue; }
     let n = (count + (mm[3] ? 0.5 : 0)) * UNITS[mm[1]];
     if (mm[4] && UNITS[mm[4]] < UNITS[mm[1]]) n += (countOf(mm[5]) || 0) * UNITS[mm[4]];
     n = Math.round(n);

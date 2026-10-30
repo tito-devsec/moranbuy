@@ -2,7 +2,8 @@ import { rankOffers, DEFAULT_POLICY } from '@moranbuy/budget-matching';
 import { museExtractRequest, museDraftRecommendation, numbersAreGrounded } from '@moranbuy/muse-intelligence';
 import { formatMoney, shortRef } from '@moranbuy/core';
 import { shoppingRequestSchema, mergeRequest } from './request.js';
-import { fallbackExtract, parseAlternatives, parseUrgency } from './parse.js';
+import { fallbackExtract, parseAlternatives, parseUrgency, placeFromAnswer } from './parse.js';
+import { normalizeProductType } from '@moranbuy/budget-matching';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
 import { researchResultsToOffers } from '@moranbuy/integrations';
@@ -15,8 +16,8 @@ const SESSION_TTL_MS = 6 * 3600000;
 
 // The customer-facing shopping engine: one call per inbound message, returns the replies to send and the new session state.
 export class ShoppingEngine {
-  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, profileLoader = null, onOrderConfirmed = null, now = Date.now }) {
-    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.profileLoader = profileLoader; this.onOrderConfirmed = onOrderConfirmed; this.now = now;
+  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, nearby = null, leads = null, profileLoader = null, onOrderConfirmed = null, now = Date.now }) {
+    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.nearby = nearby; this.leads = leads; this.profileLoader = profileLoader; this.onOrderConfirmed = onOrderConfirmed; this.now = now;
   }
 
   // Finds the customer's open session or starts one.
@@ -30,6 +31,8 @@ export class ShoppingEngine {
 
   // Handles one inbound message end to end and returns { replies: [{text, imageUrl?}], session, run }.
   async handleMessage({ customer, text = '', imageUrl = null, imageDataUrl = null, sharedLocation = null, kind = null }) {
+    // Moran sends a shared location with a placeholder caption; the coordinates are the message, the caption is not a request.
+    text = String(text || '').replace(/\[\s*customer shared (?:their|a|the) location[^\]]*\]/gi, '').trim();
     let session = await this.openSession(customer.id);
     const sourceKind = kind || (imageUrl ? 'image' : sharedLocation ? 'location' : 'text');
     await this.db('session_messages').insert({ session_id: session.id, direction: 'in', content: [text, imageUrl ? `[image] ${imageUrl}` : null].filter(Boolean).join(' ') || '[location]', content_type: imageUrl ? 'image' : sharedLocation ? 'location' : 'text', kind: sourceKind });
@@ -44,13 +47,24 @@ export class ShoppingEngine {
     // Read the message with Muse when available, with the deterministic parser as the recorded fallback.
     let museStatus = 'disabled';
     let extracted = null;
-    const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, requestRef: session.id } });
+    const lastAsked = session.state === 'clarifying' ? (context.asked || []).at(-1) || null : null;
+    const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, answering: lastAsked, requestRef: session.id } });
     if (museResult.ok && museResult.json) { extracted = sanitizeExtraction(museResult.json); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
     // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
     if (text) { Object.assign(extracted, parseAlternatives(text)); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
     if (sharedLocation) extracted.location = { lat: Number(sharedLocation.lat), lng: Number(sharedLocation.lng), label: sharedLocation.label || null, source: 'customer_shared' };
+    // A reply to "Upo wapi?" is the place itself, even without "nipo": "mbagala dar".
+    if (lastAsked === 'location' && text && !extracted.locationText && !sharedLocation) { const place = placeFromAnswer(text); if (place) extracted.locationText = place; }
+    // The product changes only when the customer clearly asks for a new one: never from a location, an answer to another question, or "mbadala ni upi?".
+    if (previous?.productType && extracted.productType && extracted.productType !== previous.productType) {
+      const namesProduct = !!normalizeProductType(text).productType || (museStatus === 'ok' && !lastAsked);
+      if (sharedLocation || (lastAsked && lastAsked !== 'productType') || extracted.wantsAlternatives || !namesProduct) delete extracted.productType;
+    }
+    if (lastAsked && lastAsked !== 'productType' && !previous?.productType && extracted.productType && !normalizeProductType(text).productType && museStatus !== 'ok') delete extracted.productType;
+    // An impossible budget (above TSh 1 billion) is asked again instead of searched.
+    if (extracted.maxBudget && extracted.maxBudget > 1_000_000_000) extracted.maxBudget = null;
     // What Muse read about timing, a schedule and the name is kept beside the request; the deterministic reading fills in when Muse did not answer.
     const guess = fallbackTiming(text);
     const intel = { purchaseTiming: ['now', 'later', 'browsing'].includes(museResult.json?.purchaseTiming) ? museResult.json.purchaseTiming : guess.purchaseTiming, schedule: museResult.json?.schedule?.when ? { when: String(museResult.json.schedule.when).slice(0, 160), note: museResult.json.schedule.note ? String(museResult.json.schedule.note).slice(0, 500) : null } : guess.schedule, customerName: typeof museResult.json?.customerName === 'string' ? museResult.json.customerName : null };
@@ -63,6 +77,12 @@ export class ShoppingEngine {
       const picked = context.presented.find((p) => p.option === intent.option);
       await signal(previous, 'select', 'selected', { merchantId: picked?.merchantId || null, listingId: picked?.listingId && !String(picked.listingId).startsWith('web:') ? picked.listingId : null });
       return this.select(session, customer, intent.option, previous || {});
+    }
+    // "Mbadala ni upi?" after a search shows the alternatives for the same request: over budget and found online.
+    if (extracted.wantsAlternatives && previous?.productType && !normalizeProductType(text).productType) {
+      const out = await this.match(session, customer, { ...previous, alternativesOk: true }, { museStatus, context: { ...context, alternatives: true } });
+      await signal(previous, 'shop', out.result && (out.result.ranked.length || out.result.overBudget.length) ? 'presented' : 'no_match');
+      return out;
     }
     // "NDIO" to a reminder reruns the search the customer made before, with nothing new mixed in.
     if (intent.kind === 'confirm' && session.state !== 'selected' && context.fromScheduleId && previous?.productType) {
@@ -82,7 +102,9 @@ export class ShoppingEngine {
     }
 
     if (intel.schedule) await recordSchedule(this.db, { customer, session, schedule: intel.schedule, now: this.now() }).catch(() => null);
-    const ask = clarificationQuestion(request);
+    // The same question is asked at most twice; after that the search runs without that detail and says so.
+    const askedTwice = ['location'].filter((f) => (context.asked || []).filter((a) => a === f).length >= 2);
+    const ask = clarificationQuestion(request, { skip: askedTwice });
     if (ask) {
       await this.save(session, { state: 'clarifying', request_json: request, context_json: { ...context, asked: [...(context.asked || []), ask.field] } });
       await signal(request, 'clarify', 'asked');
@@ -115,7 +137,9 @@ export class ShoppingEngine {
     const rows = [];
     for (const group of ['ranked', 'overBudget']) {
       for (const r of result[group]) {
-        rows.push({ run_id: run.id, listing_id: r.offer.id, merchant_id: r.offer.merchantId, group: group === 'ranked' ? 'ranked' : 'over_budget', rank: r.rank, known_total: r.cost.knownTotal, total_confirmed: r.cost.totalConfirmed, budget_status: r.budget.status, distance_km: r.location.distanceKm, evidence_json: JSON.stringify({ cost: r.cost, budget: r.budget, suitability: r.suitability, location: r.location, trust: r.trust, reasons: r.reasons, offer: { name: r.offer.name, merchant: r.offer.merchantName, source: r.offer.source, price: r.offer.price } }) });
+        // Online finds have no MoranBuy listing or business; their page link is kept in the evidence instead.
+        const own = r.offer.source !== 'web';
+        rows.push({ run_id: run.id, listing_id: own ? r.offer.id : null, merchant_id: own ? r.offer.merchantId : null, group: group === 'ranked' ? 'ranked' : 'over_budget', rank: r.rank, known_total: r.cost.knownTotal, total_confirmed: r.cost.totalConfirmed, budget_status: r.budget.status, distance_km: r.location.distanceKm, evidence_json: JSON.stringify({ cost: r.cost, budget: r.budget, suitability: r.suitability, location: r.location, trust: r.trust, reasons: r.reasons, offer: { name: r.offer.name, merchant: r.offer.merchantName, source: r.offer.source, price: r.offer.price, ...(own ? {} : { url: r.offer.sourceUrl }) } }) });
       }
     }
     if (rows.length) await this.db('matching_offers').insert(rows);
@@ -124,13 +148,56 @@ export class ShoppingEngine {
     if (this.muse.enabled && (facts.ranked.length || facts.overBudget.length)) {
       const draft = await museDraftRecommendation(this.muse, { facts, language: request.language, requestRef: session.id });
       if (draft.ok && draft.json?.reply && numbersAreGrounded(draft.json.reply, facts)) textOut = String(draft.json.reply).slice(0, 1500);
+      // Muse's wording can leave out links; online finds always keep theirs.
+      const links = [...facts.ranked, ...facts.overBudget].filter((o) => o.source === 'web' && o.sourceUrl && !textOut.includes(o.sourceUrl));
+      if (links.length) textOut += `\n${request.language === 'en' ? 'Links' : 'Viungo'}:\n${links.map((o) => `${o.option}. ${o.sourceUrl}`).join('\n')}`;
     }
     const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, variant: o.variant || null, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
     await this.save(session, { state: 'presented', request_json: request, current_run_id: run.id, context_json: { ...context, presented } });
-    const replies = [{ text: textOut }];
-    const first = presented.find((p) => p.imageUrl);
-    if (first) replies.unshift({ imageUrl: first.imageUrl, caption: `${first.option}. ${first.name} - ${first.merchant}` });
+    // Up to three offers with a photo go first, each with its price, shop, area, a line of description and, for online finds, the link.
+    const photos = [...facts.ranked, ...facts.overBudget].filter((o) => o.imageUrl).slice(0, 3).map((o) => ({ imageUrl: o.imageUrl, caption: photoCaption(o, request) }));
+    // Few confirmed MoranBuy offers: Moran AI businesses with matching products are asked (their answer comes later, as new options).
+    const own = [...result.ranked, ...result.overBudget].filter((r) => r.offer.source !== 'web').length;
+    if (this.leads && own < 3) {
+      const asked = await this.leads({ session, customer, request }).catch(() => ({ asked: 0 }));
+      if (asked.asked) textOut += `\n\n${request.language === 'en' ? `I have also asked ${asked.asked} Moran AI shop${asked.asked > 1 ? 's' : ''} that sell this; if they agree, their offers will come here and can be paid safely through MoranBuy.` : `Pia nimeuliza maduka ${asked.asked} ya Moran AI yanayouza bidhaa hii; yakikubali, ofa zao zitakuja hapa na unaweza kulipa salama kupitia MoranBuy.`}`;
+    }
+    const replies = [...photos, { text: textOut }];
+    // Shops near the customer from Google Maps: no prices there, so they come after the offers, as places to visit or call.
+    const near = await this.nearbyText(request);
+    if (near) replies.push({ text: near });
     return this.reply(session, replies, { museStatus, run, result });
+  }
+
+  // A Moran business agreed to offer its matching products to this customer: they are ranked for the request and become the new numbered options.
+  async presentAgreedOffers(customer, offers, { businessName }) {
+    const session = await this.db('shopping_sessions').where({ customer_id: customer.id }).whereNotIn('state', ['closed', 'confirmed']).orderBy('created_at', 'desc').first();
+    if (!session || !offers.length) return null;
+    const request = shoppingRequestSchema.parse(session.request_json || {});
+    const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
+    const result = rankOffers({ request, offers, policy, now: this.now() });
+    const facts = buildFacts(result, request);
+    const all = [...facts.ranked, ...facts.overBudget];
+    if (!all.length) return null;
+    const presented = all.map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, variant: o.variant || null, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
+    await this.save(session, { state: 'presented', context_json: { ...(session.context_json || {}), presented, agreedBy: businessName } });
+    const en = request.language === 'en';
+    const intro = en ? `${businessName} agreed to offer you these. Reply with the number to order; MoranBuy holds your payment until it arrives.` : `${businessName} amekubali kukuletea hizi. Jibu namba kuagiza; MoranBuy inashikilia malipo yako hadi bidhaa ifike.`;
+    const photos = all.filter((o) => o.imageUrl).slice(0, 3).map((o) => ({ imageUrl: o.imageUrl, caption: photoCaption(o, request) }));
+    return this.reply(session, [...photos, { text: `${intro}\n${renderReply(facts, request.language)}` }]);
+  }
+
+  async nearbyText(request) {
+    if (!this.nearby || !request.location) return null;
+    const r = await this.nearby.find(request).catch(() => ({ ok: false, shops: [] }));
+    if (!r.shops?.length) return null;
+    const en = request.language === 'en';
+    const lines = [en ? `Shops near you that sell ${request.productType} (Google Maps, call to check price and stock):` : `Maduka karibu nawe yanayouza ${request.productType} (Google Maps, piga kuuliza bei na upatikanaji):`];
+    for (const s of r.shops) {
+      const bits = [s.distanceKm !== null ? `${s.distanceKm} km` : null, s.rating ? `${s.rating}★${s.ratings ? ` (${s.ratings})` : ''}` : null, s.openNow === true ? (en ? 'open now' : 'wazi sasa') : s.openNow === false ? (en ? 'closed now' : 'imefungwa sasa') : null, s.phone].filter(Boolean);
+      lines.push(`• ${s.name}${s.address ? `, ${s.address}` : ''}${bits.length ? ` - ${bits.join(', ')}` : ''}${s.mapsUrl ? `\n  ${s.mapsUrl}` : ''}`);
+    }
+    return lines.join('\n').slice(0, 1500);
   }
 
   // The customer picked an option: re-check the listing now and read back the known costs before any order exists.
@@ -210,6 +277,16 @@ export class ShoppingEngine {
     for (const r of replies) await this.db('session_messages').insert({ session_id: session.id, direction: 'out', content: r.text || r.caption || '', content_type: r.imageUrl ? 'image' : 'text' });
     return { replies, session, ...extra };
   }
+}
+
+// One photo's caption: option, name, price, shop and area, a line of description, and the link for an online find.
+function photoCaption(o, request) {
+  const en = request.language === 'en';
+  const where = [o.merchant, o.area || o.locationLabel].filter(Boolean).join(', ');
+  const lines = [`${o.option}. ${o.name}`, `${formatMoney(o.price, request.currency || 'TZS')}${where ? ` - ${where}` : ''}${o.source === 'web' ? (en ? ' (found online, not confirmed)' : ' (imepatikana mtandaoni, haijathibitishwa)') : ''}`];
+  if (o.description) lines.push(o.description);
+  if (o.source === 'web' && o.sourceUrl) lines.push(o.sourceUrl);
+  return lines.join('\n').slice(0, 1000);
 }
 
 // Keeps only the fields the request schema knows and the control fields the engine reads.

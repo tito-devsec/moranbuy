@@ -20,8 +20,8 @@ const QUESTIONS = {
   },
 };
 
-export function clarificationQuestion(request) {
-  const missing = missingEssentials(request);
+export function clarificationQuestion(request, { skip = [] } = {}) {
+  const missing = missingEssentials(request).filter((f) => !skip.includes(f));
   if (!missing.length) return null;
   const lang = request.language === 'en' ? 'en' : 'sw';
   return { field: missing[0], question: QUESTIONS[lang][missing[0]] };

@@ -9,6 +9,7 @@ import { engagementDeps, loadCampaignPricing } from '../services/engagement.js';
 import { processDueReminders } from '../services/schedule-reminders.js';
 import { purgeExpired } from '../services/retention.js';
 import { runProtectionSweep } from '../services/protection/protection.js';
+import { warmUpIndex } from '../services/discovery.js';
 import { config } from '@moranbuy/core';
 import { QUEUE_NAMES, feedQueues, runOne, queue, redisReady } from '../queue/jobs.js';
 
@@ -40,6 +41,8 @@ export const workers = [
   // Payment protection's timed rules: release after the defect window, cancel unpaid orders, refund paid orders nobody is delivering.
   pollingWorker('payment-protection', Number(process.env.PROTECTION_INTERVAL_MS || 60000), () => runProtectionSweep({ moran: shoppingDeps().moran, payments: engagementDeps().payments })),
   // Opted-in Moran businesses and their products: changes every 10 minutes, a full pass (which archives what is no longer listed) every 6 hours.
+  // The online product index: the most-asked products are searched ahead of time, within half of the day's search allowance; fresh ones are skipped at no cost.
+  pollingWorker('web-index-warmup', Number(process.env.WEB_INDEX_WARMUP_INTERVAL_MS || 6 * 3600000), () => warmUpIndex()),
   pollingWorker('moran-listings-pull', Number(process.env.MORAN_LISTINGS_SYNC_INTERVAL_MS || 600000), () => pullMoranListings(db, shoppingDeps().moran, { full: Date.now() % (6 * 3600000) < Number(process.env.MORAN_LISTINGS_SYNC_INTERVAL_MS || 600000) })),
 ];
 

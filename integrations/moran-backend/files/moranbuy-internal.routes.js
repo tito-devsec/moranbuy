@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { verifyMoranBuySignature, sendFromMoranBuy, sendMerchantText, sendMerchantTemplate, listedProducts, moranBuyKnowledge, createMoranBuyOrder, updateMoranBuyOrder } from '../../services/moranbuy.service.js';
+import { verifyMoranBuySignature, sendFromMoranBuy, sendMerchantText, sendMerchantTemplate, listedProducts, moranBuyKnowledge, createMoranBuyOrder, updateMoranBuyOrder, leadMatches, leadProducts, listTenantOnMoranBuy } from '../../services/moranbuy.service.js';
 import { reportError } from '../../core/error-handler.js';
 import { logger } from '../../utils/logger.js';
 
@@ -79,6 +79,28 @@ moranbuyInternalRouter.post('/send-template', async (req, res) => {
 
 moranbuyInternalRouter.get('/listings', async (req, res) => {
   res.json(await listedProducts({ since: req.query.since || null, page: req.query.page, pageSize: req.query.pageSize }));
+});
+
+// Businesses not yet on MoranBuy with products for a customer's request: counts only, the owner is asked before anything is shared.
+moranbuyInternalRouter.post('/lead-matches', async (req, res) => {
+  const body = z.object({ words: z.array(z.string().max(60)).max(12), maxPrice: z.number().positive().nullable().optional(), limit: z.number().int().min(1).max(10).optional() }).safeParse(req.body || {});
+  if (!body.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+  res.json(await leadMatches(body.data));
+});
+
+// After the owner said yes on WhatsApp: the matching products of that one business, for that one customer.
+moranbuyInternalRouter.post('/lead-products', async (req, res) => {
+  const body = z.object({ tenantId: z.string().uuid(), productIds: z.array(z.string().max(64)).min(1).max(10) }).safeParse(req.body || {});
+  if (!body.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+  res.json(await leadProducts(body.data));
+});
+
+// The owner answered LISTI: list the whole business on MoranBuy, checked against the owner's own number.
+moranbuyInternalRouter.post('/tenants/:id/list', async (req, res) => {
+  const body = z.object({ ownerPhone: z.string().min(9).max(20) }).safeParse(req.body || {});
+  if (!body.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+  const r = await listTenantOnMoranBuy({ tenantId: req.params.id, ownerPhone: body.data.ownerPhone });
+  res.status(r.ok ? 200 : 403).json(r);
 });
 
 moranbuyInternalRouter.get('/knowledge/search', async (req, res) => {

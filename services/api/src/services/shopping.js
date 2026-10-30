@@ -1,12 +1,13 @@
 import { config } from '@moranbuy/core';
 import { MuseClient } from '@moranbuy/muse-intelligence';
-import { Geocoder, MoranInternalClient, RuntimeResearcher } from '@moranbuy/integrations';
-import { museRuntimeConfig, researchRuntimeConfig } from './runtime-settings.js';
+import { Geocoder, MoranInternalClient } from '@moranbuy/integrations';
+import { DiscoveryResearcher, NearbyShops } from './discovery.js';
+import { askMatchingBusinesses } from './business-leads.js';
+import { museRuntimeConfig } from './runtime-settings.js';
 import { notifyMerchantOfOrder } from './merchant-notify.js';
 import { handOrderToMoran } from './moran-order-sync.js';
 import { demoGeocoder, demoMoran } from '../demo/stand-ins.js';
 import { logger } from '@moranbuy/observability';
-import { recordMuseRequest } from '@moranbuy/muse-intelligence';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { DEFAULT_POLICY } from '@moranbuy/budget-matching';
 import { db } from '../db/connection.js';
@@ -35,8 +36,10 @@ export function shoppingDeps() {
       geocoder: c.DEMO_MODE ? demoGeocoder() : new Geocoder({ cfg: c }),
       moran: c.DEMO_MODE ? demoMoran() : new MoranInternalClient({ cfg: c }),
     };
-    shared.researcher = new RuntimeResearcher({ resolve: () => researchRuntimeConfig(), cfg: c, deps: { recorder: (r) => recordMuseRequest(db, r) } });
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });
+    // Online finds (Meta web search, kept in an index) and shops near the customer (Google Places), both with daily limits set in Super Admin.
+    shared.researcher = new DiscoveryResearcher();
+    shared.nearby = new NearbyShops();
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, nearby: shared.nearby, leads: c.DEMO_MODE ? null : ({ session, customer, request }) => askMatchingBusinesses({ moran: shared.moran, session, customer, request }), profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });
   }
   return shared;
 }

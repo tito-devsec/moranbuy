@@ -29,6 +29,19 @@ export async function discoverOffers(db, request, { limit = 200 } = {}) {
   return rows.map(rowToOffer);
 }
 
+// Offers for listings a business agreed to show one customer (they are hidden from search, so they are fetched by id).
+export async function offersForListings(db, ids) {
+  if (!ids.length) return [];
+  const rows = await db('listings as l')
+    .join('merchants as m', 'm.id', 'l.merchant_id')
+    .leftJoin('merchant_locations as loc', function j() { this.on('loc.merchant_id', 'm.id').andOn('loc.is_default', db.raw('true')).andOnNull('loc.deleted_at'); })
+    .whereIn('l.id', ids).whereNull('l.deleted_at').whereNull('l.admin_hidden_at').where('m.status', 'active')
+    .select('l.*', 'm.business_name', 'm.status as merchant_status', 'm.verification_status', 'm.registration_type',
+      'loc.id as location_id', 'loc.latitude', 'loc.longitude', 'loc.formatted_address', 'loc.region', 'loc.district', 'loc.ward',
+      'loc.pickup_available', 'loc.delivery_available', 'loc.delivery_radius_km', 'loc.delivery_fee');
+  return rows.map(rowToOffer);
+}
+
 // Shapes one database row into the offer object the ranking engine reads; unknowns stay null.
 export function rowToOffer(r) {
   const hasCoords = r.latitude !== null && r.latitude !== undefined && r.longitude !== null && r.longitude !== undefined;

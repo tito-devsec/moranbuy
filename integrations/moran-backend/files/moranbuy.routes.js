@@ -96,7 +96,8 @@ moranbuyAdminRouter.all('/api/*', asyncHandler(async (req, res) => {
       method: req.method,
       headers: { 'Content-Type': 'application/json', 'X-MoranBuy-Timestamp': timestamp, 'X-MoranBuy-Signature': signature, 'X-MoranBuy-Admin-Email': req.admin.email, 'X-MoranBuy-Admin-Name': req.admin.name || req.admin.email, 'X-MoranBuy-Admin-Role': req.admin.role },
       body: rawBody || undefined,
-      signal: AbortSignal.timeout(30000),
+      // A test web search reads several shop pages, so it gets longer than other admin calls.
+      signal: AbortSignal.timeout(path.startsWith('/api/admin/discovery/test') ? 90000 : 30000),
     });
   } catch (err) {
     return res.status(502).json({ error: 'MORANBUY_UNREACHABLE', message: err.message });

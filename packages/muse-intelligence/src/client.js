@@ -37,7 +37,7 @@ export class MuseClient {
   }
 
   // One chat completion; returns parsed JSON when asked for it, and always records telemetry from the real outcome.
-  async complete({ feature, system, messages, json = true, maxTokens = 1200, merchantId = null, requestRef = null, model = null }) {
+  async complete({ feature, system, messages, json = true, maxTokens = 1200, merchantId = null, requestRef = null, model = null, reasoningEffort = null }) {
     await this.refresh();
     if (!this.enabled) {
       await recordMuseRequest(this.db, { feature, provider: this.provider, model: this.model, status: 'disabled', merchantId, requestRef });
@@ -52,9 +52,10 @@ export class MuseClient {
     const body = {
       model: useModel,
       messages: [{ role: 'developer', content: system }, ...messages],
-      max_tokens: maxTokens,
+      // Muse Spark reasons before it answers and the reasoning counts against max_tokens; a small cap cuts the answer off (BAD_JSON). Only used tokens are billed.
+      max_tokens: Math.max(maxTokens, 2500),
       temperature: 0.2,
-      reasoning_effort: this.reasoningEffort,
+      reasoning_effort: reasoningEffort || this.reasoningEffort,
       ...(json ? { response_format: { type: 'json_object' } } : {}),
     };
     const started = Date.now();
@@ -76,9 +77,11 @@ export class MuseClient {
       const usage = data.usage || {};
       let parsed = null;
       if (json) {
-        try { parsed = JSON.parse(stripFences(text)); } catch { parsed = null; }
+        try { parsed = JSON.parse(stripFences(text)); } catch { parsed = firstJsonObject(text); }
         if (parsed === null) {
-          await recordMuseRequest(this.db, { feature, provider: this.provider, model: useModel, status: 'error', latencyMs, errorCode: 'BAD_JSON', merchantId, requestRef, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens });
+          // What came back is kept (redacted, first 200 characters) so a failure can be read in Super Admin; a reply cut off by the token limit says so.
+          const why = data.choices?.[0]?.finish_reason === 'length' ? 'cut off at the token limit' : 'not JSON';
+          await recordMuseRequest(this.db, { feature, provider: this.provider, model: useModel, status: 'error', latencyMs, errorCode: 'BAD_JSON', errorRedacted: `${why}: ${JSON.stringify(redact(String(text).slice(0, 200)))}`, merchantId, requestRef, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens });
           return { ok: false, status: 'error', code: 'BAD_JSON', latencyMs };
         }
       }
@@ -155,7 +158,7 @@ export class MuseClient {
   // A tiny real request so the admin page can prove the connection works right now.
   async testConnection() {
     await this.refresh();
-    const r = await this.complete({ feature: 'test_connection', system: 'Reply with the JSON object {"ok": true}.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20 });
+    const r = await this.complete({ feature: 'test_connection', system: 'Reply with the JSON object {"ok": true}.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20, reasoningEffort: 'minimal' });
     return { ...this.status(), result: r.ok ? 'ok' : r.status, code: r.code || null, latencyMs: r.latencyMs ?? null, model: r.model || this.model };
   }
 }
@@ -173,4 +176,20 @@ export function parseSamBoxes(text) {
     if ([f.x1, f.y1, f.x2, f.y2].every(Number.isFinite)) out.push({ x1: f.x1, y1: f.y1, x2: f.x2, y2: f.y2, width: f.w ?? null, height: f.h ?? null, confidence: Number.isFinite(f.c) ? f.c : null });
   }
   return out;
+}
+
+// The first complete {...} object in a reply that has words around it, or null.
+export function firstJsonObject(text) {
+  const t = String(text || '');
+  for (let start = t.indexOf('{'); start !== -1; start = t.indexOf('{', start + 1)) {
+    let depth = 0; let inStr = false; let esc = false;
+    for (let i = start; i < t.length; i += 1) {
+      const ch = t[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === '{') depth += 1;
+      else if (ch === '}') { depth -= 1; if (depth === 0) { try { return JSON.parse(t.slice(start, i + 1)); } catch { break; } } }
+    }
+  }
+  return null;
 }

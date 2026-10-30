@@ -126,7 +126,7 @@ test('a schedule falls due: quiet hours defer it, then the reminder goes as text
   const msg = moran.sent[before];
   assert.equal(msg.type, 'text');
   assert.equal(msg.to, phone);
-  assert.match(msg.body, /Habari Asha, ulisema wiki ijayo utarudi kuhusu simu samsung/);
+  assert.match(msg.body, /Habari Asha, ulisema wiki ijayo utarudi kuhusu simu\b/);
   assert.match(msg.body, /STOP/);
   const done = await db('customer_schedules').where({ id: sched.id }).first();
   assert.equal(done.status, 'reminded');
@@ -135,6 +135,8 @@ test('a schedule falls due: quiet hours defer it, then the reminder goes as text
   out = await processDueReminders({ moran, dryRun: false, now: () => MORNING + 60000 });
   assert.equal(out.sent, 0);
   // The customer answers YES and gets the offers for the search they made before.
+  // The test clock is fixed in October 2026; the engine reads the wall clock, so the reopened session must not look expired today.
+  await db('shopping_sessions').where({ customer_id: customer.id }).update({ expires_at: new Date(Date.now() + 3600000) });
   await send({ messageId: 's2', from: phone, text: 'ndio' });
   assert.match(last().body, /1\. Samsung A15/);
   assert.equal((await db('customer_schedules').where({ id: sched.id }).first()).status, 'done');

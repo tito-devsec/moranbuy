@@ -82,7 +82,7 @@ test('the plain reader understands no alternatives, alternatives ok and urgency,
 test('the plain reader reads sizes and colours, and "simu" or "kochi" match smartphone and sofa listings', async () => {
   const { assessSuitability } = await import('@moranbuy/budget-matching');
   const a = fallbackExtract('Nataka simu ya 128 GB nyeusi');
-  assert.deepEqual(a.essentialAttributes, { storage: '128GB' });
+  assert.deepEqual(a.essentialAttributes, { storage: 128 });
   assert.deepEqual(a.preferredAttributes, { color: 'black' });
   const s = assessSuitability({ request: { productType: 'simu samsung', essentialAttributes: {} }, offer: { productType: 'smartphone', category: 'phones', name: 'Samsung A15', attributes: {} } });
   assert.equal(s.essentialMet, true);

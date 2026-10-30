@@ -4,6 +4,11 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
 ## Unreleased
 
+- Understanding: "laki 350000" reads as TSh 350,000; RAM and storage are minimums; brands are kept; an answer to "Upo wapi?" is the place, not the product; the location is asked at most twice; Muse replies cut off at the token limit are recovered.
+- Online search: Meta's web search (Responses API, web_search tool, located in Tanzania) finds products in Tanzanian shops and public social pages; only links the search returned are kept; each page is read (robots.txt respected) for photo, price and description; finds are sent as photos with price, shop, area, description and link, and kept in an index that answers later requests and is refreshed every six hours within the daily limit.
+- Nearby shops from Google Places (rating, phone, open now, map link), cached for a day.
+- Moran AI businesses not on MoranBuy are asked on WhatsApp when they sell what a customer wants (at most five times a day each): NDIO sends their offers to that customer only, LISTI lists the whole business, HAPANA declines. The customer's number is never shared.
+- Super Admin → MoranBuy → Credentials and the MoranBuy admin have an "Online search and nearby shops" card: mode, daily limits, preferred and blocked sites, the Places key, index stats and a test search.
 - Customers use MoranBuy on WhatsApp only, found by the username @moranbuy (MORANBUY_WHATSAPP_USERNAME, default moranbuy) instead of a phone number. The customer web chat and its /api/shop endpoints are removed; old /customer links open the WhatsApp chat. The legal pages moved to apps/site.
 - Try the demo: a sandbox page on the website with the customer, shop owner and rider phones and the server log.
 

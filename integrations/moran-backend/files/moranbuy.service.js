@@ -256,6 +256,48 @@ export async function listedProducts({ since = null, page = 1, pageSize = 200 } 
   return { listings: rows.slice(0, limit), nextPage: hasMore ? Number(page || 1) + 1 : null };
 }
 
+const PRODUCT_COLUMNS = ['p.id', 'p.tenant_id', 'p.service_id', 'p.name', 'p.description', 'p.price', 'p.currency', 'p.stock', 'p.status', 'p.category', 'p.condition', 'p.image_url', 'p.sku', 'p.retailer_id', 'p.variants', 'p.updated_at',
+  't.business_name', 't.wa_connection_status', 't.moranbuy_listed_at', 't.owner_wa_number', 't.whatsapp_display_number', 't.owner_email', 't.industry', 's.name as service_name',
+  'l.id as location_id', 'l.name as location_name', 'l.region', 'l.district', 'l.ward', 'l.formatted_address', 'l.latitude', 'l.longitude', 'l.radius_meters'];
+const activeProducts = () => db('products as p')
+  .join('tenants as t', 't.id', 'p.tenant_id')
+  .leftJoin('services as s', 's.id', 'p.service_id')
+  .leftJoin('business_locations as l', function j() { this.on('l.tenant_id', 't.id').andOn('l.is_default', db.raw('true')).andOnNull('l.deleted_at'); })
+  .whereIn('t.status', ['active', 'trial']).whereNull('p.deleted_at').where('p.is_active', true).where('p.item_type', 'product');
+
+/**
+ * Businesses that are NOT listed on MoranBuy but have products matching a customer's request.
+ * Only the business, its owner's number and how many products match are returned; no product leaves Moran until the owner says yes.
+ */
+export async function leadMatches({ words = [], maxPrice = null, limit = 5 } = {}) {
+  const terms = words.map((w) => String(w).trim().toLowerCase()).filter((w) => w.length >= 3).slice(0, 8);
+  if (!terms.length) return { businesses: [] };
+  let q = activeProducts().where((w) => w.where('t.moranbuy_listed', false).orWhereNull('t.moranbuy_listed'))
+    .whereNotNull('t.owner_wa_number')
+    .where((w) => { for (const term of terms) w.orWhereILike('p.name', `%${term}%`).orWhereILike('p.category', `%${term}%`).orWhereILike('p.description', `%${term}%`); });
+  if (maxPrice) q = q.where((w) => w.whereNull('p.price').orWhere('p.price', '<=', Math.round(Number(maxPrice) * 1.25)));
+  const rows = await q.groupBy('t.id', 't.business_name', 't.owner_wa_number', 'l.region', 'l.district')
+    .select('t.id as tenant_id', 't.business_name', 't.owner_wa_number', 'l.region', 'l.district', db.raw('count(p.id)::int as matches'), db.raw('array_agg(p.id::text order by p.price asc nulls last) as product_ids'))
+    .orderBy('matches', 'desc').limit(Math.min(10, limit));
+  return { businesses: rows.map((r) => ({ tenantId: r.tenant_id, businessName: r.business_name, ownerPhone: r.owner_wa_number, area: [r.district, r.region].filter(Boolean).join(', ') || null, matches: r.matches, productIds: (r.product_ids || []).slice(0, 10) })) };
+}
+
+/** The products an owner agreed to offer to one customer: only these ids, only from that business. */
+export async function leadProducts({ tenantId, productIds = [] }) {
+  const ids = productIds.map(String).slice(0, 10);
+  if (!tenantId || !ids.length) return { listings: [] };
+  return { listings: await activeProducts().where('t.id', tenantId).whereIn(db.raw('p.id::text'), ids).select(PRODUCT_COLUMNS) };
+}
+
+/** The owner answered LISTI: the business turns on "List my products on MoranBuy" from WhatsApp, recorded like the switch in the dashboard. */
+export async function listTenantOnMoranBuy({ tenantId, ownerPhone }) {
+  const t = await db('tenants').where({ id: tenantId }).first('id', 'owner_wa_number', 'moranbuy_listed');
+  const digits = (v) => String(v || '').replace(/\D/g, '').slice(-9);
+  if (!t || digits(t.owner_wa_number) !== digits(ownerPhone)) return { ok: false, reason: 'not_owner' };
+  if (!t.moranbuy_listed) await db('tenants').where({ id: tenantId }).update({ moranbuy_listed: true, moranbuy_listed_at: db.fn.now() });
+  return { ok: true };
+}
+
 /** The MoranBuy tenant's own admin-written knowledge. */
 export async function moranBuyKnowledge(query, limit = 3) {
   const tenant = await moranBuyTenant();

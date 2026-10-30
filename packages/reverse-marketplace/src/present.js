@@ -25,6 +25,9 @@ export function buildFacts(result, request, { max = 5 } = {}) {
     stock: r.offer.stock,
     imageUrl: r.offer.imageUrl || null,
     source: r.offer.source,
+    sourceUrl: r.offer.sourceUrl || null,
+    area: r.offer.area || null,
+    condition: r.offer.condition || null,
     description: r.offer.description ? String(r.offer.description).replace(/\s+/g, ' ').slice(0, 140) : null,
     attributes: r.offer.attributes || {},
     reasons: r.reasons,
@@ -96,10 +99,12 @@ export function renderReply(facts, language = 'sw') {
     bits.push(o.budgetStatus === 'over' ? t.over(formatMoney(o.shortfall, cur)) : t.fits);
     if (o.distanceKm !== null) bits.push(t.km(o.distanceKm));
     else if (o.locationLabel) bits.push(o.locationLabel);
+    else if (o.area) bits.push(o.area);
+    if (o.condition && o.condition !== 'new') bits.push(o.condition);
     if (o.merchantVerified) bits.push(t.verified);
     if (facts.urgency && (o.reasons || []).includes('available_now')) bits.push(t.ready);
     if (o.source === 'web') bits.push(t.web);
-    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}`);
+    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}${o.source === 'web' && o.sourceUrl ? `\n   ${o.sourceUrl}` : ''}`);
   }
   if (facts.alternativesHidden) lines.push(t.hidden(facts.alternativesHidden));
   lines.push(facts.noneWithinBudget && !facts.exactOnly ? t.askNone : t.ask);

@@ -360,6 +360,7 @@ const credentialBodies = {
   snippe: z.object({ apiKey: z.string().max(400).optional(), webhookSecret: z.string().max(400).optional(), baseUrl: z.string().url().optional(), reason: z.string().min(3).max(500) }),
   tts: z.object({ provider: z.enum(['meta_mms', 'disabled']).optional(), mode: z.enum(['mirror', 'always', 'off']).optional(), reason: z.string().min(3).max(500) }),
   hermes: z.object({ baseUrl: z.union([z.string().url(), z.literal('')]).optional(), apiKey: z.string().max(400).optional(), model: z.string().max(64).optional(), enabled: z.boolean().optional(), allowedDomains: z.string().max(2000).optional(), reason: z.string().min(3).max(500) }),
+  discovery: z.object({ mode: z.enum(['meta_web', 'hermes', 'off']).optional(), dailySearchLimit: z.coerce.number().int().min(0).max(100000).optional(), blockedDomains: z.string().max(4000).optional(), preferredDomains: z.string().max(4000).optional(), warmup: z.boolean().optional(), placesApiKey: z.string().max(400).optional(), placesEnabled: z.boolean().optional(), placesDailyLimit: z.coerce.number().int().min(0).max(100000).optional(), reason: z.string().min(3).max(500) }),
 };
 adminRouter.put('/credentials/:group', requireAdminAuth(db, 'super_admin'), validate({ params: z.object({ group: z.enum(Object.keys(CREDENTIAL_FIELDS)) }) }), asyncHandler(async (req, res) => {
   const body = credentialBodies[req.params.group].parse(req.body || {});
@@ -367,6 +368,23 @@ adminRouter.put('/credentials/:group', requireAdminAuth(db, 'super_admin'), vali
   await saveCredentials(req.params.group, patch, { updatedBy: req.admin.email });
   await act(req, { action: `credentials.${req.params.group}_updated`, targetType: 'settings', targetId: 'credentials', after: { fields: Object.keys(patch) }, reason: why });
   res.json({ credentials: await describeCredentials({ fresh: true }) });
+}));
+
+// ---- online finds and nearby shops: what the index holds, today's searches, and a test search ----
+adminRouter.get('/discovery', asyncHandler(async (_req, res) => {
+  const { discoveryStats, discoveryRuntimeConfig } = await import('../services/discovery.js');
+  const s = await discoveryRuntimeConfig();
+  res.json({ stats: await discoveryStats(), limits: { webSearch: s.dailySearchLimit, places: s.placesDailyLimit }, mode: s.mode, placesConfigured: !!s.placesApiKey });
+}));
+adminRouter.post('/discovery/test', manage, validate({ body: z.object({ text: z.string().min(2).max(300), place: z.string().max(120).optional() }) }), asyncHandler(async (req, res) => {
+  const { DiscoveryResearcher, NearbyShops } = await import('../services/discovery.js');
+  const { fallbackExtract } = await import('@moranbuy/reverse-marketplace');
+  const request = { essentialAttributes: {}, preferredAttributes: {}, currency: 'TZS', language: 'en', ...fallbackExtract(req.body.text) };
+  if (req.body.place) { const g = await shoppingDeps().geocoder.geocode(req.body.place).catch(() => null); if (g) request.location = { lat: g.lat, lng: g.lng, label: g.label || req.body.place }; }
+  const web = await new DiscoveryResearcher().research(request, { maxResults: 6 });
+  const near = await new NearbyShops().find(request);
+  await act(req, { action: 'discovery.test_search', targetType: 'settings', targetId: 'discovery', after: { text: req.body.text, web: web.status, results: web.results.length, places: near.status } });
+  res.json({ request, web: { status: web.status, results: web.results }, nearby: { status: near.status, shops: near.shops || [] } });
 }));
 
 // ---- the name MoranBuy appears under in conversations, chosen in Super Admin after the number is connected ----

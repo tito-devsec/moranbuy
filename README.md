@@ -151,8 +151,15 @@ MoranBuy itself is registered from Moran AI's Super Admin like any business, its
 calls MoranBuy's admin API through a signed proxy that carries the admin's identity, so there is
 one login and one audit trail. Its sales agent is limited to shopping, reads only the
 products of businesses that opted in, answers policy questions only from admin-written knowledge,
-and can look up public shop sites through an optional Hermes research agent whose results are
-always shown as "found online, not confirmed".
+and, when few MoranBuy shops match, searches the web with Meta's own web search (Muse Spark on the
+Meta Model API, Tanzania-located). Only links the search itself returned are kept; each find is read
+for its photo, price and description, shown as "found online, not confirmed" with its link, and kept
+in an index so the next customer asking for the same thing is answered without a new search. Shops
+near the customer come from Google Places (address, rating, phone, open now), and Moran AI
+businesses not yet on MoranBuy that sell the product are asked on WhatsApp first: nothing of theirs
+reaches the customer until the owner answers NDIO (this customer) or LISTI (list the business).
+Search mode, daily limits, preferred and blocked sites and the Places key are set in Super Admin →
+MoranBuy → Credentials, which also has a test search.
 
 The Moran-side pieces are shipped from this repository under `integrations/moran-backend/` as
 drop-in files for the Moran AI owner to review and apply. `docs/existing-system-assessment.md`
@@ -232,7 +239,7 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 
 - The Moran-side changes are shipped as a patch in `integrations/moran-backend/` and are not applied to production by this repository.
 - The WhatsApp provider rate for campaign pricing must be configured by an administrator; until then campaigns cannot be paid.
-- Web research (Hermes) is off by default and needs an allow-list of shop domains.
+- Online search is limited per day (300 searches by default, set in Super Admin); online finds are unconfirmed and cannot be ordered through MoranBuy. Nearby shops need a Google Places key. A business owner outside WhatsApp's 24-hour window may not receive the NDIO/LISTI question until an approved template is set up.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - The Meta Model API needs a key; Muse Voice Transcribe does not list Swahili among its 25 languages, so Swahili voice notes go to Muse Spark 1.2 audio first.
 - Spoken replies use Meta's MMS voices, whose licence is non-commercial (CC-BY-NC 4.0): right for the hackathon and pilots; paid production use needs a commercial voice from Meta or the voices switched off.

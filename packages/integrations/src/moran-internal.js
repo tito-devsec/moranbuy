@@ -37,6 +37,10 @@ export class MoranInternalClient {
 
   // A PDF (a receipt) as a WhatsApp document from the MoranBuy number; the bytes travel in the signed body.
   sendDocument({ to, documentBase64, filename, caption = '', idempotencyKey }) { return this.call('/send', { body: { type: 'document', to, documentBase64, filename, caption, idempotencyKey } }); }
+  // Moran businesses not on MoranBuy that have products for a request (counts only), their products once the owner agrees, and a full opt-in.
+  leadMatches({ words, maxPrice = null, limit = 3 }) { return this.call('/lead-matches', { body: { words, maxPrice, limit } }); }
+  leadProducts({ tenantId, productIds }) { return this.call('/lead-products', { body: { tenantId, productIds } }); }
+  listTenant({ tenantId, ownerPhone }) { return this.call(`/tenants/${encodeURIComponent(tenantId)}/list`, { body: { ownerPhone } }); }
 
   // A list message: up to ten rows the person taps (their orders, for receipts).
   sendList({ to, body, button, sections, header = null, footer = null, idempotencyKey }) { return this.call('/send', { body: { type: 'list', to, body, button, sections, header, footer, idempotencyKey } }); }
@@ -81,6 +85,9 @@ export class FakeMoranInternalClient {
   async sendMoranBuyTemplate(m) { this.sent.push({ type: 'moranbuy_template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendMerchantText(m) { this.sent.push({ type: 'merchant_text', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
   async sendTemplate(m) { if (this.failNext) { this.failNext = false; return { ok: false, status: 'http_502', data: { error: 'META_ERROR' } }; } this.sent.push({ type: 'template', ...m }); return { ok: true, status: 'ok', data: { messageId: `fake-${this.sent.length}` } }; }
+  async leadMatches() { return { ok: true, status: 'ok', data: { businesses: this.leadBusinesses || [] } }; }
+  async leadProducts({ tenantId, productIds }) { return { ok: true, status: 'ok', data: { listings: (this.leadRows || []).filter((r) => r.tenant_id === tenantId && productIds.includes(String(r.id))) } }; }
+  async listTenant({ tenantId }) { (this.listedTenants ||= []).push(tenantId); return { ok: true, status: 'ok', data: { ok: true } }; }
   async listings() { return { ok: true, status: 'ok', data: { listings: this.listingRows, nextPage: null } }; }
   async knowledgeSearch() { return { ok: true, status: 'ok', data: { passages: this.knowledge } }; }
 }

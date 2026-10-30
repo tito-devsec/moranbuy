@@ -15,6 +15,7 @@ import { handleMerchantChat } from '../services/merchant-chat.js';
 import { intakeVoice, intakeImage } from '../services/media-intake.js';
 import { voiceReplyFor } from '../services/voice-reply.js';
 import { engagementDeps } from '../services/engagement.js';
+import { handleOwnerLeadReply } from '../services/business-leads.js';
 import { handleDelivererMessage, handleCustomerProtectionMessage, handleMerchantProtectionMessage, isActiveDeliverer } from '../services/protection/chat.js';
 
 export const internalInboundRouter = express.Router();
@@ -47,7 +48,7 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   const customer = await upsertCustomer({ channel: 'whatsapp', channelRef: String(from), name });
   const { engine, moran } = shoppingDeps();
   // A bare STOP to the MoranBuy number ends marketing and follow-up from every merchant; START restores only the MoranBuy relationship.
-  let out; let gate; let delivery; let protectedReply;
+  let out; let gate; let delivery; let protectedReply; let leadReply;
   if (detectOptOut(text)) {
     await optOut(db, { merchantId: null, phone: from, source: 'inbound_keyword', evidenceRef: String(messageId) });
     await stopLeadsForPhone(db, { phone: from, reason: 'opted_out' });
@@ -58,6 +59,9 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   } else if ((delivery = await deliveryMessage({ from, text, buttonId, kind, media, location, customer, messageId }))) {
     // A delivery person acts for the business at the customer's door: their buttons, photos and codes come before anything else.
     out = { replies: delivery.reply ? [{ text: delivery.reply }] : [], session: { id: null, state: 'delivery' } };
+  } else if ((leadReply = await handleOwnerLeadReply({ moran, engine, from, text, acceptTerms: () => termsGate({ customer, acceptTerms: true, channel: 'whatsapp' }) }))) {
+    // A Moran business owner answering "NDIO/LISTI/HAPANA <code>" about a customer's request.
+    out = { replies: leadReply.replies, session: { id: null, state: 'lead_answer' } };
   } else if (!(gate = await termsGate({ customer, text, buttonId, channel: 'whatsapp' })).pass) {
     // Nobody, customer or business owner, is answered before accepting the terms; the question is repeated until they do.
     out = { replies: gate.replies, session: { id: null, state: gate.accepted ? 'terms_accepted' : gate.rejected ? 'terms_rejected' : 'terms_prompted' } };

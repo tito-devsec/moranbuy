@@ -24,7 +24,7 @@ export function mergeRequest(previous, extracted) {
   const prev = previous || {};
   const next = { ...prev };
   for (const [k, v] of Object.entries(extracted || {})) {
-    if (v === null || v === undefined || v === '') continue;
+    if (v === null || v === undefined || v === '' || k === 'wantsAlternatives') continue;
     if (k === 'essentialAttributes' || k === 'preferredAttributes') next[k] = { ...(prev[k] || {}), ...v };
     else next[k] = v;
   }

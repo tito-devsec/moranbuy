@@ -51,7 +51,7 @@ export async function upsertMoranMerchant(db, row) {
   return m;
 }
 
-async function upsertMoranLocation(db, merchant, row) {
+export async function upsertMoranLocation(db, merchant, row) {
   if (!row.location_id) return null;
   const radiusKm = row.radius_meters ? Math.max(1, Math.round(row.radius_meters / 1000)) : null;
   const rec = { merchant_id: merchant.id, name: row.location_name || 'Shop', region: row.region || null, district: row.district || null, ward: row.ward || null, formatted_address: row.formatted_address || null, latitude: row.latitude ?? null, longitude: row.longitude ?? null, location_source: 'IMPORTED', pickup_available: true, delivery_available: radiusKm ? true : null, delivery_radius_km: radiusKm, source: 'moran', source_location_id: String(row.location_id), updated_at: db.fn.now() };
@@ -60,7 +60,7 @@ async function upsertMoranLocation(db, merchant, row) {
   return loc;
 }
 
-async function upsertMoranListing(db, merchant, row) {
+export async function upsertMoranListing(db, merchant, row) {
   const status = String(row.status || 'ACTIVE').toLowerCase();
   const rec = { merchant_id: merchant.id, name: row.name, description: row.description || null, category: row.category || null, variants: JSON.stringify(row.variants || []), price: Math.round(Number(row.price) || 0), currency: row.currency || 'TZS', price_status: 'listed', stock: row.stock === null || row.stock === undefined ? null : Number(row.stock), condition: row.condition || 'new', status: ['active', 'inactive', 'out_of_stock', 'archived'].includes(status) ? status : 'inactive', image_url: row.image_url || null, source: 'moran', source_merchant_ref: String(row.tenant_id), source_product_id: String(row.id), source_sku: row.sku || null, source_retailer_id: row.retailer_id || null, moran_service_id: row.service_id ? String(row.service_id) : null, source_updated_at: row.updated_at || null, synced_at: db.fn.now(), sync_json: JSON.stringify({ via: 'listings_pull', service: row.service_name || null }), updated_at: db.fn.now() };
   const existing = await db('listings').where({ source: 'moran', source_merchant_ref: rec.source_merchant_ref, source_product_id: rec.source_product_id }).first('id', 'product_type');

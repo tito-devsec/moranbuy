@@ -9,8 +9,10 @@ export const CREDENTIAL_FIELDS = Object.freeze({
   hermes: ['baseUrl', 'apiKey', 'model', 'enabled', 'allowedDomains'],
   // Spoken replies with Meta's MMS voices, run inside MoranBuy; no key is needed, only on or off and when to speak.
   tts: ['provider', 'mode'],
+  // Looking beyond MoranBuy's own shops: Meta web search with its daily limit and site lists, and Google Places for nearby shops.
+  discovery: ['mode', 'dailySearchLimit', 'blockedDomains', 'preferredDomains', 'warmup', 'placesApiKey', 'placesEnabled', 'placesDailyLimit'],
 });
-const SECRET = new Set(['apiKey', 'webhookSecret']);
+const SECRET = new Set(['apiKey', 'webhookSecret', 'placesApiKey']);
 const CACHE_MS = 15000;
 let cache = { at: 0, value: null };
 
@@ -60,6 +62,7 @@ export async function describeCredentials(opts) {
     tts: { ...(await ttsRuntimeConfig(opts)) },
     muse: { provider: c.muse.provider || env.MUSE_PROVIDER, baseUrl: c.muse.baseUrl || env.MUSE_API_BASE_URL, model: c.muse.model || env.MUSE_MODEL_ID, reasoningEffort: c.muse.reasoningEffort || env.MUSE_REASONING_EFFORT, apiKey: mask(c.muse.apiKey || env.MUSE_API_KEY), source: c.muse.apiKey ? 'admin' : env.MUSE_API_KEY ? 'environment' : 'none' },
     snippe: { baseUrl: c.snippe.baseUrl || env.SNIPPE_BASE_URL, apiKey: mask(c.snippe.apiKey || env.SNIPPE_API_KEY), webhookSecret: mask(c.snippe.webhookSecret || env.SNIPPE_WEBHOOK_SECRET), provider: env.PAYMENT_PROVIDER, source: c.snippe.apiKey ? 'admin' : env.SNIPPE_API_KEY ? 'environment' : 'none' },
+    discovery: { mode: c.discovery.mode || 'meta_web', dailySearchLimit: c.discovery.dailySearchLimit ?? 300, blockedDomains: c.discovery.blockedDomains || '', preferredDomains: c.discovery.preferredDomains || '', warmup: c.discovery.warmup ?? true, placesEnabled: c.discovery.placesEnabled ?? true, placesDailyLimit: c.discovery.placesDailyLimit ?? 300, placesApiKey: mask(c.discovery.placesApiKey || process.env.GOOGLE_PLACES_API_KEY), museKey: !!(c.muse.apiKey || env.MUSE_API_KEY) },
     hermes: { baseUrl: c.hermes.baseUrl || env.HERMES_BASE_URL || null, model: c.hermes.model || env.HERMES_MODEL, enabled: c.hermes.enabled ?? env.MORANBUY_WEB_RESEARCH_ENABLED, allowedDomains: c.hermes.allowedDomains || env.MORANBUY_ALLOWED_DOMAINS || '', apiKey: mask(c.hermes.apiKey || env.HERMES_API_KEY) },
   };
 }
