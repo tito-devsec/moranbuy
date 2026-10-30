@@ -59,11 +59,12 @@ h3 { line-height: 1; }
 .hero-title .word > span { display: inline-block; transform: translateY(105%); transition: transform 1.1s var(--ease); }
 .loaded .hero-title .word > span { transform: none; }
 .hero-actions { display: flex; gap: 14px; margin-top: 40px; flex-wrap: wrap; }
-.hero-card .btn { border-radius: 999px; padding: 13px 22px; font: 600 15px/1 var(--b); letter-spacing: 0; text-transform: none; border: 0; transition: transform .25s var(--ease), background .25s; }
-.hero-card .btn:hover { transform: translateY(-2px); }
-.hero-card .btn-primary { background: #0f766e; color: #fff; box-shadow: 0 12px 24px -12px rgba(15, 118, 110, .8); }
-.hero-card .btn-primary:hover { background: #0b5f59; }
-.hero-card .btn-ghost { background: #fff; color: #1d232c; box-shadow: inset 0 0 0 1px #e3e8ee; }
+/* Hero buttons in the flat style: Moran green and a paper outline, square corners, no shadow. */
+.hero-card .btn { padding: 15px 20px; font-size: 17px; }
+.hero-card .btn-primary { background: var(--green); border-color: var(--green); color: var(--ink); }
+.hero-card .btn-primary:hover { background: var(--paper); border-color: var(--paper); color: var(--ink); }
+.hero-card .btn-ghost { background: transparent; border-color: var(--paper); color: var(--paper); }
+.hero-card .btn-ghost:hover { background: var(--paper); color: var(--ink); }
 .route { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .route path { fill: none; stroke: #22d3ee; stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 10px rgba(34, 211, 238, .7)); stroke-dasharray: 2400; stroke-dashoffset: 2400; transition: stroke-dashoffset 2.6s var(--ease) .3s; }
 .loaded .route path { stroke-dashoffset: 0; }
