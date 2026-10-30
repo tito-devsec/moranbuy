@@ -9,8 +9,8 @@
   if (header) {
     header.outerHTML = `<header class="site-header"><div class="wrap nav">
       <a class="brand" href="/" aria-label="MoranBuy home">${LOGO}MoranBuy</a>
-      <nav class="nav-links" id="nav-links">${link('/how-it-works', 'How it works')}${link('/for-business', 'For businesses')}${link('/demo', 'Try the demo')}${link('/about', 'About')}</nav>
-      <div class="nav-cta"><a class="btn btn-ghost" href="/demo">Try the demo</a><a class="btn btn-primary" data-whatsapp href="https://wa.me/moranbuy" target="_blank" rel="noopener"><span class="long">Open MoranBuy</span><span class="arrow">→</span></a><button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button></div>
+      <nav class="nav-links" id="nav-links">${link('/how-it-works', 'How it works')}${link('/for-business', 'For businesses')}${link('/demo', 'Try the demo')}${link('/about', 'About')}<a class="menu-open" data-whatsapp href="https://wa.me/moranbuy" target="_blank" rel="noopener">Open MoranBuy <span class="arrow">→</span></a></nav>
+      <div class="nav-cta"><a class="btn btn-ghost" href="/demo">Try the demo</a><a class="btn btn-primary" data-whatsapp href="https://wa.me/moranbuy" target="_blank" rel="noopener"><span class="long">Open MoranBuy</span><span class="arrow">→</span></a><button class="menu-btn" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
     </div></header>`;
   }
   const footer = document.querySelector('[data-site-footer]');

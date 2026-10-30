@@ -211,6 +211,8 @@
   .demo-page { background: #efeae2; overflow: hidden; }
   .demo-page .site-header, .demo-page .site-header.hidden { background: var(--paper); box-shadow: 0 1px 0 var(--line); transform: none; }
   .demo-page .site-header .brand, .demo-page .site-header .nav-links, .demo-page .site-header .nav-links a, .demo-page .site-header .menu-btn { color: var(--ink) !important; }
+  .demo-page .site-header .nav-links a.menu-open { color: var(--paper) !important; }
+  .demo-page .site-header .menu-btn { border-color: var(--ink); }
   .demo-page .site-header .btn-primary { background: var(--ink) !important; color: var(--paper) !important; border-color: var(--ink) !important; }
   .demo-hero, .demo-facts, .demo-page .site-footer, .dt-device-bar, .dt-tools, .ph-speaker, .ph-cam, .ph-home, .statusbar { display: none !important; }
   .demo-stage { padding: 0; }

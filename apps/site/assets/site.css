@@ -43,7 +43,9 @@ h3 { line-height: 1; }
 .btn-dark:hover { background: var(--ink); border-color: var(--ink); }
 .btn .arrow { transition: transform .25s var(--ease); }
 .btn:hover .arrow { transform: translateX(4px); }
-.menu-btn { display: none; background: none; border: 0; font-size: 26px; cursor: pointer; }
+.menu-btn { display: none; flex: none; width: 44px; height: 44px; padding: 10px; background: none; border: 1px solid var(--ink); border-radius: 4px; color: var(--ink); cursor: pointer; }
+.menu-btn svg { width: 22px; height: 22px; }
+.nav-links .menu-open { display: none; }
 
 /* Hero: kept as it was, with the scene inside, a route line drawn across, glass cards floating over it. */
 .hero { padding: 84px 12px 0; }
@@ -209,7 +211,12 @@ h3 { line-height: 1; }
   .nav-links a { padding: 14px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
   .nav-links a:hover, .nav-links a.on { background: none; color: var(--green-dark); }
   .menu-btn { display: block; }
-  .nav-cta .btn-ghost { display: none; }
+  .nav-cta .btn-ghost, .nav-cta .btn-primary { display: none; }
+  .menu-btn { display: block; }
+  .nav { justify-content: space-between; }
+  .brand { min-width: 0; }
+  .nav-links .menu-open { display: flex; justify-content: space-between; margin: 10px 0 6px; padding: 14px 16px; background: var(--ink); color: var(--paper); border: 0; border-radius: 4px; }
+  .nav-links .menu-open:hover { background: var(--green-dark); color: #fff; }
   .stats-head, .split, .foot-grid { grid-template-columns: 1fr; }
   .split.flip > :first-child { order: 0; }
   .stat-grid, .steps { grid-template-columns: 1fr 1fr; }
