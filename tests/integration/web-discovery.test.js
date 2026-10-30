@@ -18,10 +18,11 @@ async function fakeFetch(url, init = {}) {
   const u = String(url);
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   if (u.endsWith('/responses')) {
-    calls.responses += 1;
     const body = JSON.parse(init.body);
     assert.equal(body.tools[0].type, 'web_search');
-    assert.equal(body.tools[0].user_location.country, 'TZ');
+    // The first request is turned down over an optional field, as an API version without it would; the minimal retry must still work.
+    if (body.max_tool_calls) return json({ error: { message: 'Unknown parameter: max_tool_calls' } }, 400);
+    calls.responses += 1;
     return json({
       model: 'muse-spark-1.3',
       usage: { input_tokens: 900, output_tokens: 400 },

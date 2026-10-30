@@ -91,8 +91,14 @@ export async function metaWebSearch({ fetchImpl = globalThis.fetch, baseUrl, api
     max_tool_calls: 3,
   };
   try {
-    const res = await fetchImpl(`${String(baseUrl).replace(/\/+$/, '')}/responses`, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
-    const data = await res.json().catch(() => ({}));
+    const post = (b) => fetchImpl(`${String(baseUrl).replace(/\/+$/, '')}/responses`, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(b), signal: AbortSignal.timeout(timeoutMs) });
+    let res = await post(body);
+    let data = await res.json().catch(() => ({}));
+    // If the API rejects an optional setting, the search is retried once with only the required fields.
+    if (res.status === 400) {
+      res = await post({ model, instructions: SYSTEM, input: body.input, tools: [{ type: 'web_search' }], max_output_tokens: body.max_output_tokens });
+      data = await res.json().catch(() => ({}));
+    }
     const latencyMs = Date.now() - started;
     const usage = data.usage || {};
     if (!res.ok) {
