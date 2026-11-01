@@ -14,6 +14,38 @@ A customer in Dar es Salaam who wants a three-seater sofa for TSh 350,000 has to
 sellers one by one, and repeat the same requirements each time. Businesses with the right product at
 the right price never hear from that customer.
 
+## Case study: Kariakoo, Dar es Salaam
+
+Kariakoo is the biggest trading hub in East Africa. Estimates put the crowd at more than 200,000
+people a day ([TRT Afrika](https://www.trtafrika.com/english/article/13305704)) and the money moving
+through the area at more than TSh 10 billion a day, with banking estimates of up to TSh 16 billion
+([AllAfrica](https://allafrica.com/stories/201203020066.html)). Most of it is cash and mobile money,
+paid face to face.
+
+How buying works there today:
+
+- **The buyer travels to find out.** Someone in Mbagala, Kimara or Arusha spends a day and a bus fare
+  walking from stall to stall, asking each one the price of the same item and bargaining.
+- **Prices are hidden.** The same laptop or sofa has a different price in every shop, and the buyer
+  only learns them by asking.
+- **Shops wait for walk-ins.** A shop with exactly the right item at the right price never hears from
+  the buyer three streets away, or in another region, who wants it right now.
+- **Buying remotely is risky.** Paying a seller first over mobile money and receiving nothing, or the
+  wrong item, is the common fear that keeps people travelling in person.
+
+What MoranBuy changes:
+
+| Today in Kariakoo | With MoranBuy |
+|---|---|
+| Walk stall to stall asking prices | One WhatsApp message to @moranbuy with the product and the budget, typed or spoken in Swahili |
+| Prices learned one shop at a time | Offers ranked budget first, then distance, with photos, the total cost and what is still unknown |
+| Shops wait for walk-ins | Shops, including Moran AI businesses asked with their consent, are matched to buyers who want their product now |
+| Pay the seller and hope | The payment is held by MoranBuy and released only after a handover code and a delivery photo |
+| Travel to collect | A rider named by the shop delivers, with Arrived / Refused / Customer not there buttons |
+
+MoranBuy does not replace the market; it gives Kariakoo's shops buyers who cannot come in person, and
+gives those buyers Kariakoo's prices without the trip. Every order still pays a Kariakoo shop.
+
 ## The reverse-marketplace model
 
 The customer does not browse a catalogue. The customer sends one message:
@@ -63,19 +95,45 @@ rankings, consent, authorization, payments or order state; deterministic code do
 is unavailable, MoranBuy says so and uses only configured fallback behaviour.
 See `docs/muse-integration.md` and `docs/muse-duties.md` (everything Muse does, with the check on each answer).
 
-## Meta AI tooling
+## Meta services in MoranBuy
 
-| Meta model | What MoranBuy does with it |
+Every model MoranBuy calls at runtime is a Meta model, and every customer and business conversation
+runs on Meta's WhatsApp Business Platform.
+
+### Meta models (Meta Model API and Meta's open models)
+
+| Meta model or service | What MoranBuy does with it |
 |---|---|
 | Muse Spark 1.3 | Reads shopping requests and photos, writes grounded recommendations, lists products from a business's chat, picks best-fit customers, drafts campaigns and follow-ups, explains demand and admin data |
+| Muse Spark web search (Responses API, `web_search` tool, located in Tanzania) | Finds products in Tanzanian online shops and public Facebook and Instagram shop pages when few MoranBuy shops match; only links the search returned are kept, each shown as "found online, not confirmed" |
 | Muse Spark 1.2 (audio) | Hears WhatsApp and browser voice notes in Swahili, English or a mix (`input_audio`, WAV) |
 | Muse Voice Transcribe | Second ear for voice notes when Muse Spark audio is unavailable (`/v1/asr/transcribe`) |
-| Segment Anything 3.1 | Finds every product Muse named in a business's photo; each box is cut out in-process and becomes that listing's photo, so one shelf photo lists several products |
+| Segment Anything 3.1 | Finds every product Muse named in a business's photo; each box is cut out in-process and becomes that listing's photo, so one shelf photo lists several products; also checks delivery photos |
 | MMS text-to-speech (`facebook/mms-tts-swh`, `mms-tts-eng`) | Speaks the reply back as a WhatsApp voice note, in Swahili or English, run inside MoranBuy with no outside speech service |
 
 Voice notes are decoded from Ogg Opus to 16 kHz WAV inside the Node process (`ogg-opus-decoder`, WebAssembly); nothing is
 installed on the server. Spoken replies use Meta's MMS text-to-speech voices (Swahili and English), exported to ONNX when the
 image is built and run in the same process; the speech is written as an Ogg Opus voice note in-process too. Every Meta call is recorded with its latency, tokens and cost.
+
+### WhatsApp Business Platform
+
+| Meta service | What MoranBuy does with it |
+|---|---|
+| WhatsApp business username | Customers find MoranBuy as **@moranbuy**, without needing a phone number |
+| WhatsApp Cloud API messaging | Text, photos with captions, documents (PDF receipts) and voice notes to customers, businesses and riders |
+| Interactive reply buttons | Terms acceptance, the rider's Arrived / Refused / Customer not there, and the customer confirming a refusal |
+| Embedded Signup | The MoranBuy number is connected from Moran's Super Admin, and each business connects its own number |
+| Message templates | Campaign and outreach templates are submitted to Meta for approval; MoranBuy never marks one approved itself |
+| Delivery and read receipts | Meta's sent, delivered, read and failed statuses move the campaign ledger and order alerts forward |
+
+### Meta services MoranBuy can use next (not built yet)
+
+| Meta service | How it would fit |
+|---|---|
+| WhatsApp catalogs and product messages | Show a shop's offers as tappable product cards instead of photos and text |
+| WhatsApp Flows | A short in-chat form for delivery address and order details |
+| Click-to-WhatsApp ads on Facebook and Instagram | A Kariakoo shop's ad opens a MoranBuy chat already about that product |
+| Marketing Messages for WhatsApp | Higher-delivery sending for paid campaigns, still behind the same consent gates |
 
 ## How it scales
 
@@ -106,6 +164,23 @@ with existing Moran AI infrastructure where necessary; they are not presented as
 Moran AI campaign-engine features. A campaign dispatches only after consent, sender eligibility,
 template approval, payment verification, rate limits and an explicit confirmation are all verified.
 Follow-up is optional, activated only after the merchant explicitly accepts it.
+
+How Meta services run each one:
+
+| Step | Campaigns and new-product outreach | Follow-up |
+|---|---|---|
+| Who it reaches | Muse Spark explains and may reorder the best-fit customers: those whose recent MoranBuy requests match the product, budget and region. Consent and frequency limits are applied first, and Muse cannot add anyone | Leads from confirmed orders or customers who agreed to be followed up; a lead with no consent is never scheduled |
+| What it says | Muse Spark drafts the message from the product and shop facts, and revises it on request; a draft with a number not in the facts is replaced by a fixed draft | Muse Spark drafts each follow-up from the lead's facts (product, price, what the customer said, attempt number), always with the STOP line |
+| Meta's approval | The message becomes a WhatsApp template submitted to Meta; it sends only once Meta approves it | Sent inside WhatsApp's rules for the conversation |
+| Who sends it | The merchant's own WhatsApp number, never the MoranBuy number | The merchant's own WhatsApp number |
+| What comes back | Meta's delivered, read and failed receipts update every recipient | A reply, STOP, a decline or a purchase stops the follow-up at once |
+
+New-product outreach starts when a business publishes a listing: the business is offered a campaign
+for it and must answer; publishing never sends anything. MoranBuy also reaches out for its own
+customers: a customer who says "nitanunua wiki ijayo" (I'll buy next week) is reminded from the
+MoranBuy number on that day, outside quiet hours, and Moran AI businesses not yet on MoranBuy are
+asked on WhatsApp before their matching products are shown to a customer (reply NDIO, LISTI or
+HAPANA). See `docs/campaign-workflow.md`, `docs/followup-workflow.md` and `docs/muse-duties.md`.
 
 ## What was built at the event, and what already existed
 
