@@ -55,24 +55,25 @@ export async function findIndexed(request, { dbImpl = db, limit = 12, withinHour
   return rows.map(rowToResult(canon || request.productType));
 }
 
-const rowToResult = (productType) => (r) => ({ name: r.name, price: r.price === null ? null : Number(r.price), currency: r.currency, availability: 'unknown', sourceUrl: r.url, domain: r.domain, retrievedAt: new Date(r.last_seen_at).toISOString(), attributes: r.attributes || {}, imageUrl: r.image_url, description: r.description, shopName: r.shop_name, area: r.area, condition: r.condition, productType: r.product_type || productType, category: r.category, indexed: true, lastSeenAt: r.last_seen_at });
+const rowToResult = (productType) => (r) => ({ name: r.name, price: r.price === null ? null : Number(r.price), currency: r.currency, availability: 'unknown', sourceUrl: r.url, domain: r.domain, retrievedAt: new Date(r.last_seen_at).toISOString(), attributes: r.attributes || {}, imageUrl: r.image_url, description: r.description, shopName: r.shop_name, area: r.area, condition: r.condition, contactPhone: r.contact_phone || null, productType: r.product_type || productType, category: r.category, indexed: true, lastSeenAt: r.last_seen_at });
 
 export async function saveFound(results, request, { dbImpl = db, query = null } = {}) {
   const canon = normalizeProductType(request.productType).productType || request.productType || null;
   for (const r of results) {
-    const row = { url: r.sourceUrl, domain: r.domain, name: r.name, product_type: canon, category: request.category || null, price: r.price, currency: r.currency || 'TZS', description: r.description, image_url: r.imageUrl, attributes: JSON.stringify(r.attributes || {}), shop_name: r.shopName, area: r.area, condition: r.condition, source: 'meta_web_search', search_query: query ? String(query).slice(0, 300) : null, last_seen_at: dbImpl.fn.now() };
+    const row = { url: r.sourceUrl, domain: r.domain, name: r.name, product_type: canon, category: request.category || null, price: r.price, currency: r.currency || 'TZS', description: r.description, image_url: r.imageUrl, attributes: JSON.stringify(r.attributes || {}), shop_name: r.shopName, area: r.area, condition: r.condition, contact_phone: r.contactPhone || null, source: 'meta_web_search', search_query: query ? String(query).slice(0, 300) : null, last_seen_at: dbImpl.fn.now() };
     await dbImpl('web_products').insert(row).onConflict('url').merge({ ...row, hits: dbImpl.raw('web_products.hits + 1') }).catch((err) => logger.warn({ err: err.message }, 'web product not saved'));
   }
 }
 
 // Fills in the photo and description from each listing's own page, a few at a time.
 export async function addPageDetails(results, { fetchImpl = globalThis.fetch, max = 6 } = {}) {
-  const todo = results.slice(0, max).filter((r) => !r.imageUrl || !r.description || r.price === null);
+  const todo = results.slice(0, max).filter((r) => !r.imageUrl || !r.description || r.price === null || !r.contactPhone);
   await Promise.all(todo.map(async (r) => {
     const d = await pageDetails(r.sourceUrl, { fetchImpl });
     if (!d.ok) return;
     if (!r.imageUrl && d.imageUrl) r.imageUrl = d.imageUrl;
     if (!r.description && d.description) r.description = d.description;
+    if (!r.contactPhone && d.phone) r.contactPhone = d.phone;
     if (r.price === null && d.price && (!d.currency || d.currency === (r.currency || 'TZS'))) r.price = d.price;
   }));
   return results;

@@ -1,5 +1,19 @@
 import { formatMoney } from '@moranbuy/core';
 
+// A customer never sees a shop's number or website; MoranBuy contacts the shop for them. Applied to every shopping reply as a last check.
+export function stripContacts(text) {
+  return String(text || '')
+    .replace(/https?:\/\/\S+|\bwww\.\S+/gi, '')
+    .replace(/(?<![\d,.])(?:\+?255|0)[\s-]?[67]\d(?:[\s-]?\d){7}(?!\d)/g, '')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/\s+([,.;])/g, '$1').trim();
+}
+
+// Offers with a photo let the customer see what they buy: online finds without one are dropped once at least three offers have photos.
+export function preferPictured(offers) {
+  if (offers.filter((o) => o.imageUrl).length < 3) return offers;
+  return offers.filter((o) => o.source !== 'web' || o.imageUrl);
+}
+
 // Turns a ranking result into facts and a deterministic reply; the reply uses only these facts.
 export function buildFacts(result, request, { max = 5 } = {}) {
   const line = (r, i) => ({
@@ -25,7 +39,6 @@ export function buildFacts(result, request, { max = 5 } = {}) {
     stock: r.offer.stock,
     imageUrl: r.offer.imageUrl || null,
     source: r.offer.source,
-    sourceUrl: r.offer.sourceUrl || null,
     area: r.offer.area || null,
     condition: r.offer.condition || null,
     description: r.offer.description ? String(r.offer.description).replace(/\s+/g, ' ').slice(0, 140) : null,
@@ -104,7 +117,7 @@ export function renderReply(facts, language = 'sw') {
     if (o.merchantVerified) bits.push(t.verified);
     if (facts.urgency && (o.reasons || []).includes('available_now')) bits.push(t.ready);
     if (o.source === 'web') bits.push(t.web);
-    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}${o.source === 'web' && o.sourceUrl ? `\n   ${o.sourceUrl}` : ''}`);
+    lines.push(`${o.option}. ${o.name} - ${o.merchant}: ${bits.join(', ')}.${o.description ? ` ${o.description}` : ''}`);
   }
   if (facts.alternativesHidden) lines.push(t.hidden(facts.alternativesHidden));
   lines.push(facts.noneWithinBudget && !facts.exactOnly ? t.askNone : t.ask);

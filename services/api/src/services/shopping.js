@@ -3,6 +3,7 @@ import { MuseClient } from '@moranbuy/muse-intelligence';
 import { Geocoder, MoranInternalClient } from '@moranbuy/integrations';
 import { DiscoveryResearcher, NearbyShops } from './discovery.js';
 import { askMatchingBusinesses } from './business-leads.js';
+import { createShopInquiry } from './shop-inquiries.js';
 import { museRuntimeConfig } from './runtime-settings.js';
 import { notifyMerchantOfOrder } from './merchant-notify.js';
 import { handOrderToMoran } from './moran-order-sync.js';
@@ -39,7 +40,7 @@ export function shoppingDeps() {
     // Online finds (Meta web search, kept in an index) and shops near the customer (Google Places), both with daily limits set in Super Admin.
     shared.researcher = new DiscoveryResearcher();
     shared.nearby = new NearbyShops();
-    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, nearby: shared.nearby, leads: c.DEMO_MODE ? null : ({ session, customer, request }) => askMatchingBusinesses({ moran: shared.moran, session, customer, request }), profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });
+    shared.engine = new ShoppingEngine({ db, muse: shared.muse, geocoder: shared.geocoder, policyLoader: () => loadRankingPolicy(db), researcher: shared.researcher, nearby: shared.nearby, leads: c.DEMO_MODE ? null : ({ session, customer, request }) => askMatchingBusinesses({ moran: shared.moran, session, customer, request }), contact: (args) => createShopInquiry(args), profileLoader: () => loadAgentProfile(db), onOrderConfirmed: async (order) => { await handOrderToMoran({ moran: shared.moran, order }).catch((err) => logger.warn({ err: err.message }, 'Moran order handoff failed')); await notifyMerchantOfOrder({ moran: shared.moran, order }); } });
   }
   return shared;
 }

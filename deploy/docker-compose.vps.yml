@@ -87,7 +87,7 @@ services:
       DATABASE_URL: postgres://moranbuy:${DB_PASSWORD}@moranbuy-postgres:5432/moranbuy_demo
       REDIS_URL: redis://moranbuy-redis:6379/1
       MUSE_PROVIDER: ${DEMO_MUSE_PROVIDER:-disabled}
-      MUSE_API_KEY: ${DEMO_MUSE_API_KEY:-}
+      MUSE_API_KEY: ${DEMO_MUSE_API_KEY:-${MUSE_API_KEY:-}}
     command: ["node", "services/api/src/demo/start.js"]
     volumes:
       - moranbuy_demo:/app/data/demo

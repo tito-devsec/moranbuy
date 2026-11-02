@@ -314,6 +314,7 @@ evidence; `docs/demo-script.md` (Phase 13) is the three-minute demo.
 
 - The Moran-side changes are shipped as a patch in `integrations/moran-backend/` and are not applied to production by this repository.
 - The WhatsApp provider rate for campaign pricing must be configured by an administrator; until then campaigns cannot be paid.
+- Shops that are not on MoranBuy (online finds and Google Maps shops) cannot take orders here. After the customer says YES, MoranBuy records a request and the team contacts the shop and answers the customer with `scripts/shop-inquiries.mjs`; automatic messages to such shops need an approved WhatsApp template and the shop's opt-in, so they are not sent.
 - Online search is limited per day (300 searches by default, set in Super Admin); online finds are unconfirmed and cannot be ordered through MoranBuy. Nearby shops need a Google Places key. A business owner outside WhatsApp's 24-hour window may not receive the NDIO/LISTI question until an approved template is set up.
 - Over WhatsApp, MoranBuy answers only once the Moran-side forwarding (shipped in `integrations/moran-backend/`, Phase 10) is applied and the MoranBuy business is registered in Super Admin.
 - The Meta Model API needs a key; Muse Voice Transcribe does not list Swahili among its 25 languages, so Swahili voice notes go to Muse Spark 1.2 audio first.

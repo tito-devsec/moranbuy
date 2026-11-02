@@ -4,6 +4,9 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
 ## Unreleased
 
+- Customers never see a shop's phone number, website, social link or map link, in any message. Online finds and shops from Google Maps are numbered options; picking one asks "shall I contact the shop for you?", and on YES MoranBuy records the request with the shop's number kept private (`shop_inquiries`). Answers are sent to the customer with `node scripts/shop-inquiries.mjs answer <REF> yes|no [price] [note]`.
+- Photos: online finds without a photo are dropped once three offers have photos; MoranBuy copies each product photo to its own address (JPEG or PNG only, as WhatsApp requires) before sending, and a photo that cannot be sent goes out as its caption in text. Relative photo links need `MORAN_MEDIA_BASE_URL`.
+- The demo sandbox uses `MUSE_API_KEY` when `DEMO_MUSE_API_KEY` is empty, so it answers with the real Meta model once a key is in `.env`.
 - Understanding: "laki 350000" reads as TSh 350,000; RAM and storage are minimums; brands are kept; an answer to "Upo wapi?" is the place, not the product; the location is asked at most twice; Muse replies cut off at the token limit are recovered.
 - Online search: Meta's web search (Responses API, web_search tool, located in Tanzania) finds products in Tanzanian shops and public social pages; only links the search returned are kept; each page is read (robots.txt respected) for photo, price and description; finds are sent as photos with price, shop, area, description and link, and kept in an index that answers later requests and is refreshed every six hours within the daily limit.
 - Nearby shops from Google Places (rating, phone, open now, map link), cached for a day.

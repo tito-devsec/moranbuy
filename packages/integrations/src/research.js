@@ -22,7 +22,7 @@ export function researchResultsToOffers(results) {
   return results.filter((r) => r.price !== null).map((r, i) => ({
     id: `web:${r.domain}:${i}`, merchantId: `web:${r.domain}`, merchantName: r.shopName || r.domain, merchantStatus: 'active', merchantVerified: false, source: 'web', sourceKey: `web:${r.sourceUrl}`,
     name: r.name, productType: r.productType || null, category: r.category || null, attributes: r.attributes || {}, price: r.price, currency: r.currency, priceVerified: false,
-    description: r.description || null, area: r.area || null, condition: r.condition || null,
+    description: r.description || null, area: r.area || null, condition: r.condition || null, contactPhone: r.contactPhone || null,
     stock: r.availability === 'out of stock' ? 0 : null, status: 'active', imageUrl: r.imageUrl, updatedAt: r.retrievedAt, deletedAt: null,
     location: null, delivery: { available: null, fee: null, radiusKm: null }, pickup: null, sourceUrl: r.sourceUrl, unverified: true,
   }));

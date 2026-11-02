@@ -6,6 +6,7 @@ import { upsertMoranMerchant, upsertMoranLocation, upsertMoranListing } from '@m
 import { offersForListings } from '@moranbuy/reverse-marketplace';
 import { formatMoney } from '@moranbuy/core';
 import { db } from '../db/connection.js';
+import { sendPhoto } from './outbound-image.js';
 
 // Moran AI businesses that are not on MoranBuy but sell what a customer wants are asked first, on WhatsApp, for that one customer.
 // Nothing about their products reaches a customer until the owner answers NDIO (this customer) or LISTI (list the whole business).
@@ -86,7 +87,7 @@ export async function handleOwnerLeadReply({ moran, engine, from, text, acceptTe
   const out = customer && ids.length ? await engine.presentAgreedOffers(customer, await offersForListings(dbImpl, ids), { businessName }) : null;
   if (out) for (const [i, r] of out.replies.entries()) {
     const key = `moranbuy:lead-offer:${lead.ref}:${i}`;
-    if (r.imageUrl) await moran.sendImage({ to: customer.channel_ref, imageUrl: r.imageUrl, caption: r.caption || '', idempotencyKey: key });
+    if (r.imageUrl) await sendPhoto(moran, { to: customer.channel_ref, imageUrl: r.imageUrl, caption: r.caption || '', idempotencyKey: key });
     else await moran.sendText({ to: customer.channel_ref, body: r.text, idempotencyKey: key });
   }
   const thanks = out

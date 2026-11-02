@@ -16,6 +16,7 @@ import { intakeVoice, intakeImage } from '../services/media-intake.js';
 import { voiceReplyFor } from '../services/voice-reply.js';
 import { engagementDeps } from '../services/engagement.js';
 import { handleOwnerLeadReply } from '../services/business-leads.js';
+import { sendPhoto } from '../services/outbound-image.js';
 import { handleDelivererMessage, handleCustomerProtectionMessage, handleMerchantProtectionMessage, isActiveDeliverer } from '../services/protection/chat.js';
 
 export const internalInboundRouter = express.Router();
@@ -93,7 +94,7 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
     const result = r.buttons
       ? await moran.sendButtons({ to: from, body: r.text, buttons: r.buttons, footer: r.footer || null, idempotencyKey })
       : r.imageUrl
-        ? await moran.sendImage({ to: from, imageUrl: r.imageUrl, caption: r.caption || '', idempotencyKey })
+        ? await sendPhoto(moran, { to: from, imageUrl: r.imageUrl, caption: r.caption || '', idempotencyKey })
         : await moran.sendText({ to: from, body: r.text, idempotencyKey });
     sent.push({ idempotencyKey, status: result.status });
     if (!result.ok) logger.warn({ status: result.status }, 'Reply to Moran not delivered');

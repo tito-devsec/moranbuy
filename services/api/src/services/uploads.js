@@ -8,6 +8,7 @@ import { db } from '../db/connection.js';
 // What each purpose accepts and who may see it; the type is read from the file's own bytes, never trusted from the request.
 export const PURPOSES = Object.freeze({
   product_image: { kinds: ['image'], public: true },
+  offer_image: { kinds: ['image'], public: true }, // a shop's product photo copied by MoranBuy so WhatsApp can fetch it
   verification_document: { kinds: ['image', 'pdf'], public: false },
   customer_photo: { kinds: ['image'], public: false },
   voice_note: { kinds: ['audio'], public: false },  // a voice note a customer or business sent, kept briefly
@@ -16,7 +17,7 @@ export const PURPOSES = Object.freeze({
   receipt: { kinds: ['pdf'], public: false }, // a receipt MoranBuy issued; a financial record
 });
 // Files MoranBuy makes or must keep as evidence are not counted against anyone's daily upload cap.
-const UNCAPPED = new Set(['voice_reply', 'delivery_photo', 'receipt']);
+const UNCAPPED = new Set(['voice_reply', 'delivery_photo', 'receipt', 'offer_image']);
 const DAILY_LIMIT = 200;
 
 // The real type of a file from its first bytes: JPEG, PNG, WebP or PDF; anything else is refused.

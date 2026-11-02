@@ -6,6 +6,7 @@ import { createApp } from '../../services/api/src/app.js';
 import { routers } from '../../services/api/src/routers.js';
 import { setShoppingDepsForTests } from '../../services/api/src/services/shopping.js';
 import { DiscoveryResearcher, NearbyShops, findIndexed, warmUpIndex } from '../../services/api/src/services/discovery.js';
+import { createShopInquiry, answerShopInquiry, listShopInquiries } from '../../services/api/src/services/shop-inquiries.js';
 import { ShoppingEngine } from '@moranbuy/reverse-marketplace';
 import { MuseClient } from '@moranbuy/muse-intelligence';
 import { FakeGeocoder, FakeMoranInternalClient, signBody, resetRobotsCacheForTests } from '@moranbuy/integrations';
@@ -64,14 +65,14 @@ before(async () => {
   moran = new FakeMoranInternalClient();
   const researcher = new DiscoveryResearcher({ fetchImpl: fakeFetch, resolve: async () => settings, museConfig: async () => ({ apiKey: 'muse-test-key', baseUrl: 'https://api.meta.ai/v1', model: 'muse-spark-1.3' }) });
   const nearby = new NearbyShops({ fetchImpl: fakeFetch, resolve: async () => settings });
-  const engine = new ShoppingEngine({ db, muse: new MuseClient({ cfg: loadConfig({ ...process.env, MUSE_PROVIDER: 'disabled' }), db }), geocoder: new FakeGeocoder({ mbagala: { lat: -6.9006, lng: 39.2707, label: 'Mbagala, Dar es Salaam' } }), researcher, nearby });
+  const engine = new ShoppingEngine({ db, muse: new MuseClient({ cfg: loadConfig({ ...process.env, MUSE_PROVIDER: 'disabled' }), db }), geocoder: new FakeGeocoder({ mbagala: { lat: -6.9006, lng: 39.2707, label: 'Mbagala, Dar es Salaam' } }), researcher, nearby, contact: (a) => createShopInquiry(a) });
   setShoppingDepsForTests({ engine, moran, muse: null, geocoder: null });
   server = createApp({ routers }).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
 after(async () => { server.close(); await closeDatabase(); });
 
-test('with no MoranBuy shops, online finds arrive as photos with price, shop, area, description and link, plus shops near the customer', async () => {
+test('with no MoranBuy shops, online finds arrive as photos with price, shop, area and description but no link or number, plus numbered shops near the customer', async () => {
   const phone = '255712400001'; await acceptedCustomer(phone);
   await send({ from: phone, text: 'Me nahitaji laptop Nina laki 350000, iwe na Rami kuanzia 8 and storage SSD kuanzia 128 kampuni iwe hp' });
   const r = await send({ from: phone, text: 'mbagala dar' });
@@ -80,18 +81,20 @@ test('with no MoranBuy shops, online finds arrive as photos with price, shop, ar
   const out = sentTo(phone).slice(-4);
   const photos = out.filter((m) => m.type === 'image');
   assert.equal(photos.length, 2, 'two online finds with a photo');
-  assert.equal(photos[0].imageUrl, 'https://scontent.example/probook.jpg', 'the cheaper one first');
+  assert.match(photos[0].caption, /HP ProBook/, 'the cheaper one first');
+  assert.match(photos[0].imageUrl, /\/media\/[0-9a-f-]+\.jpg$/, 'WhatsApp gets MoranBuy\'s own copy of the photo');
   assert.match(photos[1].caption, /HP 250 G8/);
   assert.match(photos[1].caption, /TSh 340,000 - Kariakoo Tech, Kariakoo, Dar es Salaam/);
   assert.match(photos[1].caption, /Core i5 11th gen, 8GB RAM, 256GB SSD/, 'description read from the shop page');
-  assert.match(photos[1].caption, /https:\/\/kariakoo-tech\.co\.tz\/hp-250-g8/);
+  assert.doesNotMatch(photos[1].caption, /https?:|kariakoo-tech\.co\.tz\/|0\d{9}/, 'no website in a caption');
   assert.match(photos[1].caption, /imepatikana mtandaoni, haijathibitishwa/);
   const text = out.find((m) => m.type === 'text' && /HP 250 G8/.test(m.body)).body;
-  assert.match(text, /https:\/\/kariakoo-tech\.co\.tz\/hp-250-g8/);
-  assert.doesNotMatch(text, /invented|made-up-shop/, 'a link the search never returned is dropped');
+  assert.doesNotMatch(text, /invented|made-up-shop|https?:\/\//, 'a link the search never returned is dropped, and no website is shown');
   const near = out.at(-1).body;
   assert.match(near, /Maduka karibu nawe yanayouza laptop/);
-  assert.match(near, /Mbagala Computer Centre.*4\.4★ \(37\).*wazi sasa.*0712 000 111/s);
+  assert.match(near, /3\. Mbagala Computer Centre.*4\.4★ \(37\).*wazi sasa/s);
+  const everything = sentTo(phone).map((m) => m.body || m.caption || '').join('\n');
+  assert.doesNotMatch(everything, /0712 ?000 ?111|maps\.google|https?:\/\//, 'no shop number, map link or website reaches the customer');
   assert.equal(await db('web_products').count('* as n').first().then((x) => Number(x.n)), 2);
 });
 
@@ -111,4 +114,29 @@ test('the next customer asking for the same thing is answered from the index, wi
   assert.equal(third.status, 'daily_limit');
   assert.equal(calls.responses, 2);
   assert.equal((await warmUpIndex({ researcher })).searched, 0, 'the warm-up respects the limit too');
+});
+
+test('picking a map shop or an online find asks first; YES records the request with the shop number kept private, and the answer reaches the customer without it', async () => {
+  const phone = '255712400002';
+  const before = sentTo(phone).length;
+  const ask = await send({ from: phone, text: '3' });
+  assert.equal(ask.body.state, 'contact_confirm');
+  const asking = sentTo(phone).at(-1).body;
+  assert.match(asking, /Mbagala Computer Centre/);
+  assert.match(asking, /halijajiunga na MoranBuy/);
+  assert.equal(await db('shop_inquiries').count('* as n').first().then((x) => Number(x.n)), 0, 'nothing is recorded before the customer says yes');
+  const yes = await send({ from: phone, text: 'ndio' });
+  assert.equal(yes.status, 200);
+  const q = (await listShopInquiries({ status: 'new' }))[0];
+  assert.equal(q.shop_name, 'Mbagala Computer Centre');
+  assert.equal(q.shop_phone, '255712000111', 'the number is kept for MoranBuy');
+  assert.equal(q.customer_phone, phone);
+  assert.match(sentTo(phone).at(-1).body, new RegExp(`ombi ${q.ref}`));
+  const done = await answerShopInquiry({ moran, ref: q.ref, available: true, price: 335000, note: 'Wapo Kilwa Rd.' });
+  assert.equal(done.ok, true);
+  const told = sentTo(phone).at(-1).body;
+  assert.match(told, /imethibitisha kuwa/);
+  assert.match(told, /TSh 335,000/);
+  assert.doesNotMatch(sentTo(phone).slice(before).map((m) => m.body || m.caption || '').join('\n'), /0712 ?000 ?111|255712000111|https?:\/\//);
+  assert.deepEqual(await answerShopInquiry({ moran, ref: q.ref, available: false }), { ok: false, reason: 'already_answered', status: 'available' });
 });

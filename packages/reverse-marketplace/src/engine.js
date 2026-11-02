@@ -7,7 +7,7 @@ import { normalizeProductType } from '@moranbuy/budget-matching';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
 import { researchResultsToOffers } from '@moranbuy/integrations';
-import { buildFacts, renderReply } from './present.js';
+import { buildFacts, renderReply, stripContacts, preferPictured } from './present.js';
 import { upsertContact, recordConsent } from '@moranbuy/consent-management';
 import { createLead, followupSettings, holdLeadsForOrder } from '@moranbuy/followup-engine';
 import { recordDemandSignal, recordSchedule, fallbackTiming } from './signals.js';
@@ -16,8 +16,8 @@ const SESSION_TTL_MS = 6 * 3600000;
 
 // The customer-facing shopping engine: one call per inbound message, returns the replies to send and the new session state.
 export class ShoppingEngine {
-  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, nearby = null, leads = null, profileLoader = null, onOrderConfirmed = null, now = Date.now }) {
-    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.nearby = nearby; this.leads = leads; this.profileLoader = profileLoader; this.onOrderConfirmed = onOrderConfirmed; this.now = now;
+  constructor({ db, muse, geocoder, policyLoader = null, researcher = null, nearby = null, leads = null, contact = null, profileLoader = null, onOrderConfirmed = null, now = Date.now }) {
+    this.db = db; this.muse = muse; this.geocoder = geocoder; this.policyLoader = policyLoader; this.researcher = researcher; this.nearby = nearby; this.leads = leads; this.contact = contact; this.profileLoader = profileLoader; this.onOrderConfirmed = onOrderConfirmed; this.now = now;
   }
 
   // Finds the customer's open session or starts one.
@@ -78,6 +78,8 @@ export class ShoppingEngine {
       await signal(previous, 'select', 'selected', { merchantId: picked?.merchantId || null, listingId: picked?.listingId && !String(picked.listingId).startsWith('web:') ? picked.listingId : null });
       return this.select(session, customer, intent.option, previous || {});
     }
+    // YES to "shall I ask this shop?" records the request; MoranBuy contacts the shop with the number it keeps private.
+    if (intent.kind === 'confirm' && session.state === 'contact_confirm') { await signal(previous, 'contact_shop', 'asked'); return this.contactShop(session, customer, previous || {}); }
     // "Mbadala ni upi?" after a search shows the alternatives for the same request: over budget and found online.
     if (extracted.wantsAlternatives && previous?.productType && !normalizeProductType(text).productType) {
       const out = await this.match(session, customer, { ...previous, alternativesOk: true }, { museStatus, context: { ...context, alternatives: true } });
@@ -127,7 +129,7 @@ export class ShoppingEngine {
       if (r.ok) offers.push(...researchResultsToOffers(r.results));
     }
     const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
-    const result = rankOffers({ request, offers, policy, now: this.now() });
+    const result = rankOffers({ request, offers: preferPictured(offers), policy, now: this.now() });
     const facts = buildFacts(result, request);
     const [run] = await this.db('matching_runs').insert({
       session_id: session.id, request_json: request, policy_json: result.policy, candidates: offers.length, ranked: result.ranked.length,
@@ -148,13 +150,15 @@ export class ShoppingEngine {
     if (this.muse.enabled && (facts.ranked.length || facts.overBudget.length)) {
       const draft = await museDraftRecommendation(this.muse, { facts, language: request.language, requestRef: session.id });
       if (draft.ok && draft.json?.reply && numbersAreGrounded(draft.json.reply, facts)) textOut = String(draft.json.reply).slice(0, 1500);
-      // Muse's wording can leave out links; online finds always keep theirs.
-      const links = [...facts.ranked, ...facts.overBudget].filter((o) => o.source === 'web' && o.sourceUrl && !textOut.includes(o.sourceUrl));
-      if (links.length) textOut += `\n${request.language === 'en' ? 'Links' : 'Viungo'}:\n${links.map((o) => `${o.option}. ${o.sourceUrl}`).join('\n')}`;
     }
-    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, variant: o.variant || null, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl }));
+    // The shop's number is kept in the session only, for the moment the customer asks MoranBuy to contact the shop; it is never put in a message.
+    const privateContact = new Map([...result.ranked, ...result.overBudget].map((r) => [r.offer.id, r.offer.contactPhone || null]));
+    const presented = [...facts.ranked, ...facts.overBudget].map((o) => ({ option: o.option, listingId: o.listingId, merchantId: o.merchantId || null, name: o.name, variant: o.variant || null, merchant: o.merchant, knownTotal: o.knownTotal, totalConfirmed: o.totalConfirmed, budgetStatus: o.budgetStatus, imageUrl: o.imageUrl, area: o.area || o.locationLabel || null, kind: o.source === 'web' ? 'web' : 'own', contact: privateContact.get(o.listingId) || null }));
+    // Shops near the customer from Google Maps continue the numbering: no prices there, so the customer can ask MoranBuy to check with the shop.
+    const near = await this.nearbyShops(request, presented.length);
+    presented.push(...near.entries);
     await this.save(session, { state: 'presented', request_json: request, current_run_id: run.id, context_json: { ...context, presented } });
-    // Up to three offers with a photo go first, each with its price, shop, area, a line of description and, for online finds, the link.
+    // Up to three offers with a photo go first, each with its price, shop, area and a line of description; no number or website is ever shown.
     const photos = [...facts.ranked, ...facts.overBudget].filter((o) => o.imageUrl).slice(0, 3).map((o) => ({ imageUrl: o.imageUrl, caption: photoCaption(o, request) }));
     // Few confirmed MoranBuy offers: Moran AI businesses with matching products are asked (their answer comes later, as new options).
     const own = [...result.ranked, ...result.overBudget].filter((r) => r.offer.source !== 'web').length;
@@ -162,10 +166,8 @@ export class ShoppingEngine {
       const asked = await this.leads({ session, customer, request }).catch(() => ({ asked: 0 }));
       if (asked.asked) textOut += `\n\n${request.language === 'en' ? `I have also asked ${asked.asked} Moran AI shop${asked.asked > 1 ? 's' : ''} that sell this; if they agree, their offers will come here and can be paid safely through MoranBuy.` : `Pia nimeuliza maduka ${asked.asked} ya Moran AI yanayouza bidhaa hii; yakikubali, ofa zao zitakuja hapa na unaweza kulipa salama kupitia MoranBuy.`}`;
     }
-    const replies = [...photos, { text: textOut }];
-    // Shops near the customer from Google Maps: no prices there, so they come after the offers, as places to visit or call.
-    const near = await this.nearbyText(request);
-    if (near) replies.push({ text: near });
+    const replies = [...photos, { text: stripContacts(textOut) }];
+    if (near.text) replies.push({ text: near.text });
     return this.reply(session, replies, { museStatus, run, result });
   }
 
@@ -187,17 +189,22 @@ export class ShoppingEngine {
     return this.reply(session, [...photos, { text: `${intro}\n${renderReply(facts, request.language)}` }]);
   }
 
-  async nearbyText(request) {
-    if (!this.nearby || !request.location) return null;
+  // Shops from Google Maps near the customer, numbered after the offers; the number and the map link stay out of the message.
+  async nearbyShops(request, startAt = 0) {
+    if (!this.nearby || !request.location) return { text: null, entries: [] };
     const r = await this.nearby.find(request).catch(() => ({ ok: false, shops: [] }));
-    if (!r.shops?.length) return null;
+    if (!r.shops?.length) return { text: null, entries: [] };
     const en = request.language === 'en';
-    const lines = [en ? `Shops near you that sell ${request.productType} (Google Maps, call to check price and stock):` : `Maduka karibu nawe yanayouza ${request.productType} (Google Maps, piga kuuliza bei na upatikanaji):`];
-    for (const s of r.shops) {
-      const bits = [s.distanceKm !== null ? `${s.distanceKm} km` : null, s.rating ? `${s.rating}★${s.ratings ? ` (${s.ratings})` : ''}` : null, s.openNow === true ? (en ? 'open now' : 'wazi sasa') : s.openNow === false ? (en ? 'closed now' : 'imefungwa sasa') : null, s.phone].filter(Boolean);
-      lines.push(`• ${s.name}${s.address ? `, ${s.address}` : ''}${bits.length ? ` - ${bits.join(', ')}` : ''}${s.mapsUrl ? `\n  ${s.mapsUrl}` : ''}`);
-    }
-    return lines.join('\n').slice(0, 1500);
+    const lines = [en ? `Shops near you that sell ${request.productType} (prices not known):` : `Maduka karibu nawe yanayouza ${request.productType} (bei haijulikani):`];
+    const entries = [];
+    r.shops.forEach((s, i) => {
+      const option = startAt + i + 1;
+      const bits = [s.distanceKm !== null ? `${s.distanceKm} km` : null, s.rating ? `${s.rating}★${s.ratings ? ` (${s.ratings})` : ''}` : null, s.openNow === true ? (en ? 'open now' : 'wazi sasa') : s.openNow === false ? (en ? 'closed now' : 'imefungwa sasa') : null].filter(Boolean);
+      lines.push(`${option}. ${s.name}${s.address ? `, ${s.address}` : ''}${bits.length ? ` - ${bits.join(', ')}` : ''}`);
+      entries.push({ option, listingId: `shop:${s.placeId || option}`, merchantId: null, name: request.productType, variant: null, merchant: s.name, knownTotal: null, totalConfirmed: false, budgetStatus: 'unknown', imageUrl: null, area: s.address || null, kind: 'shop', contact: s.phone || null });
+    });
+    lines.push(en ? 'Reply with a shop number and I will ask that shop for the price and whether it is in stock.' : 'Jibu namba ya duka nikuulizie bei na kama bidhaa ipo.');
+    return { text: stripContacts(lines.join('\n')).slice(0, 1500), entries };
   }
 
   // The customer picked an option: re-check the listing now and read back the known costs before any order exists.
@@ -205,7 +212,7 @@ export class ShoppingEngine {
     const presented = (session.context_json?.presented || []).find((p) => p.option === option);
     const lang = request.language || 'sw';
     if (!presented) return this.reply(session, [{ text: lang === 'en' ? 'Please reply with one of the option numbers shown.' : 'Tafadhali jibu kwa namba ya chaguo lililoonyeshwa.' }]);
-    if (String(presented.listingId || '').startsWith('web:')) return this.reply(session, [{ text: lang === 'en' ? 'That one was found online and is not a MoranBuy merchant, so I cannot order it for you. Pick another option or ask me to search again.' : 'Hilo limepatikana mtandaoni na si muuzaji wa MoranBuy, kwa hiyo siwezi kuliagiza. Chagua namba nyingine au niambie nitafute tena.' }]);
+    if (/^(web|shop):/.test(String(presented.listingId || ''))) return this.askContact(session, presented, request);
     const listing = await this.db('listings as l').join('merchants as m', 'm.id', 'l.merchant_id').where('l.id', presented.listingId).whereNull('l.deleted_at').first('l.*', 'm.business_name', 'm.status as merchant_status');
     const variant = presented.variant ? (Array.isArray(listing?.variants) ? listing.variants : []).find((v) => v && v.name === presented.variant) : null;
     const stockNow = variant && variant.stock !== null && variant.stock !== undefined ? Number(variant.stock) : listing?.stock;
@@ -221,6 +228,28 @@ export class ShoppingEngine {
     const askConfirm = lang === 'en' ? 'Reply YES to place this order with the merchant, or NO to go back.' : 'Jibu NDIO kuweka oda hii kwa muuzaji, au HAPANA kurudi.';
     await this.save(session, { state: 'selected', selected_offer_id: presented.listingId, context_json: { ...session.context_json, selected: { listingId: presented.listingId, option, knownTotal: presented.knownTotal, totalConfirmed: presented.totalConfirmed, price: priceNow, variant: presented.variant || null, merchantId: listing.merchant_id, merchantName: listing.business_name } } });
     return this.reply(session, [{ text: `${option}. ${listing.name}${presented.variant ? ` (${presented.variant})` : ''} - ${listing.business_name}. ${totalLine} ${askConfirm}` }]);
+  }
+
+  // An online find or a map shop is not a MoranBuy business, so it cannot be ordered here: the customer is asked whether MoranBuy should check with the shop.
+  async askContact(session, presented, request) {
+    const en = request.language === 'en';
+    const price = presented.kind === 'web' && presented.knownTotal ? formatMoney(presented.knownTotal, request.currency || 'TZS') : null;
+    await this.save(session, { state: 'contact_confirm', context_json: { ...session.context_json, contactTarget: { option: presented.option, kind: presented.kind || 'web', listingId: presented.listingId, name: presented.name, merchant: presented.merchant, price: presented.knownTotal || null, area: presented.area || null, imageUrl: presented.imageUrl || null, contact: presented.contact || null } } });
+    const what = `${presented.option}. ${presented.name} - ${presented.merchant}${price ? ` (${price})` : ''}`;
+    return this.reply(session, [{ text: en
+      ? `${what}. This shop is not on MoranBuy yet, so it cannot be ordered here. Shall I contact the shop for you to confirm that it is in stock and the final price, and tell you here? Reply YES or NO.`
+      : `${what}. Duka hili bado halijajiunga na MoranBuy, kwa hiyo siwezi kuagiza hapa. Nikuwasiliane na duka kuthibitisha kama bidhaa ipo na bei ya mwisho, kisha nikujulishe hapa? Jibu NDIO au HAPANA.` }]);
+  }
+
+  async contactShop(session, customer, request) {
+    const en = request.language === 'en';
+    const target = session.context_json?.contactTarget;
+    const made = target && this.contact ? await this.contact({ session, customer, request, target }).catch(() => null) : null;
+    await this.save(session, { state: 'presented' });
+    if (!made) return this.reply(session, [{ text: en ? 'Sorry, I could not send your request to the shop right now. Pick another option or try again later.' : 'Samahani, sikuweza kutuma ombi lako kwa duka sasa. Chagua chaguo lingine au jaribu tena baadaye.' }]);
+    return this.reply(session, [{ text: en
+      ? `Done. I have asked ${target.merchant} about ${target.name}. I will tell you here as soon as they answer (request ${made.ref}). You can pick another option meanwhile.`
+      : `Sawa. Nimeomba ${target.merchant} kuthibitisha ${target.name}. Nitakujulisha hapa mara tu watakapojibu (ombi ${made.ref}). Unaweza kuchagua chaguo lingine wakati huu.` }]);
   }
 
   // Only an explicit YES creates an order; it is recorded as pending with the merchant and the customer gets its reference.
@@ -285,8 +314,7 @@ function photoCaption(o, request) {
   const where = [o.merchant, o.area || o.locationLabel].filter(Boolean).join(', ');
   const lines = [`${o.option}. ${o.name}`, `${formatMoney(o.price, request.currency || 'TZS')}${where ? ` - ${where}` : ''}${o.source === 'web' ? (en ? ' (found online, not confirmed)' : ' (imepatikana mtandaoni, haijathibitishwa)') : ''}`];
   if (o.description) lines.push(o.description);
-  if (o.source === 'web' && o.sourceUrl) lines.push(o.sourceUrl);
-  return lines.join('\n').slice(0, 1000);
+  return stripContacts(lines.join('\n')).slice(0, 1000);
 }
 
 // Keeps only the fields the request schema knows and the control fields the engine reads.

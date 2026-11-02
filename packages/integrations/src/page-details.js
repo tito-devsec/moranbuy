@@ -40,6 +40,24 @@ function jsonLdProduct(html) {
   return null;
 }
 
+// A Tanzanian number in 255XXXXXXXXX form, or null; used privately so MoranBuy can contact the shop for a customer who asked.
+export function tzPhone(raw) {
+  const d = String(raw || '').replace(/[^\d]/g, '');
+  if (/^255[67]\d{8}$/.test(d)) return d;
+  if (/^0[67]\d{8}$/.test(d)) return `255${d.slice(1)}`;
+  return null;
+}
+
+// The first shop number on a page: JSON-LD telephone, a tel: link or a wa.me link.
+function pagePhone(html) {
+  const found = [];
+  for (const m of html.matchAll(/"telephone"\s*:\s*"([^"]+)"/gi)) found.push(m[1]);
+  for (const m of html.matchAll(/href=["']tel:([^"']+)["']/gi)) found.push(decodeURIComponent(m[1]));
+  for (const m of html.matchAll(/wa\.me\/(\+?\d{9,13})/gi)) found.push(m[1]);
+  for (const f of found) { const n = tzPhone(f); if (n) return n; }
+  return null;
+}
+
 // A link that really answers with an image (checked with a small ranged request).
 export async function isImage(fetchImpl, url) {
   try {
@@ -70,7 +88,7 @@ export async function pageDetails(url, { fetchImpl = globalThis.fetch, checkImag
     if (image && checkImage && !(await isImage(fetchImpl, image))) image = null;
     const description = decode(ld?.description || meta(html, 'og:description') || meta(html, 'description') || '').replace(/\s+/g, ' ').slice(0, 400) || null;
     const price = ld?.price !== null && ld?.price !== undefined && Number(ld.price) > 0 ? Math.round(Number(ld.price)) : null;
-    return { ok: true, imageUrl: image, description, price, currency: ld?.currency || null, title: decode(ld?.name || meta(html, 'og:title') || '').slice(0, 300) || null };
+    return { ok: true, phone: pagePhone(html), imageUrl: image, description, price, currency: ld?.currency || null, title: decode(ld?.name || meta(html, 'og:title') || '').slice(0, 300) || null };
   } catch (err) {
     return { ok: false, reason: err?.name === 'TimeoutError' ? 'timeout' : 'error' };
   }
