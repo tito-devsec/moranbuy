@@ -1,9 +1,22 @@
 import { FakeMoranInternalClient, FakeGeocoder } from '@moranbuy/integrations';
 
 // The demo's WhatsApp: every message MoranBuy would send is kept in memory with its time, so the demo phone can show it.
+// Messages to businesses and riders are written in Swahili with the English under a "/" line; the demo, made for an English-reading audience, keeps the English.
+const TITLES = { Nakubali: 'I accept', Sikubali: 'I decline', Imekataliwa: 'Refused', 'Mteja hayupo': 'Customer not there', 'Ndio, nimekataa': 'Yes, I refused', Hapana: 'No' };
+export function englishOnly(m) {
+  if (process.env.DEMO_LANGUAGE === 'sw') return m;
+  const out = { ...m };
+  const en = (s) => { const parts = String(s).split(/\n\/ /); return parts.length === 2 ? parts[1] : s; };
+  if (typeof out.body === 'string') out.body = en(out.body);
+  if (typeof out.caption === 'string') out.caption = en(out.caption);
+  if (Array.isArray(out.buttons)) out.buttons = out.buttons.map((b) => ({ ...b, title: b.title.includes(' / ') ? b.title.split(' / ').pop() : TITLES[b.title] || b.title }));
+  return out;
+}
+
 export class RecordingMoranClient extends FakeMoranInternalClient {
   constructor() { super(); this.log = []; }
-  record(m) {
+  record(raw) {
+    const m = englishOnly(raw);
     this.log.push({ seq: this.log.length + 1, at: new Date().toISOString(), ...m });
     if (this.log.length > 20000) this.log.splice(0, 5000);
   }

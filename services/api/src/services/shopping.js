@@ -48,12 +48,13 @@ export function shoppingDeps() {
 export function setShoppingDepsForTests(deps) { shared = deps; }
 
 // Finds or creates the customer record for a channel identity.
-export async function upsertCustomer({ channel, channelRef, name = null, language = null }) {
+export async function upsertCustomer({ channel, channelRef, name = null, language = null, initialLanguage = null }) {
   const existing = await db('customers').where({ channel, channel_ref: channelRef }).first();
   if (existing) {
     await db('customers').where({ id: existing.id }).update({ last_seen_at: db.fn.now(), ...(name ? { name } : {}), ...(language ? { language } : {}) });
     return existing;
   }
-  const [row] = await db('customers').insert({ channel, channel_ref: channelRef, name, language: language || 'sw', last_seen_at: db.fn.now() }).returning('*');
+  // The first message decides the language a new customer is served in; later messages can change it.
+  const [row] = await db('customers').insert({ channel, channel_ref: channelRef, name, language: language || initialLanguage || 'sw', last_seen_at: db.fn.now() }).returning('*');
   return row;
 }

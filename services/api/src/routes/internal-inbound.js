@@ -16,6 +16,7 @@ import { intakeVoice, intakeImage } from '../services/media-intake.js';
 import { voiceReplyFor } from '../services/voice-reply.js';
 import { engagementDeps } from '../services/engagement.js';
 import { handleOwnerLeadReply } from '../services/business-leads.js';
+import { parseLanguage } from '@moranbuy/reverse-marketplace';
 import { sendPhoto } from '../services/outbound-image.js';
 import { handleDelivererMessage, handleCustomerProtectionMessage, handleMerchantProtectionMessage, isActiveDeliverer } from '../services/protection/chat.js';
 
@@ -46,7 +47,7 @@ internalInboundRouter.post('/', asyncHandler(async (req, res) => {
   const inserted = await db('webhook_events').insert({ source: 'moran', event_id: String(messageId), event_type: 'inbound_message' }).onConflict(['source', 'event_id']).ignore().returning('id');
   if (!inserted.length) return res.json({ ok: true, duplicate: true });
 
-  const customer = await upsertCustomer({ channel: 'whatsapp', channelRef: String(from), name });
+  const customer = await upsertCustomer({ channel: 'whatsapp', channelRef: String(from), name, initialLanguage: text && parseLanguage(text) === 'en' ? 'en' : null });
   const { engine, moran } = shoppingDeps();
   // A bare STOP to the MoranBuy number ends marketing and follow-up from every merchant; START restores only the MoranBuy relationship.
   let out; let gate; let delivery; let protectedReply; let leadReply;
