@@ -115,6 +115,7 @@
     if (item.kind === 'sys') { wrap.innerHTML = `<div class="sys">${esc(item.text)}</div>`; return wrap; }
     if (item.kind === 'out') {
       if (item.type === 'image') wrap.innerHTML = `<div class="msg out photo-msg"><img src="${item.src}" alt="Photo sent"><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
+      else if (item.type === 'location') wrap.innerHTML = `<div class="msg out loc-msg"><div class="loc-map"><i class="fi fi-sr-marker"></i></div><b>Location</b><small>${esc(item.label)}</small><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
       else if (item.type === 'voice') wrap.innerHTML = `<div class="msg out"><div class="dvoice"><span class="avatar"><i class="fi fi-sr-microphone"></i></span><button type="button" disabled><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(item.seed || 3, 1)}</span></div><span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
       else wrap.innerHTML = `<div class="msg out">${fmt(item.text)}<span class="meta">${hhmm(item.at)} ${tick}</span></div>`;
       return wrap;
@@ -274,6 +275,25 @@
     if (!st.info?.voice) return toast('Voice is not installed on this sandbox server.');
     await act('customer', '/voice', {}, { type: 'voice', seed: Date.now() % 97 });
   }
+  // Share location: a few places around Dar es Salaam, or the browser's own position (with the visitor's permission); MoranBuy names the pin itself.
+  const PLACES = [['Sinza Mori, Dar es Salaam', -6.7745, 39.2235], ['Kariakoo, Dar es Salaam', -6.8193, 39.2737], ['Masaki, Dar es Salaam', -6.7486, 39.2824], ['Mbezi, Dar es Salaam', -6.7214, 39.1717]];
+  async function sharePin(lat, lng, label) {
+    if (st.role !== 'customer') return toast('Location sharing is set up for the customer in this demo.');
+    await send('customer', { location: { lat, lng, ...(label ? { label } : {}) } }, { type: 'location', label: label || `${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+  }
+  $('pin').addEventListener('click', () => {
+    const old = document.getElementById('pin-sheet'); if (old) { old.remove(); return; }
+    const sheet = document.createElement('div'); sheet.id = 'pin-sheet'; sheet.className = 'pin-sheet';
+    sheet.innerHTML = `<b>Share location</b>${PLACES.map((p, i) => `<button type="button" data-i="${i}"><i class="fi fi-rr-marker"></i>${esc(p[0])}</button>`).join('')}<button type="button" data-i="me"><i class="fi fi-rr-location-crosshairs"></i>My current location</button>`;
+    sheet.addEventListener('click', async (e) => {
+      const b = e.target.closest('button'); if (!b) return; sheet.remove();
+      if (b.dataset.i === 'me') {
+        if (!navigator.geolocation) return toast('This browser cannot share a location.');
+        navigator.geolocation.getCurrentPosition((pos) => sharePin(pos.coords.latitude, pos.coords.longitude, null), () => toast('Location not shared.'), { timeout: 10000 });
+      } else { const p = PLACES[Number(b.dataset.i)]; await sharePin(p[1], p[2], p[0]); }
+    });
+    document.querySelector('.composer').before(sheet);
+  });
   $('file').addEventListener('change', async (e) => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;

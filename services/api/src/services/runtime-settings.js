@@ -71,9 +71,16 @@ export async function describeCredentials(opts) {
 export async function museRuntimeConfig(opts) {
   const c = await getCredentials(opts);
   const env = config();
-  const apiKey = c.muse.apiKey || env.MUSE_API_KEY || null;
+  let apiKey = c.muse.apiKey || env.MUSE_API_KEY || null;
   const provider = c.muse.provider || env.MUSE_PROVIDER;
-  return { provider: apiKey && provider === 'disabled' ? 'meta' : provider, baseUrl: c.muse.baseUrl || env.MUSE_API_BASE_URL, apiKey, model: c.muse.model || env.MUSE_MODEL_ID, reasoningEffort: c.muse.reasoningEffort || env.MUSE_REASONING_EFFORT, timeoutMs: env.MUSE_TIMEOUT_MS };
+  // The public demo has a daily allowance of sessions; past it, the day's remaining visitors get the rules path, so a crowd cannot run up the Meta bill.
+  const cap = env.DEMO_MODE ? Number(process.env.DEMO_DAILY_SESSIONS || 300) : 0;
+  let capped = false;
+  if (cap && apiKey) {
+    const row = await db('discovery_usage').whereRaw("day = (now() AT TIME ZONE 'Africa/Dar_es_Salaam')::date").where({ kind: 'demo_session' }).first('count').catch(() => null);
+    if (row && Number(row.count) > cap) { capped = true; apiKey = null; }
+  }
+  return { provider: apiKey && provider === 'disabled' ? 'meta' : apiKey ? provider : 'disabled', baseUrl: c.muse.baseUrl || env.MUSE_API_BASE_URL, apiKey, model: c.muse.model || env.MUSE_MODEL_ID, reasoningEffort: c.muse.reasoningEffort || env.MUSE_REASONING_EFFORT, timeoutMs: env.MUSE_TIMEOUT_MS, capped, cap };
 }
 
 // Effective Snippe settings; the provider is Snippe whenever a key exists from either source.

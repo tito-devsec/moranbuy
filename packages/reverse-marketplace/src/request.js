@@ -12,7 +12,7 @@ export const shoppingRequestSchema = z.object({
   currency: z.string().length(3).default('TZS'),
   quantity: z.number().int().positive().max(1000).default(1),
   locationText: z.string().trim().max(200).nullable().default(null),
-  location: z.object({ lat: z.number(), lng: z.number(), label: z.string().max(200).nullable().default(null), source: z.enum(['customer_pin', 'customer_text_geocoded', 'customer_shared']).default('customer_shared') }).nullable().default(null),
+  location: z.object({ lat: z.number(), lng: z.number(), label: z.string().max(200).nullable().default(null), country: z.string().length(2).nullable().default(null), source: z.enum(['customer_pin', 'customer_text_geocoded', 'customer_shared']).default('customer_shared') }).nullable().default(null),
   fulfilment: z.enum(['delivery', 'pickup', 'any']).default('any'),
   alternativesOk: z.boolean().default(true),
   urgency: z.string().max(120).nullable().default(null),

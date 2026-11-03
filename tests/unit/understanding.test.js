@@ -52,3 +52,13 @@ test('a model name alone names the product, and "hp elitebook g7" as a brand is 
   assert.deepEqual(tidy.essentialAttributes, { brand: 'hp' });
   assert.deepEqual(tidy.preferredAttributes, { model: 'EliteBook G7' });
 });
+
+test('a shared map pin is named by reverse geocoding, with its country', async () => {
+  const { Geocoder } = await import('../../packages/integrations/src/geocoder.js');
+  const seen = [];
+  const g = new Geocoder({ cfg: { GEOCODER_BASE_URL: 'https://nominatim.example', GEOCODER_CONTACT_EMAIL: 'test@example.com', DEFAULT_COUNTRY: 'TZ' }, fetchImpl: async (url) => { seen.push(url); return new Response(JSON.stringify({ display_name: 'Mbagala, Temeke, Dar es Salaam, Tanzania', address: { city: 'Dar es Salaam', country_code: 'tz' } }), { status: 200 }); } });
+  const r = await g.reverse(-6.9006, 39.2707);
+  assert.match(seen[0], /\/reverse\?format=jsonv2.*lat=-6\.9006.*lon=39\.2707/);
+  assert.deepEqual(r, { label: 'Mbagala, Temeke, Dar es Salaam, Tanzania', city: 'Dar es Salaam', country: 'TZ' });
+  assert.equal(await g.reverse('x', 1), null);
+});

@@ -27,6 +27,7 @@ export async function museExtractRequest(muse, { text, imageUrl = null, imageDat
   if (context.previousRequest) messages.push({ role: 'user', content: `Current request so far (JSON): ${JSON.stringify(context.previousRequest)}` });
   if (context.presentedOffers) messages.push({ role: 'user', content: `Options already shown, numbered: ${JSON.stringify(context.presentedOffers)}` });
   if (context.answering) messages.push({ role: 'user', content: `The next message answers MoranBuy's question about: ${context.answering}` });
+  if (context.sharedPlace) messages.push({ role: 'user', content: `The customer shared their location on the map: ${context.sharedPlace}. Use it as locationText and do not ask where they are.` });
   messages.push({ role: 'user', content });
   return muse.complete({ feature: imageUrl || imageDataUrl ? 'image' : 'intent', system: SYSTEM, messages, maxTokens: 2500, reasoningEffort: 'minimal', requestRef: context.requestRef || null });
 }

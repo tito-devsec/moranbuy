@@ -22,6 +22,18 @@ export class Geocoder {
     if (!hit) return null;
     return { lat: Number(hit.lat), lng: Number(hit.lon), label: hit.display_name };
   }
+
+  // A shared map pin: returns { label, city, country } for coordinates, or null; the country code is upper case (TZ).
+  async reverse(lat, lng) {
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return null;
+    const url = `${this.baseUrl}/reverse?format=jsonv2&zoom=14&lat=${Number(lat)}&lon=${Number(lng)}`;
+    const res = await this.fetchImpl(url, { headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const hit = await res.json().catch(() => null);
+    if (!hit?.display_name) return null;
+    const a = hit.address || {};
+    return { label: hit.display_name, city: a.city || a.town || a.county || a.state || null, country: a.country_code ? String(a.country_code).toUpperCase() : null };
+  }
 }
 
 // A geocoder for tests that answers from a fixed map and records what was asked.
@@ -31,5 +43,11 @@ export class FakeGeocoder {
     this.calls.push(text);
     const key = Object.keys(this.map).find((k) => String(text).toLowerCase().includes(k.toLowerCase()));
     return key ? this.map[key] : null;
+  }
+  // The nearest known place within about five kilometres answers a shared pin.
+  async reverse(lat, lng) {
+    this.calls.push(`reverse:${lat},${lng}`);
+    const hit = Object.values(this.map).find((v) => Math.abs(v.lat - lat) < 0.05 && Math.abs(v.lng - lng) < 0.05);
+    return hit ? { label: hit.label, city: null, country: hit.country || 'TZ' } : null;
   }
 }

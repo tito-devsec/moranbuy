@@ -87,8 +87,9 @@ Where the offers come from, in order:
 
 ## Beyond Tanzania: search by the customer's location
 
-Nothing in MoranBuy is tied to one city. The customer's place drives everything: the geocoder resolves
-it inside the configured country, offers are ranked by distance from it, the online search is made for
+Nothing in MoranBuy is tied to one city. The customer's place drives everything: a typed place is
+geocoded inside the configured country, a shared WhatsApp location is named by reverse geocoding
+(with its country) and told to Muse Spark as the place, offers are ranked by distance from it, the online search is made for
 that country and city (`user_location` on Meta's web search), and the map search uses the same region.
 To run MoranBuy in another country, set `DEFAULT_COUNTRY` and `DEFAULT_CURRENCY` in `.env`, connect a
 WhatsApp number there, and let shops list. The money-handling adapters (Snippe today) sit behind one
@@ -316,7 +317,13 @@ entered in MoranBuy Admin and take effect at once.
 the server log. It is served by a separate sandbox container (`moranbuy-demo`) running the same code
 with `DEMO_MODE=true`: its own database, a recording WhatsApp line, the sandbox payment provider and
 five sample shops on reserved numbers. It gets no production keys; the main API only passes `/api/demo`
-calls through to it. Demo sessions are deleted after a day. Run it yourself with `docker compose up demo` or
+calls through to it. Demo sessions are deleted after a day.
+
+It is safe to hand to strangers: no real phone numbers or money; photos are limited to 6 MB JPEG or PNG and deleted
+with the session; 90 requests a minute per address and 160 actions per session; web searches capped per day
+(`DEMO_WEB_SEARCH_LIMIT`, 40); and a daily allowance of sessions on the Meta key (`DEMO_DAILY_SESSIONS`, 300), after
+which the sandbox keeps working on the rules path until the next day and says so in its terminal. The customer can
+also share a location from the phone's pin button (four places around Dar es Salaam, or the browser's own position). Run it yourself with `docker compose up demo` or
 `npm run demo` (see above).
 
 ## Install and run

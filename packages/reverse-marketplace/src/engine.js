@@ -48,13 +48,19 @@ export class ShoppingEngine {
     let museStatus = 'disabled';
     let extracted = null;
     const lastAsked = session.state === 'clarifying' ? (context.asked || []).at(-1) || null : null;
-    const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, answering: lastAsked, requestRef: session.id } });
+    // A shared map pin is named (and its country read) before anything else, so Muse and the search both know the place.
+    let pin = null;
+    if (sharedLocation) {
+      pin = { lat: Number(sharedLocation.lat), lng: Number(sharedLocation.lng), label: sharedLocation.label || null, country: null, source: 'customer_shared' };
+      if (this.geocoder?.reverse) { const r = await this.geocoder.reverse(pin.lat, pin.lng).catch(() => null); if (r) { pin.label = pin.label || r.label; pin.country = r.country || null; } }
+    }
+    const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, answering: lastAsked, sharedPlace: pin?.label || null, requestRef: session.id } });
     if (museResult.ok && museResult.json) { extracted = tidyAttributes(sanitizeExtraction(museResult.json)); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
     // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
     if (text) { Object.assign(extracted, parseAlternatives(text)); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
-    if (sharedLocation) extracted.location = { lat: Number(sharedLocation.lat), lng: Number(sharedLocation.lng), label: sharedLocation.label || null, source: 'customer_shared' };
+    if (pin) { extracted.location = pin; if (pin.label && !extracted.locationText) extracted.locationText = pin.label; }
     // A reply to "Upo wapi?" is the place itself, even without "nipo": "mbagala dar".
     if (lastAsked === 'location' && text && !extracted.locationText && !sharedLocation) { const place = placeFromAnswer(text); if (place) extracted.locationText = place; }
     // The product changes only when the customer clearly asks for a new one: never from a location, an answer to another question, or "mbadala ni upi?".

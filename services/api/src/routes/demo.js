@@ -10,6 +10,7 @@ import { validate } from '../middleware/validate.js';
 import { db } from '../db/connection.js';
 import { demoMoran } from '../demo/stand-ins.js';
 import { seedDemoShops, DEMO_SHOPS } from '../demo/seed.js';
+import { takeQuota } from '../services/discovery.js';
 import { traceSince, mask } from '../demo/trace.js';
 import { loadTerms } from '../services/terms.js';
 import { museRuntimeConfig } from '../services/runtime-settings.js';
@@ -122,22 +123,25 @@ demoRouter.post('/session', asyncHandler(async (_req, res) => {
   if (sessions.size > 300) { const oldest = [...sessions.values()].sort((a, b) => a.lastAt - b.lastAt)[0]; sessions.delete(oldest.id); }
   const s = { id: crypto.randomUUID(), customerPhone: randomPhone('2557008'), riderPhone: randomPhone('2557007'), customerId: null, lastEventId: 0, actions: 0, lastAt: Date.now(), lines: [] };
   sessions.set(s.id, s);
+  // Every session counts against the day's allowance (DEMO_DAILY_SESSIONS); past it the sandbox keeps working on rules, without the Meta key.
+  await takeQuota('demo_session', 1e9).catch(() => false);
   const muse = await museRuntimeConfig();
   const t = new Date().toISOString();
   s.lines.push({ at: t, level: 'INFO', svc: 'sandbox', msg: `session ${s.id.slice(0, 8)} customer=${mask(s.customerPhone)} rider=${mask(s.riderPhone)} db=moranbuy_demo whatsapp=recording payments=sandbox` },
-    { at: t, level: 'INFO', svc: 'sandbox', msg: `meta model api: ${muse.apiKey ? `live model=${muse.model}` : 'no key -> rules fallback (parse, rank and protection rules are the same code)'}` },
+    { at: t, level: 'INFO', svc: 'sandbox', msg: `meta model api: ${muse.apiKey ? `live model=${muse.model}` : muse.capped ? `today's demo allowance of ${muse.cap} sessions is used -> rules fallback until tomorrow` : 'no key -> rules fallback (parse, rank and protection rules are the same code)'}` },
     { at: t, level: 'INFO', svc: 'sandbox', msg: `catalogue: ${DEMO_SHOPS.length} sample shops, ${DEMO_SHOPS.reduce((n, x) => n + x.items.length, 0)} products around Dar es Salaam` });
   res.status(201).json({ sessionId: s.id, customer: mask(s.customerPhone), rider: mask(s.riderPhone), riderNumber: `0${s.riderPhone.slice(3)}`, museLive: !!muse.apiKey, voice: mmsAvailable('sw'), lines: s.lines, shops: DEMO_SHOPS.map((x) => ({ name: x.name, area: x.area })) });
 }));
 
-const sendBody = z.object({ role: z.enum(['customer', 'owner', 'rider']), text: z.string().max(500).optional(), buttonId: z.string().max(120).optional(), buttonTitle: z.string().max(40).optional() }).refine((b) => b.text || b.buttonId, 'text or buttonId');
+const sendBody = z.object({ role: z.enum(['customer', 'owner', 'rider']), text: z.string().max(500).optional(), buttonId: z.string().max(120).optional(), buttonTitle: z.string().max(40).optional(), location: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), label: z.string().max(200).optional() }).optional() }).refine((b) => b.text || b.buttonId || b.location, 'text, buttonId or location');
 
 demoRouter.post('/session/:id/send', validate({ body: sendBody }), asyncHandler(async (req, res) => {
   const s = getSession(req.params.id);
   const owner = await ownerPhone(s);
   const from = phoneFor(s, req.body.role, owner);
   if (!from) throw new ApiError(409, 'NO_ORDER_YET', 'The shop owner appears once the customer has placed an order.');
-  res.json(await act(req, s, () => inbound(req, s, from, req.body.buttonId ? { buttonId: req.body.buttonId, text: req.body.buttonTitle || '', kind: 'button' } : { text: req.body.text, kind: 'text' })));
+  const event = req.body.location ? { location: req.body.location, text: req.body.text || '', kind: 'location' } : req.body.buttonId ? { buttonId: req.body.buttonId, text: req.body.buttonTitle || '', kind: 'button' } : { text: req.body.text, kind: 'text' };
+  res.json(await act(req, s, () => inbound(req, s, from, event)));
 }));
 
 // A photo: the judge's own JPEG or PNG (base64), or a generated sample picture.
