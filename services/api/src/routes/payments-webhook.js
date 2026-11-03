@@ -38,7 +38,8 @@ paymentsWebhookRouter.post('/payments', asyncHandler(async (req, res) => {
 // Outside production, the sandbox provider is settled by this explicit call so the whole flow can be exercised honestly.
 export const sandboxRouter = express.Router();
 sandboxRouter.post('/payments/:reference/settle', asyncHandler(async (req, res) => {
-  if (config().APP_ENV === 'production') throw new ApiError(404, 'NOT_FOUND', 'Not available.');
+  // The public demo runs with production settings but on the sandbox provider, so its prompt can settle; real production never has this route.
+  if (config().APP_ENV === 'production' && !config().DEMO_MODE) throw new ApiError(404, 'NOT_FOUND', 'Not available.');
   const status = req.body?.status === 'failed' ? 'failed' : 'completed';
   const out = await afterSettle(await settlePayment(db, { reference: req.params.reference, status, settledAmount: req.body?.amount ?? null, eventId: `sandbox:${req.params.reference}:${status}:${req.body?.attempt || 1}`, source: 'sandbox' }));
   res.json(out);
