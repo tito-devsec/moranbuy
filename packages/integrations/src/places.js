@@ -15,7 +15,7 @@ export function shopQuery(request) {
   return `${kind}${brand} ${type === kind ? '' : type}`.replace(/\s+/g, ' ').trim();
 }
 
-export async function searchNearbyShops({ fetchImpl = globalThis.fetch, apiKey, request, location, maxResults = 4, radiusM = 8000, recorder = null }) {
+export async function searchNearbyShops({ fetchImpl = globalThis.fetch, apiKey, request, location, maxResults = 4, radiusM = 8000, regionCode = 'TZ', recorder = null }) {
   if (!apiKey || !location) return { ok: false, status: !apiKey ? 'disabled' : 'no_location', shops: [] };
   const started = Date.now();
   const textQuery = shopQuery(request);
@@ -23,7 +23,7 @@ export async function searchNearbyShops({ fetchImpl = globalThis.fetch, apiKey, 
     const res = await fetchImpl('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': FIELDS },
-      body: JSON.stringify({ textQuery, maxResultCount: Math.min(10, maxResults + 2), languageCode: 'en', regionCode: 'TZ', locationBias: { circle: { center: { latitude: location.lat, longitude: location.lng }, radius: radiusM } } }),
+      body: JSON.stringify({ textQuery, maxResultCount: Math.min(10, maxResults + 2), languageCode: 'en', regionCode, locationBias: { circle: { center: { latitude: location.lat, longitude: location.lng }, radius: radiusM } } }),
       signal: AbortSignal.timeout(10000),
     });
     const data = await res.json().catch(() => ({}));

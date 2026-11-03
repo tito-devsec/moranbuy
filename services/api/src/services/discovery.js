@@ -100,7 +100,7 @@ export class DiscoveryResearcher {
     const muse = await this.museConfig();
     if (!muse.apiKey) return { ok: indexed.length > 0, status: indexed.length ? 'indexed' : 'no_key', results: indexed.slice(0, maxResults) };
     if (!(await takeQuota('web_search', s.dailySearchLimit, this.dbImpl))) return { ok: indexed.length > 0, status: 'daily_limit', results: indexed.slice(0, maxResults) };
-    const live = await metaWebSearch({ fetchImpl: this.fetchImpl, baseUrl: muse.baseUrl, apiKey: muse.apiKey, model: muse.model, request, city: city || cityOf(request), maxResults, blockedDomains: s.blockedDomains, preferredDomains: s.preferredDomains, recorder: record });
+    const live = await metaWebSearch({ fetchImpl: this.fetchImpl, baseUrl: muse.baseUrl, apiKey: muse.apiKey, model: muse.model, request, city: city || cityOf(request), country: countryOf(request), maxResults, blockedDomains: s.blockedDomains, preferredDomains: s.preferredDomains, recorder: record });
     if (!live.ok) return { ok: indexed.length > 0, status: indexed.length ? 'indexed' : live.status, results: indexed.slice(0, maxResults) };
     await addPageDetails(live.results, { fetchImpl: this.fetchImpl });
     for (const r of live.results) { r.productType = canon; r.category = request.category || null; }
@@ -110,11 +110,21 @@ export class DiscoveryResearcher {
   }
 }
 
-// "Mbagala, Dar es Salaam" -> "Dar es Salaam"; Meta's search takes a city, not a neighbourhood.
+// The shopper's country: the geocoder works inside the configured country (DEFAULT_COUNTRY), so every search, online or on the map, is made for that country.
+const COUNTRY_NAMES = { TZ: 'Tanzania', KE: 'Kenya', UG: 'Uganda', RW: 'Rwanda', BI: 'Burundi', ZM: 'Zambia', MW: 'Malawi', MZ: 'Mozambique', ET: 'Ethiopia', NG: 'Nigeria', GH: 'Ghana', ZA: 'South Africa', CD: 'DR Congo', SS: 'South Sudan', SO: 'Somalia', IN: 'India', GB: 'United Kingdom', US: 'United States' };
+export function countryOf(request) {
+  const code = String(request.location?.country || config().DEFAULT_COUNTRY || 'TZ').toUpperCase();
+  return { code, name: COUNTRY_NAMES[code] || code };
+}
+
+// "Mbagala, Dar es Salaam" -> "Dar es Salaam"; Meta's search takes a city, not a neighbourhood. Known Tanzanian cities first, else the part of the place name before the country.
 export function cityOf(request) {
   const label = request.location?.label || request.locationText || '';
   const known = ['Dar es Salaam', 'Arusha', 'Mwanza', 'Dodoma', 'Mbeya', 'Morogoro', 'Tanga', 'Zanzibar', 'Moshi', 'Iringa', 'Tabora', 'Kigoma', 'Mtwara', 'Songea', 'Shinyanga', 'Musoma', 'Bukoba', 'Singida', 'Sumbawanga', 'Lindi'];
-  return known.find((c) => label.toLowerCase().includes(c.toLowerCase())) || (/\b(dar|dsm)\b/i.test(label) ? 'Dar es Salaam' : null);
+  const hit = known.find((c) => label.toLowerCase().includes(c.toLowerCase())) || (/\b(dar|dsm)\b/i.test(label) ? 'Dar es Salaam' : null);
+  if (hit) return hit;
+  const parts = label.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : parts[0] || null;
 }
 
 // Shops near the customer from Google Places, cached for a day per product and area.
@@ -129,7 +139,7 @@ export class NearbyShops {
     const cached = await this.dbImpl('nearby_shop_cache').where({ key }).where('created_at', '>=', new Date(Date.now() - 24 * 3600000)).first();
     if (cached) return { ok: true, status: 'cached', shops: cached.results.slice(0, max) };
     if (!(await takeQuota('places', s.placesDailyLimit, this.dbImpl))) return { ok: false, status: 'daily_limit', shops: [] };
-    const r = await searchNearbyShops({ fetchImpl: this.fetchImpl, apiKey: s.placesApiKey, request: { ...request, productType: canon }, location: request.location, maxResults: max, recorder: record });
+    const r = await searchNearbyShops({ fetchImpl: this.fetchImpl, apiKey: s.placesApiKey, request: { ...request, productType: canon }, location: request.location, maxResults: max, regionCode: countryOf(request).code, recorder: record });
     if (r.ok) await this.dbImpl('nearby_shop_cache').insert({ key, results: JSON.stringify(r.shops), created_at: this.dbImpl.fn.now() }).onConflict('key').merge();
     return r;
   }

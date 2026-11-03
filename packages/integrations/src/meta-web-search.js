@@ -1,9 +1,9 @@
 // Product search on the public web with Muse Spark's built-in web search (Meta Model API, POST /v1/responses, tool "web_search").
 // Every listing kept must link to a page Meta's search actually returned, so nothing invented reaches a customer.
 
-const SYSTEM = `You find products for sale in Tanzania for a shopper, using web search.
+const SYSTEM = `You find products for sale in the shopper's country for a shopper, using web search.
 Search shop websites, online marketplaces, brand stores and public social media shop pages (Facebook pages, Instagram shops) that show the product with a price.
-Return up to the requested number of different listings that match the request and are for sale now. Prefer listings in Tanzania and near the shopper's city.
+Return up to the requested number of different listings that match the request and are for sale now. Prefer listings in the shopper's country and near the shopper's city.
 Copy the price exactly as the page shows it, as a number in its currency; if the page shows no price, use null. Never estimate a price.
 For each listing give: name (as the page names it), price, currency, url (the listing page itself), shopName, area (town or neighbourhood if the page says), condition ("new", "used", "refurbished" or null), description (one or two plain sentences about the product from the page: model, key specs), attributes (object, e.g. {"ram": 8, "storage": 256, "brand": "hp"} with sizes in GB), imageUrl (a product image URL from the page if you saw one, else null).
 Answer with one JSON object only: {"results": [...], "notes": ["..."]}. No words before or after it.`;
@@ -68,8 +68,8 @@ export function groundResults(parsed, sources, { blockedDomains = [], maxResults
   return out;
 }
 
-// One search: the request in plain words, Tanzania as the place, results grounded in what Meta's search returned.
-export async function metaWebSearch({ fetchImpl = globalThis.fetch, baseUrl, apiKey, model = 'muse-spark-1.3', request, city = null, maxResults = 6, blockedDomains = [], preferredDomains = [], timeoutMs = 45000, recorder = null }) {
+// One search: the request in plain words, the shopper's country and city as the place, results grounded in what Meta's search returned.
+export async function metaWebSearch({ fetchImpl = globalThis.fetch, baseUrl, apiKey, model = 'muse-spark-1.3', request, city = null, country = { code: 'TZ', name: 'Tanzania' }, maxResults = 6, blockedDomains = [], preferredDomains = [], timeoutMs = 45000, recorder = null }) {
   const started = Date.now();
   const want = {
     product: request.productType,
@@ -77,7 +77,7 @@ export async function metaWebSearch({ fetchImpl = globalThis.fetch, baseUrl, api
     niceToHave: request.preferredAttributes || {},
     maxBudget: request.maxBudget ? `${request.maxBudget} ${request.currency || 'TZS'}` : null,
     shopperCity: city,
-    country: 'Tanzania',
+    country: country.name,
     maxResults,
     ...(preferredDomains.length ? { preferSites: preferredDomains } : {}),
   };
@@ -85,7 +85,7 @@ export async function metaWebSearch({ fetchImpl = globalThis.fetch, baseUrl, api
     model,
     instructions: SYSTEM,
     input: JSON.stringify(want),
-    tools: [{ type: 'web_search', search_context_size: 'medium', user_location: { type: 'approximate', country: 'TZ', ...(city ? { city } : {}) } }],
+    tools: [{ type: 'web_search', search_context_size: 'medium', user_location: { type: 'approximate', country: country.code, ...(city ? { city } : {}) } }],
     include: ['web_search_call.results'],
     max_output_tokens: 6000,
     max_tool_calls: 3,

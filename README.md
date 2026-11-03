@@ -1,24 +1,37 @@
 # MoranBuy
 
-MoranBuy is an AI-powered reverse marketplace. Customers describe the product they need and the
-budget they can afford. MoranBuy discovers eligible business offers and brings the most suitable
-matches to the customer, prioritizing budget fit and total cost before location convenience.
+**Tell us your budget. The shops come to you.**
+
+MoranBuy is an AI reverse marketplace on WhatsApp. A customer sends one message, a photo or a voice
+note: what they need, what they can pay, and where they are. MoranBuy finds the shops that have it,
+ranks the offers budget first, and holds the payment until the product is in the customer's hands.
+Every model it calls is a Meta model, and it reaches customers where they already are: WhatsApp.
 
 > Build status: complete and tested for customers (WhatsApp, found by the username @moranbuy; text, photos and voice), standalone and
 > Moran-registered businesses, and administrators in Moran's Super Admin. Live services (WhatsApp, the Meta
-> Model API, Snippe) run once their keys are entered; every model it calls at runtime is a Meta model; `HACKATHON_CHANGES.md` lists what is new.
+> Model API, Snippe) run once their keys are entered. `HACKATHON_CHANGES.md` lists what is new; the public sandbox at
+> [buy.moranai.co.tz/demo](https://buy.moranai.co.tz/demo) runs the real code on the real Meta models.
 
 ## The problem
 
-A customer in Dar es Salaam who wants a three-seater sofa for TSh 350,000 has to visit shops, message
-sellers one by one, and repeat the same requirements each time. Businesses with the right product at
-the right price never hear from that customer.
+In most of the world, buying something still means going to find it. The buyer does not know who has
+the product, at what price, or whether it is in stock, so they travel, ask, bargain, and travel again.
+The shop with the right product at the right price never hears from the buyer three streets away who
+wants it today. And when buying at a distance is possible at all, the buyer has to pay a stranger first
+and hope the product arrives.
 
-## Case study: Kariakoo, Dar es Salaam
+Three things are missing, and they are the same in Dar es Salaam, Nairobi, Lagos or Dhaka:
 
-Kariakoo is the biggest trading hub in East Africa. Estimates put the crowd at more than 200,000
-people a day ([TRT Afrika](https://www.trtafrika.com/english/article/13305704)) and the money moving
-through the area at more than TSh 10 billion a day, with banking estimates of up to TSh 16 billion
+1. **Discovery that starts from the buyer.** Shops advertise what they have; nobody asks what buyers want.
+2. **Honest comparison.** Prices, delivery costs and distance are never on one screen.
+3. **Trust at the handover.** Nothing protects the buyer's money or the seller's product until the two meet.
+
+### Case study: Kariakoo, Dar es Salaam
+
+We built and tested MoranBuy in Tanzania, so Kariakoo is our case study, not our limit. Kariakoo is
+the biggest trading hub in East Africa: estimates put the crowd at more than 200,000 people a day
+([TRT Afrika](https://www.trtafrika.com/english/article/13305704)) and the money moving through the
+area at more than TSh 10 billion a day, with banking estimates of up to TSh 16 billion
 ([AllAfrica](https://allafrica.com/stories/201203020066.html)). Most of it is cash and mobile money,
 paid face to face.
 
@@ -33,18 +46,27 @@ How buying works there today:
 - **Buying remotely is risky.** Paying a seller first over mobile money and receiving nothing, or the
   wrong item, is the common fear that keeps people travelling in person.
 
-What MoranBuy changes:
+## How MoranBuy solves it
 
 | Today in Kariakoo | With MoranBuy |
 |---|---|
-| Walk stall to stall asking prices | One WhatsApp message to @moranbuy with the product and the budget, typed or spoken in Swahili |
-| Prices learned one shop at a time | Offers ranked budget first, then distance, with photos, the total cost and what is still unknown |
-| Shops wait for walk-ins | Shops, including Moran AI businesses asked with their consent, are matched to buyers who want their product now |
-| Pay the seller and hope | The payment is held by MoranBuy and released only after a handover code and a delivery photo |
+| Walk stall to stall asking prices | One WhatsApp message to **@moranbuy** with the product and the budget, typed, spoken, or as a photo of the product, in Swahili or English |
+| Prices learned one shop at a time | Offers ranked within budget first, then by total cost including delivery, then by distance, with photos and what is still unknown |
+| Shops wait for walk-ins | Shops, including Moran AI businesses asked with their consent and shops found online near the customer, are matched to the buyer who wants their product now |
+| Pay the seller and hope | The payment is held by MoranBuy and released only after a private handover code and a delivery photo |
 | Travel to collect | A rider named by the shop delivers, with Arrived / Refused / Customer not there buttons |
 
-MoranBuy does not replace the market; it gives Kariakoo's shops buyers who cannot come in person, and
-gives those buyers Kariakoo's prices without the trip. Every order still pays a Kariakoo shop.
+MoranBuy does not replace the market; it gives the market's shops buyers who cannot come in person, and
+gives those buyers the market's prices without the trip. Every order still pays a real shop.
+
+### Why it is easy to use
+
+- **Nothing to install.** Customers search @moranbuy on WhatsApp, which they already have; no app, no account, no card.
+- **One message is enough.** "Nina laki tatu na nusu ya sofa, nipo Sinza" is a complete request. A photo of the product is too.
+- **Any language they speak.** Swahili, English or a mix, typed or as a voice note; the reply comes back the same way, with a voice note when the customer sent one.
+- **Nothing to compare by hand.** Every offer shows the total the customer would pay and says plainly when a delivery fee is not confirmed.
+- **Nothing to fear.** The customer pays MoranBuy, not a stranger, and checks the product at the door before giving the code that releases the money.
+- **Shops need no dashboard either.** A shop lists products by sending one photo on WhatsApp, and answers orders with one word.
 
 ## The reverse-marketplace model
 
@@ -55,6 +77,32 @@ The customer does not browse a catalogue. The customer sends one message:
 MoranBuy understands the product (three-seater sofa), the maximum budget (TSh 350,000), the
 location (Sinza, Dar es Salaam) and the fulfilment preference (delivery if available). It then finds
 real products from eligible merchants, ranks them, and presents the best offers.
+
+Where the offers come from, in order:
+
+1. **Shops on MoranBuy**: standalone shops and Moran AI businesses that opted in, with verified listings, stock and delivery terms. Only these can be ordered and paid through MoranBuy.
+2. **Moran AI businesses not yet on MoranBuy**: if they sell the product, the owner is asked on WhatsApp first, and nothing of theirs is shown until the owner says yes.
+3. **Shops online, near the customer**: when fewer than three MoranBuy shops fit, Muse Spark's web search finds the product in shops of the customer's country and city, with real photos and prices, shown as "found online, not confirmed".
+4. **Shops on the map**: Google Places lists shops near the customer that sell the product, with rating and opening hours, as places MoranBuy can check with for the customer.
+
+## Beyond Tanzania: search by the customer's location
+
+Nothing in MoranBuy is tied to one city. The customer's place drives everything: the geocoder resolves
+it inside the configured country, offers are ranked by distance from it, the online search is made for
+that country and city (`user_location` on Meta's web search), and the map search uses the same region.
+To run MoranBuy in another country, set `DEFAULT_COUNTRY` and `DEFAULT_CURRENCY` in `.env`, connect a
+WhatsApp number there, and let shops list. The money-handling adapters (Snippe today) sit behind one
+interface, so a local mobile money or card provider is a new adapter, not a rewrite. The sandbox works
+the same way: its sample shops are in Dar es Salaam, but a request from anywhere is searched online
+for that place.
+
+## Vision
+
+Every market in the world has a Kariakoo: a place where billions change hands on foot because buyers
+and sellers cannot find each other any other way. Two billion people use WhatsApp, and most of them
+shop by asking around. MoranBuy's aim is to be the one place to say what you need and what you can
+pay, in your own words and language, and have the right shops answer, with your money safe until the
+product is in your hands. First Tanzania, then East Africa, then anywhere people shop by asking.
 
 ## Budget first, location second
 
@@ -95,25 +143,22 @@ rankings, consent, authorization, payments or order state; deterministic code do
 is unavailable, MoranBuy says so and uses only configured fallback behaviour.
 See `docs/muse-integration.md` and `docs/muse-duties.md` (everything Muse does, with the check on each answer).
 
-## Meta services in MoranBuy
+## Meta services in MoranBuy, and how each one works
 
 Every model MoranBuy calls at runtime is a Meta model, and every customer and business conversation
-runs on Meta's WhatsApp Business Platform.
+runs on Meta's WhatsApp Business Platform. Each model has one job, and fixed rules check its answer
+before anything reaches a customer; the model never decides a price, a ranking, a payment or an order.
 
 ### Meta models (Meta Model API and Meta's open models)
 
-| Meta model or service | What MoranBuy does with it |
-|---|---|
-| Muse Spark 1.3 | Reads shopping requests and photos, writes grounded recommendations, lists products from a business's chat, picks best-fit customers, drafts campaigns and follow-ups, explains demand and admin data |
-| Muse Spark web search (Responses API, `web_search` tool, located in Tanzania) | Finds products in Tanzanian online shops and public Facebook and Instagram shop pages when few MoranBuy shops match; only links the search returned are kept, each shown as "found online, not confirmed" |
-| Muse Spark 1.2 (audio) | Hears WhatsApp and browser voice notes in Swahili, English or a mix (`input_audio`, WAV) |
-| Muse Voice Transcribe | Second ear for voice notes when Muse Spark audio is unavailable (`/v1/asr/transcribe`) |
-| Segment Anything 3.1 | Finds every product Muse named in a business's photo; each box is cut out in-process and becomes that listing's photo, so one shelf photo lists several products; also checks delivery photos |
-| MMS text-to-speech (`facebook/mms-tts-swh`, `mms-tts-eng`) | Speaks the reply back as a WhatsApp voice note, in Swahili or English, run inside MoranBuy with no outside speech service |
-
-Voice notes are decoded from Ogg Opus to 16 kHz WAV inside the Node process (`ogg-opus-decoder`, WebAssembly); nothing is
-installed on the server. Spoken replies use Meta's MMS text-to-speech voices (Swahili and English), exported to ONNX when the
-image is built and run in the same process; the speech is written as an Ogg Opus voice note in-process too. Every Meta call is recorded with its latency, tokens and cost.
+| Meta model or service | What MoranBuy does with it | How it works here |
+|---|---|---|
+| **Muse Spark 1.3** (`/v1/chat/completions`) | Reads shopping requests and product photos, writes the recommendation, lists products from a shop's chat, picks best-fit customers for campaigns, drafts campaigns and follow-ups, explains admin data | The message (and photo) go to Muse with a strict JSON schema; the answer is validated and only its facts are used. The reply it writes is checked against the ranked offers: a number not in the data is rejected and the deterministic reply is sent instead |
+| **Muse Spark web search** (`/v1/responses`, `web_search` tool) | Finds the product in online shops and public Facebook and Instagram shop pages in the customer's country and city, when few MoranBuy shops fit | The search is located with `user_location`; only links the search itself returned are kept, so nothing is invented; each page is then read (robots.txt respected) for its photo, price and description, and the find is kept in an index so the next customer is answered without a new search |
+| **Muse Spark 1.2 (audio)** | Hears WhatsApp and browser voice notes in Swahili, English or a mix | The Ogg Opus note is decoded in-process to WAV and sent as `input_audio`; the transcript then goes through the same request reading as text |
+| **Muse Voice Transcribe** (`/v1/asr/transcribe`) | Second ear for voice notes when Muse Spark audio is unavailable | Same WAV, same checks; an empty transcript makes MoranBuy ask the customer to type |
+| **Segment Anything 3.1** | Finds every product Muse named in a shop's photo, so one shelf photo becomes several listings; checks that a delivery photo shows the ordered product | Muse names the products, SAM returns a box per name, each box is cut out in-process as that listing's photo; at delivery the photo is also fingerprinted so a re-sent or catalogue picture is caught |
+| **MMS text-to-speech** (`facebook/mms-tts-swh`, `mms-tts-eng`) | Speaks the reply back as a WhatsApp voice note, in Swahili or English | Exported to ONNX when the image is built and run inside the API process with no outside speech service; prices are spelled the way Tanzanians say them |
 
 ### WhatsApp Business Platform
 
@@ -230,7 +275,7 @@ calls MoranBuy's admin API through a signed proxy that carries the admin's ident
 one login and one audit trail. Its sales agent is limited to shopping, reads only the
 products of businesses that opted in, answers policy questions only from admin-written knowledge,
 and, when few MoranBuy shops match, searches the web with Meta's own web search (Muse Spark on the
-Meta Model API, Tanzania-located). Only links the search itself returned are kept; each find is read
+Meta Model API, located in the customer's country and city). Only links the search itself returned are kept; each find is read
 for its photo, price and description, shown as "found online, not confirmed" with its link, and kept
 in an index so the next customer asking for the same thing is answered without a new search. Shops
 near the customer come from Google Places (address, rating, phone, open now), and Moran AI
