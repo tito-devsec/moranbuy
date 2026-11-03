@@ -12,6 +12,44 @@ Every model it calls is a Meta model, and it reaches customers where they alread
 > Model API, Snippe) run once their keys are entered. `HACKATHON_CHANGES.md` lists what is new; the public sandbox at
 > [buy.moranai.co.tz/demo](https://buy.moranai.co.tz/demo) runs the real code on the real Meta models.
 
+## For judges: run it in five minutes
+
+Everything below runs from this repository alone, with no Moran AI account and no WhatsApp number. The
+sandbox is the real MoranBuy code on a simulated phone (customer, shop owner, rider) next to the live
+server log, which prints every call to the Meta Model API as it happens.
+
+```bash
+git clone https://github.com/tito-devsec/moranbuy && cd moranbuy
+cp .env.example .env            # add MUSE_API_KEY=<your Meta Model API key> for live Meta calls
+docker compose up demo          # first build 5-10 min (it exports Meta's MMS voices); then open http://localhost:4001/demo
+```
+
+Without Docker, with Postgres 16 (user `moranbuy`, password `moranbuy`, allowed to create databases) and Redis
+running locally: `npm ci && npm run demo`, then open http://localhost:4001/demo. `TTS_VOICES= docker compose up demo`
+skips the voice export for a quicker first build (spoken replies off).
+
+What to try on the demo page: press **Run all** for the whole story (terms, request, offers, order, payment held,
+rider, photo, handover code, shop paid, receipt), or type your own request as the customer, send a product photo with
+the camera button, share a location with the pin button, or press the microphone for a Swahili voice note. The
+terminal's first lines say `meta model api: live model=muse-spark-1.3` when a key is set, or `no key -> rules fallback`
+when not; every Muse call then appears as `[muse] POST api.meta.ai/...` with its latency and tokens.
+
+**Hosted copy, optional:** [buy.moranai.co.tz/demo](https://buy.moranai.co.tz/demo) runs the same code with a live Meta key
+already set; no login, no real money, no real numbers (see *Try the demo* below for its limits).
+
+**Which Meta models, and where they run**
+
+| Model | Runs | Used for |
+|---|---|---|
+| Muse Spark 1.3 (`muse-spark-1.3`) | Meta Model API, `https://api.meta.ai/v1/chat/completions` | Reading requests and photos, writing replies, campaign drafts |
+| Muse Spark web search | Meta Model API, `https://api.meta.ai/v1/responses` with the `web_search` tool | Finding products online near the customer |
+| Muse Spark 1.2 audio (`muse-spark-1.2`) and Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Meta Model API | Hearing voice notes |
+| Segment Anything 3.1 (`sam-3.1`) | Meta Model API | Finding products in a shop's photo; checking delivery photos |
+| MMS text-to-speech (`facebook/mms-tts-swh`, `mms-tts-eng`) | Inside the API container, as ONNX, downloaded from Hugging Face at image build | Spoken replies in Swahili and English |
+
+Model ids and the base URL are in `.env.example`; one key (`MUSE_API_KEY`) covers every hosted model. Tests:
+`npm run lint && npm run check && npm test && npm run test:integration` (186 tests, Postgres and Redis needed).
+
 ## The problem
 
 In most of the world, buying something still means going to find it. The buyer does not know who has

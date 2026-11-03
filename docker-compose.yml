@@ -57,7 +57,9 @@ services:
   # The "Try the demo" sandbox, runnable with no Moran AI and no keys: http://localhost:4001/demo
   # Its own database (moranbuy_demo), a recording WhatsApp stand-in, sandbox payments and five sample shops.
   demo:
-    build: .
+    build:
+      context: .
+      args: { TTS_VOICES: "${TTS_VOICES-swh,eng}" }
     restart: unless-stopped
     environment:
       PORT: "4000"

@@ -4,7 +4,9 @@ WORKDIR /build
 COPY scripts/tts/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY scripts/tts/export-mms-tts.py ./
-RUN python export-mms-tts.py /voices swh,eng && rm -rf /root/.cache
+# TTS_VOICES lists the MMS voices to export (swh,eng); an empty value skips the download for a quicker first build, with spoken replies off.
+ARG TTS_VOICES=swh,eng
+RUN mkdir -p /voices && if [ -n "$TTS_VOICES" ]; then python export-mms-tts.py /voices "$TTS_VOICES" && rm -rf /root/.cache; fi
 
 # Stage 2: the MoranBuy API and workers; Debian slim because the ONNX runtime needs glibc.
 FROM node:22-bookworm-slim
