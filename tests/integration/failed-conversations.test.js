@@ -77,3 +77,14 @@ test('28 Oct: "natak laptop 350k" then "mbagala dar" searches after one question
   assert.equal(third.body.state, 'presented');
   assert.equal((await request(other)).request_json.productType, 'laptop');
 });
+
+test('3 Nov: "hp elitebook g7" with no such laptop in stock shows the closest HP laptops and says the model was not met', async () => {
+  const phone = '255712300031'; await acceptedCustomer(phone);
+  await send({ from: phone, text: 'nahitaji hp elitebook g7 budget yangu ni million moja na laki 4 nipo mbagala' });
+  const r = await request(phone);
+  assert.equal(r.state, 'presented');
+  assert.equal(r.request_json.maxBudget, 1400000);
+  const reply = lastTo(phone);
+  assert.match(reply, /HP 250 G8/);
+  assert.doesNotMatch(reply, /Dell Latitude/, 'another brand is still left out');
+});

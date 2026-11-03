@@ -30,10 +30,10 @@ export function parseShillings(text) {
     if (n >= 1000 && (best === null || n > best)) best = Math.round(n);
   }
   // Swahili also puts the unit first: "laki tatu", "laki 4", "milioni mbili".
-  const UNITS = { laki: 100000, elfu: 1000, milioni: 1000000 };
-  // "laki tatu na nusu" is 350,000; "laki mbili na elfu hamsini" is 250,000; "elfu ishirini na tano" is 25,000.
+  const UNITS = { laki: 100000, elfu: 1000, milioni: 1000000, million: 1000000 };
+  // "laki tatu na nusu" is 350,000; "laki mbili na elfu hamsini" is 250,000; "elfu ishirini na tano" is 25,000; "million moja na laki 4" is 1,400,000.
   const COUNT = '(?:\\d+(?:\\.\\d+)?|[a-z]+(?:\\s+na\\s+(?!nusu\\b|elfu\\b|laki\\b)[a-z]+)?)';
-  for (const mm of t.matchAll(new RegExp(`\\b(laki|elfu|milioni)\\s+(${COUNT})(\\s+na\\s+nusu)?(?:\\s+na\\s+(laki|elfu)\\s+(${COUNT}))?`, 'g'))) {
+  for (const mm of t.matchAll(new RegExp(`\\b(laki|elfu|milioni|million)\\s+(${COUNT})(\\s+na\\s+nusu)?(?:\\s+na\\s+(laki|elfu)\\s+(${COUNT}))?`, 'g'))) {
     const count = countOf(mm[2]);
     if (count === null) continue;
     // "laki 350000" names the whole amount after the word: keep 350,000.

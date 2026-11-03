@@ -35,6 +35,9 @@ export function parseProductGuess(text) {
   const withoutBrands = String(text || '').toLowerCase().replace(new RegExp(`\\b(${BRANDS.join('|')})\\b`, 'g'), ' ');
   const word = normalizeProductType(withoutBrands);
   if (word.matched) return word.matched;
+  // A model name alone ("elitebook g7", "galaxy a15") says what the product is.
+  const model = Object.keys(MODEL_TYPES).find((m) => new RegExp(`\\b${m}\\b`).test(withoutBrands));
+  if (model) return MODEL_TYPES[model];
   const known = normalizeProductType(text);
   if (known.matched) return known.productType;
   let t = String(text || '').toLowerCase();
@@ -62,6 +65,9 @@ export function parseLocationText(text) {
 }
 
 // Brands customers name; the key is how the brand is matched in listing names.
+// Laptop and phone model families customers name instead of the product word.
+const MODEL_TYPES = { elitebook: 'laptop', probook: 'laptop', pavilion: 'laptop', envy: 'laptop', omen: 'laptop', thinkpad: 'laptop', ideapad: 'laptop', yoga: 'laptop', latitude: 'laptop', inspiron: 'laptop', vostro: 'laptop', xps: 'laptop', zenbook: 'laptop', vivobook: 'laptop', aspire: 'laptop', nitro: 'laptop', macbook: 'laptop', chromebook: 'laptop', galaxy: 'smartphone', spark: 'smartphone', camon: 'smartphone', phantom: 'smartphone', 'hot \\d+': 'smartphone', 'note \\d+': 'smartphone', redmi: 'smartphone', pixel: 'smartphone' };
+
 export const BRANDS = ['hp', 'dell', 'lenovo', 'apple', 'macbook', 'asus', 'acer', 'msi', 'toshiba', 'samsung', 'tecno', 'infinix', 'itel', 'xiaomi', 'redmi', 'oppo', 'vivo', 'realme', 'nokia', 'huawei', 'iphone', 'google pixel', 'lg', 'hisense', 'sony', 'tcl', 'panasonic', 'philips', 'sharp', 'von', 'bruhm', 'boss', 'nikon', 'canon'];
 const AT_LEAST = '(?:kuanzia|angalau|at least|from|min(?:imum)?|zaidi ya|over|>=?)';
 
@@ -115,4 +121,17 @@ export function fallbackExtract(text) {
     urgency: parseUrgency(text),
     intent: 'shop',
   };
+}
+
+// Muse sometimes reads "hp elitebook g7" as the brand; only the maker is the brand, the rest is the model the customer prefers.
+export function tidyAttributes(extracted) {
+  const ess = extracted.essentialAttributes;
+  if (!ess || typeof ess.brand !== 'string') return extracted;
+  const words = ess.brand.trim().toLowerCase().split(/\s+/);
+  const maker = BRANDS.find((b) => words.slice(0, b.split(' ').length).join(' ') === b);
+  if (!maker || words.join(' ') === maker) return extracted;
+  const model = ess.brand.trim().slice(maker.length).trim();
+  extracted.essentialAttributes = { ...ess, brand: maker };
+  if (model && !extracted.preferredAttributes?.model) extracted.preferredAttributes = { ...(extracted.preferredAttributes || {}), model };
+  return extracted;
 }

@@ -2,7 +2,7 @@ import { rankOffers, DEFAULT_POLICY } from '@moranbuy/budget-matching';
 import { museExtractRequest, museDraftRecommendation, numbersAreGrounded } from '@moranbuy/muse-intelligence';
 import { formatMoney, shortRef } from '@moranbuy/core';
 import { shoppingRequestSchema, mergeRequest } from './request.js';
-import { fallbackExtract, parseAlternatives, parseUrgency, placeFromAnswer } from './parse.js';
+import { fallbackExtract, parseAlternatives, parseUrgency, placeFromAnswer, tidyAttributes } from './parse.js';
 import { normalizeProductType } from '@moranbuy/budget-matching';
 import { clarificationQuestion, missingEssentials } from './clarify.js';
 import { discoverOffers } from './discover.js';
@@ -49,7 +49,7 @@ export class ShoppingEngine {
     let extracted = null;
     const lastAsked = session.state === 'clarifying' ? (context.asked || []).at(-1) || null : null;
     const museResult = await museExtractRequest(this.muse, { text, imageUrl: imageDataUrl ? null : imageUrl, imageDataUrl, context: { previousRequest: previous, presentedOffers: context.presented || null, answering: lastAsked, requestRef: session.id } });
-    if (museResult.ok && museResult.json) { extracted = sanitizeExtraction(museResult.json); museStatus = 'ok'; }
+    if (museResult.ok && museResult.json) { extracted = tidyAttributes(sanitizeExtraction(museResult.json)); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
     // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
@@ -129,8 +129,20 @@ export class ShoppingEngine {
       if (r.ok) offers.push(...researchResultsToOffers(r.results));
     }
     const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
-    const result = rankOffers({ request, offers: preferPictured(offers), policy, now: this.now() });
+    let result = rankOffers({ request, offers: preferPictured(offers), policy, now: this.now() });
+    // Nothing matched only because of an attribute (a brand, a model): the closest offers are shown instead of nothing, and the reply says which detail was not met.
+    let relaxed = null;
+    if (!result.ranked.length && !result.overBudget.length && request.alternativesOk !== false) {
+      const failedKeys = [...new Set(result.excluded.flatMap((e) => (String(e.reason).startsWith('unsuitable:') ? e.reason.slice(11).split(',') : [])))];
+      if (failedKeys.length) {
+        const essential = { ...(request.essentialAttributes || {}) }; const preferred = { ...(request.preferredAttributes || {}) };
+        for (const k of failedKeys) { preferred[k] = essential[k]; delete essential[k]; }
+        const again = rankOffers({ request: { ...request, essentialAttributes: essential, preferredAttributes: preferred }, offers: preferPictured(offers), policy, now: this.now() });
+        if (again.ranked.length || again.overBudget.length) { result = again; relaxed = failedKeys.map((k) => `${k === 'brand' ? '' : `${k} `}${typeof request.essentialAttributes[k] === 'object' ? JSON.stringify(request.essentialAttributes[k]) : request.essentialAttributes[k]}`.trim()); }
+      }
+    }
     const facts = buildFacts(result, request);
+    facts.relaxed = relaxed;
     const [run] = await this.db('matching_runs').insert({
       session_id: session.id, request_json: request, policy_json: result.policy, candidates: offers.length, ranked: result.ranked.length,
       over_budget: result.overBudget.length, excluded: result.excluded.length, none_within_budget: result.noneWithinBudget,
@@ -147,7 +159,7 @@ export class ShoppingEngine {
     if (rows.length) await this.db('matching_offers').insert(rows);
 
     let textOut = renderReply(facts, request.language);
-    if (this.muse.enabled && (facts.ranked.length || facts.overBudget.length)) {
+    if (this.muse.enabled && !relaxed && (facts.ranked.length || facts.overBudget.length)) {
       const draft = await museDraftRecommendation(this.muse, { facts, language: request.language, requestRef: session.id });
       if (draft.ok && draft.json?.reply && numbersAreGrounded(draft.json.reply, facts)) textOut = String(draft.json.reply).slice(0, 1500);
     }

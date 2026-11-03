@@ -54,6 +54,7 @@ const T = {
   sw: {
     intro: (n) => `Nimepata ${n} zinazokaribia mahitaji yako. Nimezipanga kwa kuzingatia bei na bajeti yako kwanza, kisha ukaribu wa duka na delivery.`,
     none: (b) => `Sijapata bidhaa inayolingana ndani ya bajeti ya ${b}. Hizi ndizo zilizo karibu zaidi:`,
+    relaxed: (w) => `Sijapata inayolingana kabisa na ${w}; hizi ndizo zinazokaribia zaidi:`,
     nothing: 'Samahani, sijapata bidhaa inayolingana na ombi lako kwa sasa. Unaweza kubadilisha maelezo, kuongeza bajeti, au kukubali mbadala.',
     over: (s) => `inazidi bajeti kwa ${s}`,
     fits: 'ndani ya bajeti',
@@ -74,6 +75,7 @@ const T = {
   en: {
     intro: (n) => `I found ${n} offers close to what you need, ordered by price and your budget first, then by how close the shop is and delivery.`,
     none: (b) => `Nothing matched within ${b}. These are the closest alternatives:`,
+    relaxed: (w) => `I found no exact match for ${w}; these are the closest:`,
     nothing: 'Sorry, I could not find a matching product right now. You can change the details, raise the budget, or accept alternatives.',
     over: (s) => `over budget by ${s}`,
     fits: 'within budget',
@@ -100,8 +102,9 @@ export function renderReply(facts, language = 'sw') {
   const lines = [];
   const all = [...facts.ranked, ...facts.overBudget];
   if (!all.length) return facts.alternativesHidden ? `${t.nothing}\n${t.hidden(facts.alternativesHidden)}` : `${t.nothing}`;
+  if (facts.relaxed?.length) lines.push(t.relaxed(facts.relaxed.join(', ')));
   if (facts.noneWithinBudget) lines.push(t.none(formatMoney(facts.maxBudget, cur)));
-  else lines.push(t.intro(facts.ranked.length));
+  else if (!facts.relaxed?.length) lines.push(t.intro(facts.ranked.length));
   if (facts.urgency) lines.push(t.urgentNote);
   for (const o of all) {
     const bits = [];

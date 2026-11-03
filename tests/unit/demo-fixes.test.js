@@ -9,6 +9,8 @@ test('Swahili budgets with "na nusu" and "na elfu ..." add up, in words or digit
   assert.equal(parseBudget('milioni moja na nusu'), 1500000);
   assert.equal(parseBudget('laki mbili na elfu hamsini'), 250000);
   assert.equal(parseBudget('laki nne na elfu 20'), 420000);
+  assert.equal(parseBudget('budget yangu ni million moja na laki 4'), 1400000);
+  assert.equal(parseBudget('milioni mbili na nusu'), 2500000);
   assert.equal(parseBudget('elfu ishirini na tano'), 25000);
   // Unchanged forms still read the same.
   assert.equal(parseBudget('Nina laki tatu ya sofa'), 300000);

@@ -43,3 +43,12 @@ test('a JSON object is recovered from a reply with words around it', () => {
   assert.deepEqual(firstJsonObject('Here you go: {"a": {"b": "}"}, "c": 1} thanks'), { a: { b: '}' }, c: 1 });
   assert.equal(firstJsonObject('no json here'), null);
 });
+
+test('a model name alone names the product, and "hp elitebook g7" as a brand is split into brand and model', async () => {
+  const { parseProductGuess, tidyAttributes } = await import('../../packages/reverse-marketplace/src/parse.js');
+  assert.equal(parseProductGuess('nahitaji hp elitebook g7 budget yangu ni million moja'), 'laptop');
+  assert.equal(parseProductGuess('nataka galaxy a15 laki 4'), 'smartphone');
+  const tidy = tidyAttributes({ essentialAttributes: { brand: 'HP EliteBook G7' }, preferredAttributes: {} });
+  assert.deepEqual(tidy.essentialAttributes, { brand: 'hp' });
+  assert.deepEqual(tidy.preferredAttributes, { model: 'EliteBook G7' });
+});
