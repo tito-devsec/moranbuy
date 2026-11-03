@@ -74,11 +74,13 @@ export class RuntimePaymentProvider {
   constructor({ resolve, cfg = null, fetchImpl = globalThis.fetch }) { this.resolve = resolve; this.cfg = cfg || config(); this.fetchImpl = fetchImpl; this.sandbox = new SandboxPaymentProvider(); }
   async current() {
     const s = await this.resolve();
+    // The demo sandbox never moves real money, whatever its other settings say.
+    if (this.cfg.DEMO_MODE) return this.sandbox;
     if (s.provider === 'snippe') return new SnippePaymentProvider({ cfg: this.cfg, settings: s, fetchImpl: this.fetchImpl });
     if (this.cfg.APP_ENV === 'production') return new SnippePaymentProvider({ cfg: this.cfg, settings: s, fetchImpl: this.fetchImpl });
     return this.sandbox;
   }
-  get name() { return this._name || (this.cfg.APP_ENV === 'production' ? 'snippe' : this.cfg.PAYMENT_PROVIDER); }
+  get name() { return this._name || (this.cfg.DEMO_MODE ? 'sandbox' : this.cfg.APP_ENV === 'production' ? 'snippe' : this.cfg.PAYMENT_PROVIDER); }
   async createPayment(args) { const p = await this.current(); this._name = p.name; return p.createPayment(args); }
   async createPayout(args) { const p = await this.current(); this._name = p.name; return p.createPayout(args); }
   async verifyWebhookAsync(rawBody, timestamp, signature) { const p = await this.current(); this._name = p.name; return p.verifyWebhook(rawBody, timestamp, signature); }
