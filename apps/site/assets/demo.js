@@ -121,7 +121,10 @@
     }
     const meta = `<span class="meta">${hhmm(m.at)}</span>`;
     const text = m.body || (m.type === 'template' ? templateText(m) : '');
-    if (m.type === 'document') {
+    if (m.type === 'image' && m.imageUrl) {
+      // A product photo from MoranBuy, with its caption: option, price, shop and a line of description.
+      wrap.innerHTML = `<div class="msg in photo-msg"><img src="${esc(m.imageUrl)}" alt="Product photo">${m.caption ? fmt(m.caption) : ''}${meta}</div>`;
+    } else if (m.type === 'document') {
       wrap.innerHTML = `<div class="msg in"><a class="doc" href="${receiptUrl()}" target="_blank" rel="noopener"><span class="ic">PDF</span><span><b>${esc(m.filename || 'receipt.pdf')}</b><small>PDF · tap to open</small></span></a>${text ? fmt(text) : ''}${meta}</div>`;
     } else if (m.audio) {
       wrap.innerHTML = `<div class="msg in"><div class="dvoice"><button type="button" aria-label="Play"><i class="fi fi-sr-play"></i></button><span class="wave">${waveBars(m.seq, 0)}</span><span class="avatar"><i class="fi fi-sr-microphone"></i></span></div>${meta}</div>`;

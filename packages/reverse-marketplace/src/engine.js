@@ -121,14 +121,14 @@ export class ShoppingEngine {
   async match(session, customer, request, { museStatus, context }) {
     const started = this.now();
     const offers = await discoverOffers(this.db, request);
-    // Web research, when switched on, adds unverified "found online" offers; they never outrank verified in-budget ones and cannot be ordered here.
+    const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
+    // MoranBuy's own shops come first; the web is searched only when fewer than three of them fit within budget. Online finds never outrank verified ones and cannot be ordered here.
     let researchStatus = null;
-    if (this.researcher) {
+    if (this.researcher && rankOffers({ request, offers, policy, now: this.now() }).ranked.length < 3) {
       const r = await this.researcher.research(request).catch(() => ({ ok: false, status: 'error', results: [] }));
       researchStatus = r.status;
       if (r.ok) offers.push(...researchResultsToOffers(r.results));
     }
-    const policy = this.policyLoader ? await this.policyLoader() : DEFAULT_POLICY;
     let result = rankOffers({ request, offers: preferPictured(offers), policy, now: this.now() });
     // Nothing matched only because of an attribute (a brand, a model): the closest offers are shown instead of nothing, and the reply says which detail was not met.
     let relaxed = null;
