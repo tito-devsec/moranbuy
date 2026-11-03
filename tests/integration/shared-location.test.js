@@ -34,8 +34,8 @@ after(async () => { server.close(); await closeDatabase(); });
 
 test('a shared pin with no name is named by reverse geocoding and used as the place', async () => {
   const phone = '255712600001'; await acceptedCustomer(phone);
-  await send({ from: phone, text: 'nataka blender laki moja' });
-  assert.match(lastTo(phone), /wapi/i, 'the place is asked');
+  await send({ from: phone, text: 'I need a blender, my budget is 100,000 shillings.' });
+  assert.match(lastTo(phone), /where are you/i, 'the place is asked, in English');
   const r = await send({ from: phone, kind: 'location', text: '', location: { lat: -6.9010, lng: 39.2710, label: null } });
   assert.equal(r.body.state, 'presented');
   const s = await db('shopping_sessions as s').join('customers as c', 'c.id', 's.customer_id').where('c.channel_ref', phone).orderBy('s.created_at', 'desc').first('s.request_json');
@@ -44,5 +44,6 @@ test('a shared pin with no name is named by reverse geocoding and used as the pl
   assert.equal(s.request_json.location.country, 'TZ');
   assert.equal(s.request_json.productType, 'blender', 'the pin never replaces the product');
   assert.match(lastTo(phone), /Blender 1\.5L/);
+  assert.match(lastTo(phone), /within budget|I found/i, 'the reply stays in English after a pin with no words');
   assert.ok(geocoder.calls.some((c) => c.startsWith('reverse:')));
 });

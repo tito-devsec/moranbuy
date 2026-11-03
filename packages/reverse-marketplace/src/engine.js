@@ -58,6 +58,8 @@ export class ShoppingEngine {
     if (museResult.ok && museResult.json) { extracted = tidyAttributes(sanitizeExtraction(museResult.json)); museStatus = 'ok'; }
     else { extracted = fallbackExtract(text); museStatus = museResult.status === 'disabled' ? 'disabled' : 'fallback'; }
     if (text && extracted.maxBudget === null) extracted.maxBudget = fallbackExtract(text).maxBudget;
+    // A message with no words (a shared pin, a photo alone) says nothing about the customer's language; the conversation keeps the one it had.
+    if (!text) delete extracted.language;
     // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
     if (text) { Object.assign(extracted, parseAlternatives(text)); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
     if (pin) { extracted.location = pin; if (pin.label && !extracted.locationText) extracted.locationText = pin.label; }
