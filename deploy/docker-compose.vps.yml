@@ -88,6 +88,8 @@ services:
       REDIS_URL: redis://moranbuy-redis:6379/1
       MUSE_PROVIDER: ${DEMO_MUSE_PROVIDER:-disabled}
       MUSE_API_KEY: ${DEMO_MUSE_API_KEY:-${MUSE_API_KEY:-}}
+      DEMO_WEB_SEARCH: ${DEMO_WEB_SEARCH:-true}
+      DEMO_WEB_SEARCH_LIMIT: ${DEMO_WEB_SEARCH_LIMIT:-40}
     command: ["node", "services/api/src/demo/start.js"]
     volumes:
       - moranbuy_demo:/app/data/demo

@@ -17,9 +17,9 @@ export async function discoveryRuntimeConfig(opts) {
   const env = config();
   const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : d);
   return {
-    // The demo sandbox does not search the web unless DEMO_WEB_SEARCH=true, because every search costs money.
-    mode: env.DEMO_MODE && process.env.DEMO_WEB_SEARCH !== 'true' ? 'off' : (c.mode || DISCOVERY_DEFAULTS.mode),
-    dailySearchLimit: num(c.dailySearchLimit, DISCOVERY_DEFAULTS.dailySearchLimit),
+    // The demo sandbox searches the web as soon as it has a Meta key (DEMO_WEB_SEARCH=false switches it off), capped at a few searches a day because each one costs money.
+    mode: env.DEMO_MODE ? (env.MUSE_API_KEY && process.env.DEMO_WEB_SEARCH !== 'false' ? 'meta_web' : 'off') : (c.mode || DISCOVERY_DEFAULTS.mode),
+    dailySearchLimit: env.DEMO_MODE ? num(process.env.DEMO_WEB_SEARCH_LIMIT, 40) : num(c.dailySearchLimit, DISCOVERY_DEFAULTS.dailySearchLimit),
     placesDailyLimit: num(c.placesDailyLimit, DISCOVERY_DEFAULTS.placesDailyLimit),
     blockedDomains: list(c.blockedDomains),
     preferredDomains: list(c.preferredDomains),

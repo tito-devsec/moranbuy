@@ -4,6 +4,7 @@ All notable changes to MoranBuy are recorded here. Dates are in UTC.
 
 ## Unreleased
 
+- The demo sandbox uses the Meta model as soon as `MUSE_API_KEY` (or `DEMO_MUSE_API_KEY`) is in `.env`, and then also searches the web for products its five sample shops do not have, up to `DEMO_WEB_SEARCH_LIMIT` (40) searches a day. The sample shops now carry three laptops.
 - Customers never see a shop's phone number, website, social link or map link, in any message. Online finds and shops from Google Maps are numbered options; picking one asks "shall I contact the shop for you?", and on YES MoranBuy records the request with the shop's number kept private (`shop_inquiries`). Answers are sent to the customer with `node scripts/shop-inquiries.mjs answer <REF> yes|no [price] [note]`.
 - Photos: online finds without a photo are dropped once three offers have photos; MoranBuy copies each product photo to its own address (JPEG or PNG only, as WhatsApp requires) before sending, and a photo that cannot be sent goes out as its caption in text. Relative photo links need `MORAN_MEDIA_BASE_URL`.
 - The demo sandbox uses `MUSE_API_KEY` when `DEMO_MUSE_API_KEY` is empty, so it answers with the real Meta model once a key is in `.env`.

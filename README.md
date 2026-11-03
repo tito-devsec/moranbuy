@@ -209,8 +209,11 @@ npm install
 npm run demo                    # creates the moranbuy_demo database itself; open http://localhost:4001/demo
 ```
 
-To use Meta's models live in the sandbox, set `DEMO_MUSE_PROVIDER=meta` and `DEMO_MUSE_API_KEY` (Docker),
-or `MUSE_PROVIDER=meta` and `MUSE_API_KEY` (npm). Spoken replies need the MMS voices (see Install and run).
+To use Meta's models live in the sandbox, put the Meta key in `.env` as `MUSE_API_KEY` (or `DEMO_MUSE_API_KEY`
+to give the demo a different key) and recreate the demo container. With a key the demo also searches the web for
+products not in its five sample shops, at most `DEMO_WEB_SEARCH_LIMIT` (40) searches a day; `DEMO_WEB_SEARCH=false`
+turns that off. The demo's terminal says `meta model api: live` or `no key` on every session. Spoken replies need
+the MMS voices (see Install and run).
 
 ## Existing Moran AI integration boundaries
 
