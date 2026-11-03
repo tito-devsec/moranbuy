@@ -132,9 +132,10 @@ export class ShoppingEngine {
     let result = rankOffers({ request, offers: preferPictured(offers), policy, now: this.now() });
     // Nothing matched only because of an attribute (a brand, a model): the closest offers are shown instead of nothing, and the reply says which detail was not met.
     let relaxed = null;
-    if (!result.ranked.length && !result.overBudget.length && request.alternativesOk !== false) {
+    if (!result.ranked.length && !result.overBudget.length) {
       const failedKeys = [...new Set(result.excluded.flatMap((e) => (String(e.reason).startsWith('unsuitable:') ? e.reason.slice(11).split(',') : [])))];
-      if (failedKeys.length) {
+      // A brand or model (often read off a photo) never hides every offer, even for a customer who wants no other product; other details stay exact when they asked for that.
+      if (failedKeys.length && (request.alternativesOk !== false || failedKeys.every((k) => ['brand', 'model'].includes(k)))) {
         const essential = { ...(request.essentialAttributes || {}) }; const preferred = { ...(request.preferredAttributes || {}) };
         for (const k of failedKeys) { preferred[k] = essential[k]; delete essential[k]; }
         const again = rankOffers({ request: { ...request, essentialAttributes: essential, preferredAttributes: preferred }, offers: preferPictured(offers), policy, now: this.now() });
