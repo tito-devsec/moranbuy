@@ -26,6 +26,9 @@ export async function traceSince({ dbImpl = db, session, since, moranLog, reques
       out.push(line(r.created_at, 'INFO', 'parse', `source=${String(r.muse_status || '').startsWith('ok') ? 'muse_spark' : 'rules'} product=${q.productType || '-'} budget=${money(q.maxBudget)} place="${q.location?.label || q.locationText || '-'}" fulfilment=${q.fulfilment || '-'}`));
       out.push(line(r.created_at, 'INFO', 'rank', `run=${r.id.slice(0, 8)} candidates=${r.candidates} within_budget=${r.ranked} over_budget=${r.over_budget} excluded=${r.excluded}${/research:/.test(r.muse_status || '') ? ` web_search=${String(r.muse_status).split('research:')[1]}` : ''} order=budget,total,distance ${r.duration_ms ?? '-'}ms`));
       const offers = await dbImpl('matching_offers as o').leftJoin('listings as l', 'l.id', 'o.listing_id').leftJoin('merchants as m', 'm.id', 'o.merchant_id').where('o.run_id', r.id).orderBy([{ column: 'o.group', order: 'desc' }, { column: 'o.rank' }]).limit(6).select('o.*', 'l.name', 'm.business_name');
+      // Why candidates were left out, so a surprising "nothing found" explains itself in the terminal.
+      const left = Array.isArray(r.excluded_json) ? r.excluded_json : [];
+      if (left.length) out.push(line(r.created_at, 'DEBUG', 'rank', `excluded: ${left.slice(0, 6).map((e) => `${String(e.name || '').slice(0, 28)} (${e.reason})`).join('; ')}`));
       for (const o of offers) out.push(line(r.created_at, 'DEBUG', 'rank', `${o.group === 'ranked' ? `#${o.rank}` : 'over'} ${String(o.name || '').padEnd(26).slice(0, 26)} ${String(o.business_name || '').padEnd(27).slice(0, 27)} total=${money(o.known_total)}${o.total_confirmed ? '' : '+?'} dist=${o.distance_km ?? '-'}km ${o.budget_status}`));
     }
     const orders = await dbImpl('orders').where({ customer_id: session.customerId });

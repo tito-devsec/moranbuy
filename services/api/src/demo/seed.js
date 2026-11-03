@@ -17,21 +17,24 @@ export const DEMO_SHOPS = Object.freeze([
 
 const DEMO_TAG = 'demo_sandbox';
 
-// Creates the sample shops once; running it again changes nothing, so every restart of the demo starts from the same catalogue.
+// Creates the sample shops once and adds any product the catalogue gained since, so every restart of the demo has the same catalogue.
 export async function seedDemoShops(dbImpl = db) {
-  let created = 0;
+  let created = 0; let added = 0;
   for (const s of DEMO_SHOPS) {
     let m = await dbImpl('merchants').where({ contact_phone: s.phone }).first();
     if (!m) {
       [m] = await dbImpl('merchants').insert({ registration_type: 'standalone', business_name: s.name, slug: `demo-${s.key}`, verification_status: 'verified', status: 'active', contact_phone: s.phone, owner_name: s.owner, payout_phone: s.phone, settings_json: JSON.stringify({ demo: DEMO_TAG, language: 'sw' }) }).returning('*');
       await dbImpl('merchant_locations').insert({ merchant_id: m.id, name: `${s.name}`, region: 'Dar es Salaam', district: s.area, latitude: s.lat, longitude: s.lng, location_source: 'USER_PIN', formatted_address: `${s.area}, Dar es Salaam`, delivery_available: true, delivery_fee: s.fee, delivery_radius_km: s.radius, is_default: true });
-      for (const [name, productType, category, price, attributes] of s.items) {
-        await dbImpl('listings').insert({ merchant_id: m.id, name, product_type: productType, category, price, attributes: JSON.stringify(attributes), stock: 6, status: 'active', source: 'moranbuy' });
-      }
       created += 1;
     }
+    const have = new Set((await dbImpl('listings').where({ merchant_id: m.id }).whereNull('deleted_at').pluck('name')));
+    for (const [name, productType, category, price, attributes] of s.items) {
+      if (have.has(name)) continue;
+      await dbImpl('listings').insert({ merchant_id: m.id, name, product_type: productType, category, price, attributes: JSON.stringify(attributes), stock: 6, status: 'active', source: 'moranbuy' });
+      added += 1;
+    }
   }
-  if (created) logger.info({ created }, 'Demo shops seeded');
+  if (created || added) logger.info({ created, added }, 'Demo shops seeded');
   return created;
 }
 
