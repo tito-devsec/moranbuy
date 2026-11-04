@@ -38,6 +38,8 @@ Nothing above is claimed as working until its row says "done" and names a test o
 
 | Online search with Meta's web search (grounded links, page photo and description, product index, daily limits, warm-up), nearby shops from Google Places, Moran AI businesses asked with consent (NDIO / LISTI / HAPANA), settings card and test search in both admins | done; live check of the Meta Responses API on the VPS still to run | `services/api/src/services/discovery.js`, `services/api/src/services/business-leads.js`, `packages/integrations/src/meta-web-search.js`, `packages/integrations/src/places.js`, `tests/integration/web-discovery.test.js`, `tests/integration/business-leads.test.js`, `tests/integration/failed-conversations.test.js` |
 
+| Shared WhatsApp locations named by reverse geocoding and placed in their country; Muse told the place; online and map search follow the customer's country; the demo phone shares a pin; a daily allowance of demo sessions on the Meta key; a judges' section in the README verified from a fresh clone (`npm run demo` and `docker compose up demo`) | done | `packages/integrations/src/geocoder.js`, `services/api/src/services/discovery.js`, `services/api/src/routes/demo.js`, `tests/integration/shared-location.test.js`, README "For judges" |
+
 ## Still open for the owner
 
 - Nothing for spoken replies: Meta's MMS voices are built into the image and on by default (Super Admin → MoranBuy → Credentials can switch them off or change when they speak). Voice notes need only the Meta Model API key.
