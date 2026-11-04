@@ -61,7 +61,8 @@ export class ShoppingEngine {
     // A message with no words (a shared pin, a photo alone) says nothing about the customer's language; the conversation keeps the one it had.
     if (!text) delete extracted.language;
     // The plain words for "no alternatives" and urgency always count, even when Muse missed them.
-    if (text) { Object.assign(extracted, parseAlternatives(text)); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
+    // Only the customer's own words rule alternatives out; a model's guess at "no alternatives" would hide the closest offers for no reason.
+    if (text) { const said = parseAlternatives(text); if (extracted.alternativesOk === false && said.alternativesOk === undefined) delete extracted.alternativesOk; Object.assign(extracted, said); if (!extracted.urgency) extracted.urgency = parseUrgency(text); }
     if (pin) { extracted.location = pin; if (pin.label && !extracted.locationText) extracted.locationText = pin.label; }
     // A reply to "Upo wapi?" is the place itself, even without "nipo": "mbagala dar".
     if (lastAsked === 'location' && text && !extracted.locationText && !sharedLocation) { const place = placeFromAnswer(text); if (place) extracted.locationText = place; }
