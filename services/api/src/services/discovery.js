@@ -111,10 +111,10 @@ export class DiscoveryResearcher {
 }
 
 // The shopper's country: the geocoder works inside the configured country (DEFAULT_COUNTRY), so every search, online or on the map, is made for that country.
-const COUNTRY_NAMES = { TZ: 'Tanzania', KE: 'Kenya', UG: 'Uganda', RW: 'Rwanda', BI: 'Burundi', ZM: 'Zambia', MW: 'Malawi', MZ: 'Mozambique', ET: 'Ethiopia', NG: 'Nigeria', GH: 'Ghana', ZA: 'South Africa', CD: 'DR Congo', SS: 'South Sudan', SO: 'Somalia', IN: 'India', GB: 'United Kingdom', US: 'United States' };
+const countryName = (code) => { try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code; } catch { return code; } };
 export function countryOf(request) {
   const code = String(request.location?.country || config().DEFAULT_COUNTRY || 'TZ').toUpperCase();
-  return { code, name: COUNTRY_NAMES[code] || code };
+  return { code, name: countryName(code) };
 }
 
 // "Mbagala, Dar es Salaam" -> "Dar es Salaam"; Meta's search takes a city, not a neighbourhood. Known Tanzanian cities first, else the part of the place name before the country.

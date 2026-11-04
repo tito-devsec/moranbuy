@@ -11,16 +11,19 @@ export class Geocoder {
   }
 
   // Returns { lat, lng, label } for a text address, or null when nothing was found.
+  // The configured country is tried first; a place not found there is looked up worldwide, so a customer abroad is placed in their own country.
   async geocode(text) {
     const q = String(text || '').trim();
     if (!q) return null;
-    const url = `${this.baseUrl}/search?format=jsonv2&limit=1&countrycodes=${this.country.toLowerCase()}&q=${encodeURIComponent(q)}`;
-    const res = await this.fetchImpl(url, { headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const rows = await res.json().catch(() => []);
-    const hit = rows?.[0];
-    if (!hit) return null;
-    return { lat: Number(hit.lat), lng: Number(hit.lon), label: hit.display_name };
+    for (const scope of [`&countrycodes=${this.country.toLowerCase()}`, '']) {
+      const url = `${this.baseUrl}/search?format=jsonv2&limit=1&addressdetails=1${scope}&q=${encodeURIComponent(q)}`;
+      const res = await this.fetchImpl(url, { headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return null;
+      const rows = await res.json().catch(() => []);
+      const hit = rows?.[0];
+      if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon), label: hit.display_name, country: hit.address?.country_code ? String(hit.address.country_code).toUpperCase() : this.country };
+    }
+    return null;
   }
 
   // A shared map pin: returns { label, city, country } for coordinates, or null; the country code is upper case (TZ).

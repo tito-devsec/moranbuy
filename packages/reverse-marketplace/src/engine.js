@@ -108,7 +108,7 @@ export class ShoppingEngine {
     try { request = mergeRequest(previous, extracted); } catch { request = shoppingRequestSchema.parse(previous || {}); }
     if (!request.location && request.locationText && this.geocoder) {
       const found = await this.geocoder.geocode(request.locationText).catch(() => null);
-      if (found) request.location = { lat: found.lat, lng: found.lng, label: found.label || request.locationText, source: 'customer_text_geocoded' };
+      if (found) request.location = { lat: found.lat, lng: found.lng, label: found.label || request.locationText, country: found.country || null, source: 'customer_text_geocoded' };
     }
 
     if (intel.schedule) await recordSchedule(this.db, { customer, session, schedule: intel.schedule, now: this.now() }).catch(() => null);
