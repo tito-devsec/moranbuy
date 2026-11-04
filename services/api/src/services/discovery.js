@@ -92,7 +92,8 @@ export class DiscoveryResearcher {
     if (s.mode === 'off' || !request.productType) return { ok: false, status: 'disabled', results: [] };
     if (s.mode === 'hermes') return this.hermes.research(request, { maxResults });
     const canon = normalizeProductType(request.productType).productType || request.productType;
-    const indexed = (await findIndexed(request, { dbImpl: this.dbImpl })).map((r) => ({ ...r, productType: canon }));
+    // Only finds in the customer's currency count as answered: a request from another country gets its own search.
+    const indexed = (await findIndexed(request, { dbImpl: this.dbImpl })).filter((r) => !request.currency || !r.currency || r.currency === request.currency).map((r) => ({ ...r, productType: canon }));
     const fresh = indexed.filter((r) => Date.now() - new Date(r.lastSeenAt).getTime() < this.freshHours * 3600000);
     // Enough fresh finds, or this product was searched in the last 6 hours: answer from the index, no new search to pay for.
     const searchedRecently = indexed.some((r) => Date.now() - new Date(r.lastSeenAt).getTime() < 6 * 3600000);
