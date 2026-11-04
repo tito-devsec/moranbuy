@@ -1,4 +1,4 @@
-import { FakeMoranInternalClient, FakeGeocoder } from '@moranbuy/integrations';
+import { FakeMoranInternalClient, FakeGeocoder, Geocoder } from '@moranbuy/integrations';
 
 // The demo's WhatsApp: every message MoranBuy would send is kept in memory with its time, so the demo phone can show it.
 // Messages to businesses and riders are written in Swahili with the English under a "/" line; the demo, made for an English-reading audience, keeps the English.
@@ -48,7 +48,13 @@ export const DEMO_PLACES = Object.freeze({
   mbezi: { lat: -6.7214, lng: 39.1717, label: 'Mbezi, Dar es Salaam' },
 });
 
-export const demoGeocoder = () => new FakeGeocoder(DEMO_PLACES);
+// Places around Dar es Salaam are answered from the list above; anywhere else (a judge in Berlin or Austin) is looked up for real, so the search runs in their country.
+class DemoGeocoder {
+  constructor() { this.local = new FakeGeocoder(DEMO_PLACES); this.real = new Geocoder(); }
+  async geocode(text) { const hit = await this.local.geocode(text); if (hit) return { ...hit, country: 'TZ' }; return this.real.geocode(text).catch(() => null); }
+  async reverse(lat, lng) { const hit = await this.local.reverse(lat, lng); return hit || this.real.reverse(lat, lng).catch(() => null); }
+}
+export const demoGeocoder = () => new DemoGeocoder();
 
 let recording = null;
 export const demoMoran = () => (recording ||= new RecordingMoranClient());
